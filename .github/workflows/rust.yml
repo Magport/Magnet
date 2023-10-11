@@ -15,8 +15,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+    - name: Rust Setup
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        target: wasm32-unknown-unknown
+        override: true
+        components: rustfmt, clippy
+
+    - name: Install protoc
+      run: |
+        sudo apt-get install -y protobuf-compiler
+        protoc --version
+
     - uses: actions/checkout@v3
+    
+    - name: Rustfmt
+      uses: actions-rs/cargo@v1
+      with:
+        toolchain: stable
+        command: fmt
+        args: --all --check
+
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v2.5.0
+      with:
+        cache-on-failure: true
+        cache-all-crates: true
+            
     - name: Build
-      run: cargo build --verbose
+      run: cargo check --release
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --release --locked --verbose --all
