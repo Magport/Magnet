@@ -228,7 +228,7 @@ For `paraKind`, select yes.
 Click `submit`, followed by `sign and submit`. Then, check the explorer to verify that the parachain is syncing with the relay chain.
 #### 5. Test Parachain Block Production
 
-Connect to port 8844 using polkadot.js, use the transfer function, and check if blocks are being produced normally.
+Using polkadot.js, connect to port 8844, initiate a transfer, and verify that blocks are generated as expected.
 
 
 ## License
