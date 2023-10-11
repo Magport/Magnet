@@ -1,17 +1,4 @@
-<!-- 这是一个注释
-<div align="center">
-  <a href="https://github.com/Sovereign-Labs/sovereign-sdk/blob/stable/LICENSE">
-    <img alt="License: Apache-2.0" src="https://img.shields.io/github/license/Sovereign-Labs/sovereign-sdk.svg" />
-  </a>
-  <a href="https://discord.gg/kbykCcPrcA" > 
-      <img alt="Discord" src="https://img.shields.io/discord/1050059327626555462?label=discord"/> 
-  </a>
-  <a href="https://codecov.io/gh/Sovereign-Labs/sovereign-sdk" > 
-      <img alt="Coverage" src="https://codecov.io/gh/Sovereign-Labs/sovereign-sdk/branch/nightly/graph/badge.svg"/> 
-  </a>
-  <img alt="GitHub Workflow Status (with event)" src="https://img.shields.io/github/actions/workflow/status/Magport/Magnet/rust.yml?label=Pre-release%20checks">
-</div>
- -->
+
 ## What is the MAGNET?
 
 
@@ -36,7 +23,7 @@ contract services and charges GAS fees as platform fees.
 **Polkadot:** Provides high-quality BlockSpace for Magnet and offers
 blockchain security services.
 
-![Diagram of Magnet Operation](https://github.com/y19818/aabb/blob/master/DiagramofMagnetOperation.png)
+![Diagram of Magnet Operation](https://github.com/Magport/Magnet/blob/main/Img/DiagramofMagnetOperation.png)
 
 When providing smart contract platform services to users, Magnet calculates the total GAS fees from the current transaction pool and obtains the expected Blockspace/coretime price from RelayChain. By strategically leveraging the price difference, Magnet achieves continuous profits, thereby serving users more efficiently. Once the GAS fees exceed the expected price, Magnet will delegate Collators to package the transactions and submit a Blockspace Order to the Relaychain, strategically collecting gas fees to pay for coretime. Upon successful ordering, the produced blocks will be anchored to the Relaychain for block confirmation.
 
@@ -78,7 +65,6 @@ Substrate is a modular framework that enables you to create purpose-built blockc
 Substrate is developed using Rust; hence, Rust is a prerequisite for Substrate. Install Rust using rustup by running the following command in your terminal:
 
 ```sh
-
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
@@ -87,7 +73,6 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 After completing the installation, restart your terminal and run:
 
 ```sh
-
 source $HOME/.cargo/env
 ```
 
@@ -96,7 +81,6 @@ source $HOME/.cargo/env
 Or, add the following line to your shell profile file (e.g., `~/.bashrc` or `~/.zshrc`):
 
 ```sh
-
 export PATH=$HOME/.cargo/bin:$PATH
 ```
 
@@ -106,7 +90,6 @@ export PATH=$HOME/.cargo/bin:$PATH
 Keep your Rust installation up to date by running:
 
 ```sh
-
 rustup update
 ```
 
@@ -117,7 +100,6 @@ Substrate has several library dependencies. Install them using the appropriate c
 #### For Ubuntu
 
 ```sh
-
 sudo apt update
 sudo apt install -y cmake pkg-config libssl-dev git build-essential clang libclang-dev
 ```
@@ -126,7 +108,6 @@ sudo apt install -y cmake pkg-config libssl-dev git build-essential clang libcla
 #### For macOS
 
 ```sh
-
 brew install cmake pkg-config openssl git llvm
 ```
 
@@ -136,7 +117,6 @@ brew install cmake pkg-config openssl git llvm
 With Rust and the necessary libraries installed, proceed to install Substrate:
 
 ```sh
-
 curl https://getsubstrate.io -sSf | bash -s -- --fast
 ```
 
@@ -146,7 +126,6 @@ curl https://getsubstrate.io -sSf | bash -s -- --fast
 Check your Substrate installation by running:
 
 ```sh
-
 substrate --version
 ```
 
@@ -158,7 +137,6 @@ This command should output the installed Substrate version.
 Configure the Rust toolchain for Substrate by running:
 
 ```sh
-
 rustup default nightly
 rustup target add wasm32-unknown-unknown --toolchain nightly
 ```
@@ -177,11 +155,80 @@ To build Magnet, you will need a proper Substrate development environment.
 
 If you need a refresher setting up your Substrate environment, see [Substrate's Getting Started Guide](https://substrate.dev/docs/en/knowledgebase/getting-started/).
 
+### I. Launching the Local Relay Chain
 
-## Getting Started
+Using the `custom-spec-raw.json` file provided by substrate.
+#### 1. Create the First Node
+
+```sh
+nohup ./target/release/polkadot --alice --validator --base-path /data/zachary/relaychain/alice --chain custom-spec-raw.json --port 30333 --rpc-port 9944  --rpc-cors all --unsafe-rpc-external >alice.log 2>&1 &
+```
 
 
-## Testing
+#### 2. Create the Second Node
+
+```sh
+nohup ./target/release/polkadot --bob --validator --base-path /data/zachary/relaychain/bob --chain ./custom-spec-raw.json --port 30334 --rpc-port 9945 --rpc-cors all --unsafe-rpc-external >bob.log 2>&1 &
+```
+
+
+### II. Connecting to the Local Parachain (Using the frontier-parachain-template for testing)
+#### 1. Create a new `paraid` in the browser 
+- a. Click on `network`, select `parachains`. 
+- b. Click on `parathreads`, click on `paraid`.
+- c. Choose an account and submit. 
+- d. The registered `paraid` for this session is 2000.
+#### 2. Modify the Default Chain Specification
+- a. Generate the default chain specification:
+
+```sh
+./target/release/frontier-parachain-node build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
+```
+
+
+
+Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `parachainid` to 2000.
+- b. Convert the spec file to a raw file:
+
+```sh
+./target/release/frontier-parachain-node build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
+```
+
+
+#### 3. Prepare the Parachain Collator
+- a. Export the wasm file:
+
+```sh
+./target/release/frontier-parachain-node export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
+```
+
+
+- b. Generate the genesis state of the parachain:
+
+```sh
+./target/release/frontier-parachain-node  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
+```
+
+
+- c. Start the collator node:
+
+```sh
+Nohow ./target/release/frontier-parachain-node --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
+```
+
+
+#### 4. Register on the Local Relay Chain 
+- a. Open the browser, click on `Developer`, select `Sudo`. 
+- b. On the left, select `paraSudoWrapper`, on the right, select `sudoScheduleParaInitialize(id,genesis)`. 
+- c. For `id`, enter 2000.
+For `genesisHead`, choose file upload and upload the genesis file `para-2000-genesis-state` generated in the steps above.
+For `ValidationCode`, choose file upload and upload the file `para-2000-wasm` generated above.
+For `paraKind`, select yes.
+
+Click `submit`, followed by `sign and submit`. Then, check the explorer to verify that the parachain is syncing with the relay chain.
+#### 5. Test Parachain Block Production
+
+Connect to port 8844 using polkadot.js, use the transfer function, and check if blocks are being produced normally.
 
 
 ## License
