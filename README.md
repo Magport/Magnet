@@ -149,30 +149,66 @@ At this point, you should have a working Substrate development environment. Regu
 Remember to replace the placeholder text with the actual content, and feel free to modify the structure and formatting to suit your preferences and requirements.
 
 
-## Build the Magnet Node
+## Start the Magnet Node
 
-To build Magnet, you will need a proper Substrate development environment.
+To start Magnet, you will need a proper Substrate development environment.
 
 If you need a refresher setting up your Substrate environment, see [Substrate's Getting Started Guide](https://substrate.dev/docs/en/knowledgebase/getting-started/).
 
 ### I. Launching the Local Relay Chain
 
-Using the `custom-spec-raw.json` file provided by substrate.
-#### 1. Create the First Node
+Using the   [`custom-spec-raw.json`](https://docs.substrate.io/assets/tutorials/relay-chain-specs/raw-local-chainspec.json/) file provided by substrate.
+#### 1.Build the relay chain node
+Clone the most recent release branch of the Polkadot repository to prepare a stable working environment.
 
 ```sh
-nohup ./target/release/polkadot --alice --validator --base-path /data/zachary/relaychain/alice --chain custom-spec-raw.json --port 30333 --rpc-port 9944  --rpc-cors all --unsafe-rpc-external >alice.log 2>&1 &
+git clone --branch release-v1.1.0 https://github.com/paritytech/polkadot-sdk.git
+```
+Change to the root of the polkadot directory by running the following command:
+
+```sh
+cd polkadot
+```
+
+Build the relay chain node by running the following command:
+```sh
+cargo build --release
+```
+Compiling the node can take 15 to 60 minuets to complete.
+
+Verify the node built correctly by running the following command:
+
+```sh
+./target/release/polkadot --help
+```
+If command-line help is displayed, the node is ready to configure.
+
+
+#### 2. Create the First Node
+
+```sh
+nohup ./target/release/polkadot --alice --validator --chain custom-spec-raw.json --port 30333 --rpc-port 9944  --rpc-cors all --unsafe-rpc-external >alice.log 2>&1 &
 ```
 
 
-#### 2. Create the Second Node
+#### 3. Create the Second Node
 
 ```sh
-nohup ./target/release/polkadot --bob --validator --base-path /data/zachary/relaychain/bob --chain ./custom-spec-raw.json --port 30334 --rpc-port 9945 --rpc-cors all --unsafe-rpc-external >bob.log 2>&1 &
+nohup ./target/release/polkadot --bob --validator --chain custom-spec-raw.json --port 30334 --rpc-port 9945 --rpc-cors all --unsafe-rpc-external >bob.log 2>&1 &
 ```
 
 
-### II. Connecting to the Local Parachain (Using the frontier-parachain-template for testing)
+### II. Connecting to the Local Parachain 
+#### 1.Build the Magnet node
+
+```sh
+git clone https://github.com/Magport/Magnet.git
+
+cd Magnet
+
+cargo build --release
+```
+Compiling the node can take 30 minuets to complete.
 #### 1. Create a new `paraid` in the browser 
 - a. Click on `network`, select `parachains`. 
 - b. Click on `parathreads`, click on `paraid`.
@@ -182,16 +218,15 @@ nohup ./target/release/polkadot --bob --validator --base-path /data/zachary/rela
 - a. Generate the default chain specification:
 
 ```sh
-./target/release/frontier-parachain-node build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
+./target/release/magnet build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
 ```
-
 
 
 Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `parachainid` to 2000.
 - b. Convert the spec file to a raw file:
 
 ```sh
-./target/release/frontier-parachain-node build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
+./target/release/magnet build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
 ```
 
 
@@ -199,21 +234,21 @@ Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `para
 - a. Export the wasm file:
 
 ```sh
-./target/release/frontier-parachain-node export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
+./target/release/magnet export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
 ```
 
 
 - b. Generate the genesis state of the parachain:
 
 ```sh
-./target/release/frontier-parachain-node  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
+./target/release/magnet  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
 ```
 
 
 - c. Start the collator node:
 
 ```sh
-Nohow ./target/release/frontier-parachain-node --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
+Nohow ./target/release/magnet --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
 ```
 
 
