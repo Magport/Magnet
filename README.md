@@ -209,12 +209,12 @@ cd Magnet
 cargo build --release
 ```
 Compiling the node can take 30 minuets to complete.
-#### 1. Create a new `paraid` in the browser 
+#### 2. Create a new `paraid` in the browser 
 - a. Click on `network`, select `parachains`. 
 - b. Click on `parathreads`, click on `paraid`.
 - c. Choose an account and submit. 
 - d. The registered `paraid` for this session is 2000.
-#### 2. Modify the Default Chain Specification
+#### 3. Modify the Default Chain Specification
 - a. Generate the default chain specification:
 
 ```sh
@@ -230,7 +230,7 @@ Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `para
 ```
 
 
-#### 3. Prepare the Parachain Collator
+#### 4. Prepare the Parachain Collator
 - a. Export the wasm file:
 
 ```sh
@@ -252,7 +252,7 @@ Nohow ./target/release/magnet --alice --collator --force-authoring --chain custo
 ```
 
 
-#### 4. Register on the Local Relay Chain 
+#### 5. Register on the Local Relay Chain 
 - a. Open the browser, click on `Developer`, select `Sudo`. 
 - b. On the left, select `paraSudoWrapper`, on the right, select `sudoScheduleParaInitialize(id,genesis)`. 
 - c. For `id`, enter 2000.
@@ -261,7 +261,7 @@ For `ValidationCode`, choose file upload and upload the file `para-2000-wasm` ge
 For `paraKind`, select yes.
 
 Click `submit`, followed by `sign and submit`. Then, check the explorer to verify that the parachain is syncing with the relay chain.
-#### 5. Test Parachain Block Production
+#### 6. Test Parachain Block Production
 
 Using polkadot.js, connect to port 8844, initiate a transfer, and verify that blocks are generated as expected.
 
