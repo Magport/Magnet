@@ -14,12 +14,18 @@ use codec::{Decode, Encode};
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
-use sp_core::{crypto::{KeyTypeId, ByteArray,}, OpaqueMetadata, H160, U256, H256};
+use sp_core::{
+	crypto::{ByteArray, KeyTypeId},
+	OpaqueMetadata, H160, H256, U256,
+};
 use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
-	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, Get, IdentifyAccount, Verify, UniqueSaturatedInto, PostDispatchInfoOf, DispatchInfoOf, Dispatchable, },
+	traits::{
+		AccountIdLookup, BlakeTwo256, Block as BlockT, DispatchInfoOf, Dispatchable, Get,
+		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
+	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
-	ApplyExtrinsicResult, MultiSignature, ConsensusEngineId,
+	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature,
 };
 
 use sp_std::{marker::PhantomData, prelude::*};
@@ -37,7 +43,10 @@ use frame_support::{
 	construct_runtime,
 	dispatch::DispatchClass,
 	parameter_types,
-	traits::{ConstBool, ConstU32, ConstU64, ConstU8, FindAuthor, OnFinalize, Currency, EitherOfDiverse, Everything, OnUnbalanced, Imbalance},
+	traits::{
+		ConstBool, ConstU32, ConstU64, ConstU8, Currency, EitherOfDiverse, Everything, FindAuthor,
+		Imbalance, OnFinalize, OnUnbalanced,
+	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
 		WeightToFeeCoefficients, WeightToFeePolynomial,
@@ -74,15 +83,13 @@ pub use pallet_parachain_template;
 
 use fp_evm::weight_per_gas;
 use fp_rpc::TransactionStatus;
-use pallet_ethereum::{PostLogContent, Call::transact,
-					  Transaction as EthereumTransaction, TransactionAction,
-					  TransactionData,
+use pallet_ethereum::{
+	Call::transact, PostLogContent, Transaction as EthereumTransaction, TransactionAction,
+	TransactionData,
 };
 use pallet_evm::{
-	EnsureAddressTruncated,
-	Account as EVMAccount,
-    HashedAddressMapping, OnChargeEVMTransaction, EVMCurrencyAdapter,
-	FeeCalculator, Runner,
+	Account as EVMAccount, EVMCurrencyAdapter, EnsureAddressTruncated, FeeCalculator,
+	HashedAddressMapping, OnChargeEVMTransaction, Runner,
 };
 
 mod precompiles;
@@ -180,9 +187,8 @@ impl fp_self_contained::SelfContainedCall for RuntimeCall {
 		len: usize,
 	) -> Option<Result<(), TransactionValidityError>> {
 		match self {
-			RuntimeCall::Ethereum(call) => {
-				call.pre_dispatch_self_contained(info, dispatch_info, len)
-			}
+			RuntimeCall::Ethereum(call) =>
+				call.pre_dispatch_self_contained(info, dispatch_info, len),
 			_ => None,
 		}
 	}
@@ -192,11 +198,10 @@ impl fp_self_contained::SelfContainedCall for RuntimeCall {
 		info: Self::SignedInfo,
 	) -> Option<sp_runtime::DispatchResultWithInfo<PostDispatchInfoOf<Self>>> {
 		match self {
-			call @ RuntimeCall::Ethereum(pallet_ethereum::Call::transact { .. }) => {
+			call @ RuntimeCall::Ethereum(pallet_ethereum::Call::transact { .. }) =>
 				Some(call.dispatch(RuntimeOrigin::from(
 					pallet_ethereum::RawOrigin::EthereumTransaction(info),
-				)))
-			}
+				))),
 			_ => None,
 		}
 	}
@@ -265,7 +270,6 @@ impl_opaque_keys! {
 		pub aura: Aura,
 	}
 }
-
 
 #[derive(Clone)]
 pub struct TransactionConverter;
@@ -626,11 +630,11 @@ impl pallet_motion::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type SimpleMajorityOrigin =
-	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
+		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
 	type SuperMajorityOrigin =
-	pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
+		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
 	type UnanimousOrigin =
-	pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 1>;
+		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 1>;
 	type WeightInfo = pallet_motion::weights::SubstrateWeight<Runtime>;
 }
 
@@ -639,12 +643,12 @@ impl pallet_evm_chain_id::Config for Runtime {}
 pub struct FindAuthorTruncated<F>(PhantomData<F>);
 impl<F: FindAuthor<u32>> FindAuthor<H160> for FindAuthorTruncated<F> {
 	fn find_author<'a, I>(digests: I) -> Option<H160>
-		where
-			I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+	where
+		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
 	{
 		if let Some(author_index) = F::find_author(digests) {
 			let authority_id = Aura::authorities()[author_index as usize].clone();
-			return Some(H160::from_slice(&authority_id.to_raw_vec()[4..24]));
+			return Some(H160::from_slice(&authority_id.to_raw_vec()[4..24]))
 		}
 		None
 	}
@@ -654,10 +658,10 @@ impl<F: FindAuthor<u32>> FindAuthor<H160> for FindAuthorTruncated<F> {
 pub struct EVMDealWithFees<R>(PhantomData<R>);
 
 impl<R> OnUnbalanced<NegativeImbalance<R>> for EVMDealWithFees<R>
-	where
-		R: pallet_balances::Config + pallet_collator_selection::Config + core::fmt::Debug,
-		AccountIdOf<R>: From<polkadot_primitives::AccountId> + Into<polkadot_primitives::AccountId>,
-		<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
+where
+	R: pallet_balances::Config + pallet_collator_selection::Config + core::fmt::Debug,
+	AccountIdOf<R>: From<polkadot_primitives::AccountId> + Into<polkadot_primitives::AccountId>,
+	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
 {
 	fn on_nonzero_unbalanced(amount: NegativeImbalance<R>) {
 		// deposit the fee into the collator_selection reward pot
@@ -670,17 +674,17 @@ pub struct EVMTransactionChargeHandler<OU>(PhantomData<OU>);
 
 type BalanceOf<R> = <<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::Balance;
 type PositiveImbalanceOf<R> =
-<<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::PositiveImbalance;
+	<<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::PositiveImbalance;
 type NegativeImbalanceOf<R> =
-<<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::NegativeImbalance;
+	<<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::NegativeImbalance;
 
 impl<R, OU> OnChargeEVMTransaction<R> for EVMTransactionChargeHandler<OU>
-	where
-		R: pallet_evm::Config,
-		PositiveImbalanceOf<R>: Imbalance<BalanceOf<R>, Opposite = NegativeImbalanceOf<R>>,
-		NegativeImbalanceOf<R>: Imbalance<BalanceOf<R>, Opposite = PositiveImbalanceOf<R>>,
-		OU: OnUnbalanced<NegativeImbalanceOf<R>>,
-		U256: UniqueSaturatedInto<BalanceOf<R>>,
+where
+	R: pallet_evm::Config,
+	PositiveImbalanceOf<R>: Imbalance<BalanceOf<R>, Opposite = NegativeImbalanceOf<R>>,
+	NegativeImbalanceOf<R>: Imbalance<BalanceOf<R>, Opposite = PositiveImbalanceOf<R>>,
+	OU: OnUnbalanced<NegativeImbalanceOf<R>>,
+	U256: UniqueSaturatedInto<BalanceOf<R>>,
 {
 	type LiquidityInfo = Option<NegativeImbalanceOf<R>>;
 

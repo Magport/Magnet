@@ -1,15 +1,14 @@
 //! Service and ServiceFactory implementation. Specialized wrapper over substrate service.
 
 // std
-use std::{sync::Arc, path::Path, time::Duration};
 use sp_core::U256;
+use std::{path::Path, sync::Arc, time::Duration};
 
 use cumulus_client_cli::CollatorOptions;
 // Local Runtime Types
 use parachain_magnet_runtime::{
 	opaque::{Block, Hash},
-	RuntimeApi,
-	TransactionConverter,
+	RuntimeApi, TransactionConverter,
 };
 
 // Cumulus Imports
@@ -38,14 +37,14 @@ use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_keystore::KeystorePtr;
 use substrate_prometheus_endpoint::Registry;
 
-use crate::{
-	eth::{
-		new_frontier_partial, spawn_frontier_tasks, BackendType, //EthCompatRuntimeApiCollection,
-		FrontierBackend,  FrontierBlockImport as TFrontierBlockImport, FrontierPartialComponents,
-	},
-};
-pub use crate::{
-	eth::{db_config_dir, EthConfiguration},
+pub use crate::eth::{db_config_dir, EthConfiguration};
+use crate::eth::{
+	new_frontier_partial,
+	spawn_frontier_tasks,
+	BackendType, //EthCompatRuntimeApiCollection,
+	FrontierBackend,
+	FrontierBlockImport as TFrontierBlockImport,
+	FrontierPartialComponents,
 };
 
 /// Native executor type.
@@ -88,9 +87,13 @@ pub fn new_partial(
 		(),
 		sc_consensus::DefaultImportQueue<Block>,
 		sc_transaction_pool::FullPool<Block, ParachainClient>,
-		(ParachainBlockImport, Option<Telemetry>, Option<TelemetryWorkerHandle>,
-		 FrontierBackend,
-		 Arc<fc_rpc::OverrideHandle<Block>>,),
+		(
+			ParachainBlockImport,
+			Option<Telemetry>,
+			Option<TelemetryWorkerHandle>,
+			FrontierBackend,
+			Arc<fc_rpc::OverrideHandle<Block>>,
+		),
 	>,
 	sc_service::Error,
 > {
@@ -167,9 +170,9 @@ pub fn new_partial(
 				std::num::NonZeroU32::new(eth_config.frontier_sql_backend_num_ops_timeout),
 				overrides.clone(),
 			))
-				.unwrap_or_else(|err| panic!("failed creating sql backend: {:?}", err));
+			.unwrap_or_else(|err| panic!("failed creating sql backend: {:?}", err));
 			FrontierBackend::Sql(backend)
-		}
+		},
 	};
 
 	let frontier_block_import = FrontierBlockImport::new(client.clone(), client.clone());
@@ -192,7 +195,13 @@ pub fn new_partial(
 		task_manager,
 		transaction_pool,
 		select_chain: (),
-		other: (parachain_block_import, telemetry, telemetry_worker_handle, frontier_backend, overrides,),
+		other: (
+			parachain_block_import,
+			telemetry,
+			telemetry_worker_handle,
+			frontier_backend,
+			overrides,
+		),
 	})
 }
 
@@ -213,7 +222,8 @@ async fn start_node_impl(
 	parachain_config.rpc_id_provider = Some(Box::new(fc_rpc::EthereumSubIdProvider));
 
 	let params = new_partial(&parachain_config, &eth_config)?;
-	let (block_import, mut telemetry, telemetry_worker_handle, frontier_backend, overrides) = params.other;
+	let (block_import, mut telemetry, telemetry_worker_handle, frontier_backend, overrides) =
+		params.other;
 	let net_config = sc_network::config::FullNetworkConfiguration::new(&parachain_config.network);
 
 	let FrontierPartialComponents { filter_pool, fee_history_cache, fee_history_cache_limit } =
@@ -279,8 +289,9 @@ async fn start_node_impl(
 
 	// Sinks for pubsub notifications.
 	// Everytime a new subscription is created, a new mpsc channel is added to the sink pool.
-	// The MappingSyncWorker sends through the channel on block import and the subscription emits a notification to the subscriber on receiving a message through this channel.
-	// This way we avoid race conditions when using native substrate block import notification stream.
+	// The MappingSyncWorker sends through the channel on block import and the subscription emits a
+	// notification to the subscriber on receiving a message through this channel. This way we avoid
+	// race conditions when using native substrate block import notification stream.
 	let pubsub_notification_sinks: fc_mapping_sync::EthereumBlockNotificationSinks<
 		fc_mapping_sync::EthereumBlockNotification<Block>,
 	> = Default::default();
@@ -293,10 +304,11 @@ async fn start_node_impl(
 		let current = sp_timestamp::InherentDataProvider::from_system_time();
 		let next_slot = current.timestamp().as_millis() + slot_duration.as_millis();
 		let timestamp = sp_timestamp::InherentDataProvider::new(next_slot.into());
-		let slot = sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_slot_duration(
-			*timestamp,
-			slot_duration,
-		);
+		let slot =
+			sp_consensus_aura::inherents::InherentDataProvider::from_timestamp_and_slot_duration(
+				*timestamp,
+				slot_duration,
+			);
 		let dynamic_fee = fp_dynamic_fee::InherentDataProvider(U256::from(target_gas_price));
 		Ok((slot, timestamp, dynamic_fee))
 	};
@@ -344,10 +356,12 @@ async fn start_node_impl(
 				eth: eth_rpc_params.clone(),
 			};
 
-			crate::rpc::create_full(deps,
-									subscription_task_executor,
-									pubsub_notification_sinks.clone(),
-			).map_err(Into::into)
+			crate::rpc::create_full(
+				deps,
+				subscription_task_executor,
+				pubsub_notification_sinks.clone(),
+			)
+			.map_err(Into::into)
 		})
 	};
 
@@ -377,7 +391,8 @@ async fn start_node_impl(
 		fee_history_cache_limit,
 		sync_service.clone(),
 		pubsub_notification_sinks_frontier,
-	).await;
+	)
+	.await;
 
 	if let Some(hwbench) = hwbench {
 		sc_sysinfo::print_hwbench(&hwbench);
@@ -471,7 +486,8 @@ fn build_import_queue(
 	>(
 		client,
 		block_import,
-		move |_, _| async move { //TODO: add  create_inherent_data_providers
+		move |_, _| async move {
+			//TODO: add  create_inherent_data_providers
 			let timestamp = sp_timestamp::InherentDataProvider::from_system_time();
 			Ok(timestamp)
 		},
@@ -560,5 +576,13 @@ pub async fn start_parachain_node(
 	para_id: ParaId,
 	hwbench: Option<sc_sysinfo::HwBench>,
 ) -> sc_service::error::Result<(TaskManager, Arc<ParachainClient>)> {
-	start_node_impl(parachain_config, polkadot_config, eth_config, collator_options, para_id, hwbench).await
+	start_node_impl(
+		parachain_config,
+		polkadot_config,
+		eth_config,
+		collator_options,
+		para_id,
+		hwbench,
+	)
+	.await
 }

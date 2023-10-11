@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use crate::service::EthConfiguration;
+use std::path::PathBuf;
 
 /// Sub-commands supported by the collator.
 #[derive(Debug, clap::Subcommand)]
