@@ -1,0 +1,142 @@
+[package]
+name = "parachain-magnet-node"
+version = "0.1.0"
+authors = ["Anonymous"]
+description = "A scalable evm smart contract platform node, utilizing DOT as the gas fee."
+license = "Apache License 2.0"
+homepage = "https://magnet.magport.io/"
+repository.workspace = true
+edition.workspace = true
+build = "build.rs"
+publish = false
+
+[dependencies]
+clap = { version = "4.4.2", features = ["derive"] }
+log = "0.4.20"
+codec = { package = "parity-scale-codec", version = "3.0.0" }
+serde = { version = "1.0.188", features = ["derive"] }
+jsonrpsee = { version = "0.16.2", features = ["server"] }
+futures = "0.3.28"
+
+# Local
+parachain-magnet-runtime = { path = "../runtime" }
+
+# Substrate
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+frame-benchmarking-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-basic-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-chain-spec = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-offchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-consensus-manual-seal = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-executor = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-network = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-network-sync = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0"}
+sc-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-rpc-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-service = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-sysinfo = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-telemetry = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-tracing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sc-transaction-pool-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-offchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+substrate-prometheus-endpoint = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+
+# Polkadot
+polkadot-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", features = ["rococo-native"] }
+polkadot-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+xcm = { package = "staging-xcm", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+
+# Cumulus
+cumulus-client-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-client-collator = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-client-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-client-consensus-common = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-client-consensus-proposer = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-client-service = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0"}
+cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-primitives-parachain-inherent = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+cumulus-relay-chain-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+frame-system-rpc-runtime-api={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+color-print = "0.3.4"
+
+# Frontier Primitive
+fp-evm = { version = "3.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fp-rpc = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fp-dynamic-fee = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+
+fc-api = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-cli = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-db = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-mapping-sync = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-rpc = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-rpc-core = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-storage = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-consensus = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+
+[build-dependencies]
+substrate-build-script-utils = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+
+[features]
+default = [
+	"with-rocksdb-weights",
+	"rocksdb",
+	"sql",
+	"txpool",
+]
+
+rocksdb = [
+	"sc-cli/rocksdb",
+	"sc-service/rocksdb",
+	"fc-cli/rocksdb",
+	"fc-db/rocksdb",
+	"fc-mapping-sync/rocksdb",
+	"fc-rpc/rocksdb",
+]
+
+sql = [
+	"fc-db/sql",
+	"fc-mapping-sync/sql",
+]
+with-rocksdb-weights = ["parachain-magnet-runtime/with-rocksdb-weights"]
+with-paritydb-weights = ["parachain-magnet-runtime/with-paritydb-weights"]
+txpool = ["fc-rpc/txpool"]
+
+runtime-benchmarks = [
+	"frame-benchmarking-cli/runtime-benchmarks",
+	"frame-benchmarking/runtime-benchmarks",
+	"parachain-magnet-runtime/runtime-benchmarks",
+	"polkadot-cli/runtime-benchmarks",
+	"polkadot-primitives/runtime-benchmarks",
+	"sc-service/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+]
+try-runtime = [
+	"parachain-magnet-runtime/try-runtime",
+	"polkadot-cli/try-runtime",
+	"sp-runtime/try-runtime",
+]
+network-protocol-staging = [
+	"cumulus-client-service/network-protocol-staging",
+	"polkadot-cli/network-protocol-staging",
+]
