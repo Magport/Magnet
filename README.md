@@ -211,14 +211,16 @@ cargo build --release
 Compiling the node can take 30 minuets to complete.
 #### 2. Create a new `paraid` in the browser 
 - a. Click on `network`, select `parachains`. 
+![](https://github.com/y19818/Magnet/blob/main/Img/1a.png)
 - b. Click on `parathreads`, click on `paraid`.
+![](https://github.com/y19818/Magnet/blob/main/Img/1b.png)
 - c. Choose an account and submit. 
 - d. The registered `paraid` for this session is 2000.
 #### 3. Modify the Default Chain Specification
 - a. Generate the default chain specification:
 
 ```sh
-./target/release/magnet build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
+./target/release/parachain-magnet-node build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
 ```
 
 
@@ -226,7 +228,7 @@ Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `para
 - b. Convert the spec file to a raw file:
 
 ```sh
-./target/release/magnet build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
+./target/release/parachain-magnet-node build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
 ```
 
 
@@ -234,37 +236,42 @@ Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `para
 - a. Export the wasm file:
 
 ```sh
-./target/release/magnet export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
+./target/release/parachain-magnet-node export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
 ```
 
 
 - b. Generate the genesis state of the parachain:
 
 ```sh
-./target/release/magnet  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
+./target/release/parachain-magnet-node  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
 ```
 
 
 - c. Start the collator node:
 
 ```sh
-Nohow ./target/release/magnet --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
+Nohow ./target/release/parachain-magnet-node --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
 ```
 
 
 #### 5. Register on the Local Relay Chain 
 - a. Open the browser, click on `Developer`, select `Sudo`. 
+![](https://github.com/y19818/Magnet/blob/main/Img/4a.png)
 - b. On the left, select `paraSudoWrapper`, on the right, select `sudoScheduleParaInitialize(id,genesis)`. 
+![](https://github.com/y19818/Magnet/blob/main/Img/4b.png)
+![](https://github.com/y19818/Magnet/blob/main/Img/4b2.png)
 - c. For `id`, enter 2000.
 For `genesisHead`, choose file upload and upload the genesis file `para-2000-genesis-state` generated in the steps above.
 For `ValidationCode`, choose file upload and upload the file `para-2000-wasm` generated above.
 For `paraKind`, select yes.
+![](https://github.com/y19818/Magnet/blob/main/Img/4c.png)
 
 Click `submit`, followed by `sign and submit`. Then, check the explorer to verify that the parachain is syncing with the relay chain.
+![](https://github.com/y19818/Magnet/blob/main/Img/5.png)
 #### 6. Test Parachain Block Production
 
 Using polkadot.js, connect to port 8844, initiate a transfer, and verify that blocks are generated as expected.
-
+![](https://github.com/y19818/Magnet/blob/main/Img/6a.png)
 
 ## License
 
