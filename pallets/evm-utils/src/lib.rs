@@ -16,15 +16,17 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-pub use pallet::*;
-use sp_core::H160;
 use frame_support::traits::Currency;
-use pallet_evm::{BalanceOf, AddressMapping};
+pub use pallet::*;
+use pallet_evm::{AddressMapping, BalanceOf};
+use sp_core::H160;
 
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;	
-	use frame_support::{dispatch::DispatchResultWithPostInfo, traits::ExistenceRequirement, pallet_prelude::*};
+	use super::*;
+	use frame_support::{
+		dispatch::DispatchResultWithPostInfo, pallet_prelude::*, traits::ExistenceRequirement,
+	};
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::config]
@@ -34,7 +36,6 @@ pub mod pallet {
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
-
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -54,9 +55,14 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn transfer_to_evm(origin: OriginFor<T>, address: H160, value: BalanceOf<T>) -> DispatchResultWithPostInfo {
+		pub fn transfer_to_evm(
+			origin: OriginFor<T>,
+			address: H160,
+			value: BalanceOf<T>,
+		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			let address_account_id = <T as pallet_evm::Config>::AddressMapping::into_account_id(address);
+			let address_account_id =
+				<T as pallet_evm::Config>::AddressMapping::into_account_id(address);
 
 			<T as pallet_evm::Config>::Currency::transfer(
 				&who,
@@ -64,7 +70,7 @@ pub mod pallet {
 				value,
 				ExistenceRequirement::AllowDeath,
 			)?;
-			
+
 			Self::deposit_event(Event::TransferedToEVM(address, value, who));
 			Ok(().into())
 		}

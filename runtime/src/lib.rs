@@ -800,7 +800,7 @@ impl pallet_hotfix_sufficients::Config for Runtime {
 }
 
 impl pallet_evm_utils::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;	
+	type RuntimeEvent = RuntimeEvent;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -845,7 +845,7 @@ construct_runtime!(
 
 		// Template
 		TemplatePallet: pallet_parachain_template = 50,
-		
+
 		//Magnet
 		EVMUtils: pallet_evm_utils = 60,
 	}
