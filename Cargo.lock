@@ -7164,6 +7164,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-evm-utils"
+version = "0.1.0"
+dependencies = [
+ "fp-account",
+ "fp-evm",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "pallet-evm",
+ "pallet-evm-chain-id",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-fast-unstake"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
@@ -7959,6 +7978,7 @@ dependencies = [
  "futures",
  "jsonrpsee",
  "log",
+ "pallet-evm-utils",
  "pallet-transaction-payment-rpc",
  "pallet-transaction-payment-rpc-runtime-api",
  "parachain-magnet-runtime",
@@ -8044,6 +8064,7 @@ dependencies = [
  "pallet-evm-precompile-modexp",
  "pallet-evm-precompile-sha3fips",
  "pallet-evm-precompile-simple",
+ "pallet-evm-utils",
  "pallet-hotfix-sufficients",
  "pallet-motion",
  "pallet-parachain-template",

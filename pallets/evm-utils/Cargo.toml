@@ -1,0 +1,69 @@
+[package]
+name = "pallet-evm-utils"
+version = "0.1.0"
+authors = ["Alex Wang"]
+description = "EVM utils for Magnet."
+license = "Apache-2.0"
+homepage = "https://magnet.magport.io/"
+repository.workspace = true
+edition.workspace = true
+readme = "README.md"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { package = "parity-scale-codec", version = "3.0.0", features = ["derive"], default-features = false }
+scale-info = { version = "2.2.0", default-features = false, features = ["derive"] }
+
+# Substrate
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+
+#Frontier FRAME
+pallet-evm-chain-id = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false}
+pallet-evm = { version = "6.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false}
+
+# Frontier Primitive
+fp-evm = { version = "3.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false}
+fp-account = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false}
+
+[dev-dependencies]
+serde = { version = "1.0.188" }
+
+# Substrate
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+
+
+
+[features]
+default = [ "std" ]
+runtime-benchmarks = [
+	"frame-benchmarking/runtime-benchmarks",
+	"frame-support/runtime-benchmarks",
+	"frame-system/runtime-benchmarks",
+	"sp-runtime/runtime-benchmarks",
+	"pallet-evm/runtime-benchmarks",
+]
+std = [
+	"codec/std",
+	"frame-benchmarking/std",
+	"frame-support/std",
+	"frame-system/std",
+	"scale-info/std",
+	"sp-core/std",
+	"sp-io/std",
+	"sp-runtime/std",
+	"pallet-evm/std",
+]
+try-runtime = [
+	"frame-support/try-runtime",
+	"frame-system/try-runtime",
+	"sp-runtime/try-runtime",
+	"pallet-evm/try-runtime",
+]
+forbid-evm-reentrancy = ["pallet-evm/forbid-evm-reentrancy"]
