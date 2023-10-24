@@ -880,6 +880,7 @@ impl pallet_assets_bridge::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type EvmCaller = EvmCaller;
 	type ClaimBond = ClaimBond;
+}
 
 impl pallet_evm_utils::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
