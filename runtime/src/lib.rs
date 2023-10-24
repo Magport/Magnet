@@ -880,6 +880,9 @@ impl pallet_assets_bridge::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type EvmCaller = EvmCaller;
 	type ClaimBond = ClaimBond;
+
+impl pallet_evm_utils::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -926,6 +929,9 @@ construct_runtime!(
 
 		// Template
 		TemplatePallet: pallet_parachain_template = 50,
+
+		//Magnet
+		EVMUtils: pallet_evm_utils = 60,
 	}
 );
 
