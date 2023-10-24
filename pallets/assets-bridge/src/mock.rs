@@ -17,17 +17,19 @@ pub use assets_bridge::{Config, Error, Event as AssetsBridgeEvent};
 use frame_support::{
 	pallet_prelude::Weight,
 	parameter_types,
-	traits::{ConstU32, GenesisBuild},
+	traits::{AsEnsureOriginWithArg, ConstU32},
 };
 use frame_system as system;
+use frame_system::EnsureSigned;
+
 use sp_core::{H160, H256};
 pub use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
-	AccountId32,
+	AccountId32, BuildStorage,
 };
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+//type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 // Configure a mock runtime to test the pallet.
@@ -37,10 +39,10 @@ frame_support::construct_runtime!(
 		NodeBlock = Block,
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
-		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		Evm: pallet_evm::{Pallet, Call, Storage, Config, Event<T>},
+		Evm: pallet_evm::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Assets: pallet_assets::{Pallet, Call, Storage, Event<T>},
 		AssetsBridge: assets_bridge::{Pallet, Call, Storage, Config<T>, Event<T>},
 	}
@@ -56,13 +58,15 @@ impl system::Config for Test {
 	type BlockWeights = ();
 	type BlockLength = ();
 	type DbWeight = ();
-	type Index = u64;
-	type BlockNumber = u64;
+	type Nonce = u64;
+	type Block = Block;
+	//type Index = u64;
+	//type BlockNumber = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
 	type AccountId = AccountId32;
 	type Lookup = IdentityLookup<Self::AccountId>;
-	type Header = Header;
+	//type Header = Header;
 	type BlockHashCount = BlockHashCount;
 	type Version = ();
 	type PalletInfo = PalletInfo;
@@ -100,7 +104,14 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ();
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
+	type RuntimeHoldReason = ();
+	type FreezeIdentifier = ();
+	type MaxHolds = ();
+	type MaxFreezes = ();
 }
+
+const BLOCK_GAS_LIMIT: u64 = 150_000_000;
+const MAX_POV_SIZE: u64 = 5 * 1024 * 1024;
 
 parameter_types! {
 	pub const AssetDeposit: u64 = 1;
@@ -113,7 +124,9 @@ parameter_types! {
 	pub EvmCaller: H160 = H160::from_slice(&[17u8;20][..]);
 	pub ClaimBond: u128 = 2;
 
-	pub const WeightPerGas: Weight = Weight::from_ref_time(20_000);
+	pub const WeightPerGas: Weight = Weight::from_parts(20_000, 0);
+
+	pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE);
 }
 
 impl pallet_assets::Config for Test {
@@ -131,6 +144,10 @@ impl pallet_assets::Config for Test {
 	type WeightInfo = ();
 	type Extra = ();
 	type AssetAccountDeposit = ();
+	type RemoveItemsLimit = ConstU32<1000>;
+	type AssetIdParameter = codec::Compact<u32>;
+	type CallbackHandle = ();
+	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId32>>;
 }
 
 impl pallet_evm::Config for Test {
@@ -150,6 +167,10 @@ impl pallet_evm::Config for Test {
 	type OnChargeTransaction = ();
 	type BlockHashMapping = pallet_evm::SubstrateBlockHashMapping<Self>;
 	type FindAuthor = ();
+	type OnCreate = ();
+	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
+	type Timestamp = Timestamp;
+	type WeightInfo = ();
 }
 
 impl assets_bridge::Config for Test {
@@ -162,7 +183,7 @@ pub const ALICE: [u8; 32] = [1u8; 32];
 pub const BOB: [u8; 32] = [2u8; 32];
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+	let mut t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 	pallet_balances::GenesisConfig::<Test> {
 		balances: vec![(ALICE.into(), 1000), (BOB.into(), 1000)],
