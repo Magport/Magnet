@@ -8003,7 +8003,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-node"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap",
  "color-print",
@@ -8033,7 +8033,6 @@ dependencies = [
  "futures",
  "jsonrpsee",
  "log",
- "pallet-evm-utils",
  "pallet-transaction-payment-rpc",
  "pallet-transaction-payment-rpc-runtime-api",
  "parachain-magnet-runtime",
