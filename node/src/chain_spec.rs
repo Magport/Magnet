@@ -213,6 +213,9 @@ fn testnet_genesis(
 			// Genesis accounts: Vec<(id, account_id, balance)>
 			accounts: vec![(1, alice.into(), 50_000_000_0000), (2, bob.into(), 50_000_000_0000)],
 		},
+		assets_bridge: parachain_magnet_runtime::AssetsBridgeConfig {
+			admin_key: Some(root.clone()),
+		},
 		council: parachain_magnet_runtime::CouncilConfig {
 			phantom: PhantomData,
 			members: endowed_accounts
@@ -252,7 +255,7 @@ fn testnet_genesis(
 			..Default::default()
 		},
 		transaction_payment: Default::default(),
-		sudo: parachain_magnet_runtime::SudoConfig { key: Some(root) },
+		sudo: parachain_magnet_runtime::SudoConfig { key: Some(root.clone()) },
 
 		// EVM compatibility
 		evm_chain_id: parachain_magnet_runtime::EVMChainIdConfig {
