@@ -19,6 +19,9 @@ use ethabi::{Function, Param, ParamType, Token};
 use hex_literal::hex;
 use std::str::FromStr;
 
+use crate::LocalFortitude;
+use crate::LocalPrecision;
+
 const SIGNATURE: [u8; 65] = hex!["7def4e5806b7cf5dbfa44bc9d14422462dc9fe803c74e5d544db71bdcefc8ba04fc54cd079f2f8a2947f4d3b1c0d9e9f12fa279f6a40828ecc08766b4bab4bb21c"];
 const EVM_ADDR: [u8; 20] = hex!["f24ff3a9cf04c71dbc94d0b566f7a27b94566cac"];
 const SUB_ACCOUNT: &str = "5USGSZK3raH3LD4uxvNTa23HN5VULnYrkXonRktyizTJUYg9";
@@ -148,7 +151,13 @@ fn pause_should_work() {
 		expect_event(AssetsBridgeEvent::Register(1, H160::from_slice(&ERC20_1)));
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 
@@ -156,7 +165,13 @@ fn pause_should_work() {
 		expect_event(AssetsBridgeEvent::Paused(1));
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 	})
@@ -202,7 +217,13 @@ fn pause_after_pause_should_work() {
 		expect_event(AssetsBridgeEvent::Register(2, H160::from_slice(&ERC20_2)));
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 
@@ -212,7 +233,13 @@ fn pause_after_pause_should_work() {
 		assert_eq!(AssetsBridge::emergencies(), vec![1]);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 
@@ -251,7 +278,13 @@ fn unpause_should_work() {
 		expect_event(AssetsBridgeEvent::PausedAll);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 
@@ -259,7 +292,13 @@ fn unpause_should_work() {
 		expect_event(AssetsBridgeEvent::UnPaused(1));
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 	})
@@ -325,7 +364,13 @@ fn unpause_after_unpause_should_work() {
 		assert_eq!(AssetsBridge::emergencies(), vec![1, 2]);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 
@@ -374,12 +419,24 @@ fn more_pause_and_unpause_should_work() {
 		assert!(AssetsBridge::emergencies().is_empty());
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 2, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				2,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 
@@ -389,12 +446,24 @@ fn more_pause_and_unpause_should_work() {
 		assert_eq!(AssetsBridge::emergencies(), vec![1, 2]);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 2, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				2,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 
@@ -404,12 +473,24 @@ fn more_pause_and_unpause_should_work() {
 		assert_eq!(AssetsBridge::emergencies(), vec![1]);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::InEmergency
 		);
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 2, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				2,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 
@@ -419,7 +500,13 @@ fn more_pause_and_unpause_should_work() {
 		assert!(AssetsBridge::emergencies().is_empty());
 
 		assert_noop!(
-			AssetsBridge::deposit(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::deposit(
+				RuntimeOrigin::signed(BOB.into()),
+				1,
+				1,
+				LocalPrecision::Exact,
+				LocalFortitude::Polite
+			),
 			Error::<Test>::EthAddressHasNotMapped
 		);
 	})
