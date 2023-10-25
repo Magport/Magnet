@@ -28,7 +28,7 @@ pub use abi::*;
 pub mod recover;
 pub use recover::*;
 
-use codec::Encode;
+use codec::{Decode, Encode, Input, Output};
 use frame_support::{
 	ensure,
 	pallet_prelude::*,
@@ -38,9 +38,6 @@ use frame_support::{
 	},
 	transactional,
 };
-
-use Fortitude::Force;
-use Precision::Exact;
 
 use sp_core::{ecdsa, H160, U256};
 use sp_io::{crypto::secp256k1_ecdsa_recover, hashing::keccak_256};
@@ -94,6 +91,104 @@ pub struct DebitFlags {
 impl From<TransferFlags> for DebitFlags {
 	fn from(f: TransferFlags) -> Self {
 		Self { keep_alive: f.keep_alive, best_effort: f.best_effort }
+	}
+}
+
+use scale_info::prelude::*;
+use scale_info::TypeInfo;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TypeInfo)]
+pub enum LocalPrecision {
+	/// The operation should must either proceed either exactly according to the amounts involved
+	/// or not at all.
+	Exact,
+	/// The operation may be considered successful even if less than the specified amounts are
+	/// available to be used. In this case a best effort will be made.
+	BestEffort,
+}
+
+impl Encode for LocalPrecision {
+	fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+		match self {
+			LocalPrecision::Exact => dest.push_byte(0),
+			LocalPrecision::BestEffort => dest.push_byte(1),
+		}
+	}
+}
+
+impl Decode for LocalPrecision {
+	fn decode<I: Input>(input: &mut I) -> Result<Self, codec::Error> {
+		let byte = u8::decode(input)?;
+		match byte {
+			0 => Ok(LocalPrecision::Exact),
+			1 => Ok(LocalPrecision::BestEffort),
+			_ => Err(codec::Error::from("Invalid value for LocalPrecision")),
+		}
+	}
+}
+
+impl From<LocalPrecision> for Precision {
+	fn from(local: LocalPrecision) -> Self {
+		match local {
+			LocalPrecision::Exact => Precision::Exact,
+			LocalPrecision::BestEffort => Precision::BestEffort,
+		}
+	}
+}
+
+impl From<Precision> for LocalPrecision {
+	fn from(external: Precision) -> Self {
+		match external {
+			Precision::Exact => LocalPrecision::Exact,
+			Precision::BestEffort => LocalPrecision::BestEffort,
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, TypeInfo)]
+pub enum LocalFortitude {
+	/// The operation should execute with regular privilege.
+	Polite,
+	/// The operation should be forced to succeed if possible. This is usually employed for system-
+	/// level security-critical events such as slashing.
+	Force,
+}
+
+impl Encode for LocalFortitude {
+	fn encode_to<T: Output + ?Sized>(&self, dest: &mut T) {
+		match self {
+			LocalFortitude::Polite => dest.push_byte(0),
+			LocalFortitude::Force => dest.push_byte(1),
+		}
+	}
+}
+
+impl Decode for LocalFortitude {
+	fn decode<I: Input>(input: &mut I) -> Result<Self, codec::Error> {
+		let byte = u8::decode(input)?;
+		match byte {
+			0 => Ok(LocalFortitude::Polite),
+			1 => Ok(LocalFortitude::Force),
+			_ => Err(codec::Error::from("Invalid value for LocalFortitude")),
+		}
+	}
+}
+
+impl From<LocalFortitude> for Fortitude {
+	fn from(local: LocalFortitude) -> Self {
+		match local {
+			LocalFortitude::Polite => Fortitude::Polite,
+			LocalFortitude::Force => Fortitude::Force,
+		}
+	}
+}
+
+impl From<Fortitude> for LocalFortitude {
+	fn from(external: Fortitude) -> Self {
+		match external {
+			Fortitude::Polite => LocalFortitude::Polite,
+			Fortitude::Force => LocalFortitude::Force,
+		}
 	}
 }
 
@@ -334,8 +429,8 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			asset_id: T::AssetId,
 			amount: T::Balance,
-			//precision: Precision,
-			//force: Fortitude
+			precision: LocalPrecision,
+			force: LocalFortitude,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			ensure!(!Self::is_in_emergency(asset_id.clone()), Error::<T>::InEmergency);
@@ -344,13 +439,15 @@ pub mod pallet {
 			// 1. check evm account
 			let evm_account = Self::evm_accounts(&who).ok_or(Error::<T>::EthAddressHasNotMapped)?;
 
+			let external_precision: Precision = precision.into();
+			let external_force: Fortitude = force.into();
 			// 2. burn asset
 			let _ = pallet_assets::Pallet::<T>::burn_from(
 				asset_id.clone(),
 				&who,
 				amount,
-				Exact,
-				Force,
+				external_precision,
+				external_force,
 			)?;
 
 			// 3. mint erc20
@@ -424,8 +521,8 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			amount: BalanceOf<T>,
 			action: ActionType<T::AssetId>,
-			//precision: Precision,
-			//force: Fortitude
+			precision: LocalPrecision,
+			force: LocalFortitude,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			let action_clone = action.clone();
@@ -457,13 +554,15 @@ pub mod pallet {
 
 					let amount: u128 = amount.unique_saturated_into();
 					// burn asset first, then relay will transfer back `who`.
+					let external_precision: Precision = precision.into();
+					let external_force: Fortitude = force.into();
+
 					let _ = pallet_assets::Pallet::<T>::burn_from(
 						asset_id.clone(),
 						&who,
 						amount.unique_saturated_into(),
-						Exact,
-						Force, //precision,
-						       //force
+						external_precision,
+						external_force,
 					)?;
 
 					(who.clone(), who.clone(), true)
