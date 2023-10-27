@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.1.1"
+version = "0.1.3"
 authors = ["Anonymous"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -25,7 +25,7 @@ smallvec = "1.11.0"
 pallet-parachain-template = { path = "../pallets/template", default-features = false }
 pallet-motion = { path = "../pallets/motion", default-features = false }
 pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
-
+pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
 
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
@@ -167,6 +167,7 @@ std = [
 	"pallet-motion/std",
 	"fp-self-contained/std",
 	"pallet-evm-utils/std",
+	"pallet-precompile-substrate-utils/std",
 ]
 
 runtime-benchmarks = [
@@ -190,6 +191,7 @@ runtime-benchmarks = [
 	"xcm-builder/runtime-benchmarks",
 	"xcm-executor/runtime-benchmarks",
 	"pallet-evm-utils/runtime-benchmarks",
+	"pallet-precompile-substrate-utils/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -216,6 +218,7 @@ try-runtime = [
 	"polkadot-runtime-common/try-runtime",
 	"sp-runtime/try-runtime",
 	"pallet-evm-utils/try-runtime",
+	"pallet-precompile-substrate-utils/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]

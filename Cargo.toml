@@ -4,8 +4,10 @@ panic = "unwind"
 [workspace]
 members = [
     "node",
-    "pallets/*",
     "runtime",
+    "pallets/motion",
+    "pallets/evm-utils",
+	"pallets/evm/precompile/substrate-utils",
 ]
 resolver = "2"
 
