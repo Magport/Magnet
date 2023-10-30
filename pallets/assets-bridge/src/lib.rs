@@ -377,8 +377,16 @@ pub mod pallet {
 			ensure!(!SubAccounts::<T>::contains_key(eth_address), Error::<T>::EthAddressHasMapped);
 
 			// recover evm address from signature
-			let address = eth_recover(&eth_signature, &who.using_encoded(to_ascii_hex), &[][..])
+			// let address = eth_recover(&eth_signature, &who.using_encoded(to_ascii_hex), &[][..])
+			// 	.ok_or(Error::<T>::BadSignature)?;
+
+			let address = beta_eth_recover(&eth_signature, &who.using_encoded(to_ascii_hex))
 				.ok_or(Error::<T>::BadSignature)?;
+
+			// let address = Self::eth_recover(&eth_signature).ok_or(Error::<T>::BadSignature)?;
+
+			// frame_support::runtime_print!("\n\n========================================================================who {:?},eth_address {:?}, address {:?}=============================\n\n",
+			// &who.using_encoded(to_ascii_hex),eth_address.as_bytes(),address.as_bytes());
 
 			ensure!(eth_address == address, Error::<T>::InvalidSignature);
 

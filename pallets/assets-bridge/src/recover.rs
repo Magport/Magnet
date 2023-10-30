@@ -52,3 +52,22 @@ pub fn ethereum_signable_message(what: &[u8], extra: &[u8]) -> Vec<u8> {
 	v.extend_from_slice(extra);
 	v
 }
+
+pub fn beta_eth_recover(signature: &ecdsa::Signature, what: &[u8]) -> Option<H160> {
+	let mut v = Vec::new();
+	let prefix = b"evm:";
+	v.extend_from_slice(&prefix[..]);
+	v.extend_from_slice(what);
+
+	// frame_support::runtime_print!("\n\n=================msg  : {:?}============================\n\n", &v);
+	let message_hash: [u8; 32] = keccak_256(v.as_ref());
+	// frame_support::runtime_print!("\n\n=================msg hash  : {:?}============================\n\n", &message_hash);
+	let mut sig = [0u8; 65];
+	sig[0..64].copy_from_slice(&signature.0[0..64]);
+	sig[64] = signature.0[64];
+
+	let public_key = sp_io::crypto::secp256k1_ecdsa_recover(&sig, &message_hash).ok()?;
+
+	let address_hash = keccak_256(&public_key);
+	Some(H160::from_slice(&address_hash[12..32]))
+}
