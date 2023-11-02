@@ -1212,6 +1212,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "case"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd6c0e7b807d60291f42f33f58480c0bfafe28ed08286446f45e463728cf9c1c"
+
+[[package]]
 name = "cc"
 version = "1.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3547,7 +3553,7 @@ dependencies = [
 [[package]]
 name = "fflonk"
 version = "0.1.0"
-source = "git+https://github.com/w3f/fflonk#26a5045b24e169cffc1f9328ca83d71061145c40"
+source = "git+https://github.com/w3f/fflonk#e141d4b6f42fb481aefe1b479788694945b6940d"
 dependencies = [
  "ark-ec",
  "ark-ff",
@@ -6730,23 +6736,6 @@ dependencies = [
 [[package]]
 name = "pallet-assets"
 version = "4.0.0-dev"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "pallet-balances",
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
-name = "pallet-assets"
-version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
 dependencies = [
  "frame-benchmarking",
@@ -6768,7 +6757,7 @@ dependencies = [
  "frame-support",
  "frame-system",
  "hex-literal",
- "pallet-assets 4.0.0-dev",
+ "pallet-assets",
  "pallet-balances",
  "pallet-evm",
  "pallet-timestamp",
@@ -7219,6 +7208,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-evm-test-vector-support"
+version = "1.0.0-dev"
+source = "git+https://github.com/paritytech/frontier?branch=polkadot-v1.1.0#24cd3ea75262a33481d59d54de9746723ef298fb"
+dependencies = [
+ "evm",
+ "fp-evm",
+ "hex",
+ "serde",
+ "serde_json",
+ "sp-core",
+]
+
+[[package]]
 name = "pallet-evm-utils"
 version = "0.1.0"
 dependencies = [
@@ -7554,6 +7556,21 @@ dependencies = [
  "parity-scale-codec",
  "scale-info",
  "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pallet-precompile-substrate-utils"
+version = "0.1.0"
+dependencies = [
+ "fp-account",
+ "fp-evm",
+ "frame-support",
+ "pallet-evm",
+ "pallet-evm-test-vector-support",
+ "precompile-utils",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -8003,7 +8020,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-node"
-version = "0.1.1"
+version = "0.1.3"
 dependencies = [
  "clap",
  "color-print",
@@ -8081,7 +8098,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-runtime"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "cumulus-pallet-aura-ext",
  "cumulus-pallet-dmp-queue",
@@ -8105,7 +8122,7 @@ dependencies = [
  "frame-try-runtime",
  "hex-literal",
  "log",
- "pallet-assets 4.0.0-dev",
+ "pallet-assets",
  "pallet-assets-bridge",
  "pallet-aura",
  "pallet-authorship",
@@ -8124,6 +8141,7 @@ dependencies = [
  "pallet-hotfix-sufficients",
  "pallet-motion",
  "pallet-parachain-template",
+ "pallet-precompile-substrate-utils",
  "pallet-session",
  "pallet-sudo",
  "pallet-timestamp",
@@ -8168,7 +8186,7 @@ dependencies = [
  "log",
  "num-traits",
  "pallet-asset-tx-payment",
- "pallet-assets 4.0.0-dev (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
+ "pallet-assets",
  "pallet-authorship",
  "pallet-balances",
  "pallet-collator-selection",
@@ -9771,6 +9789,43 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
+
+[[package]]
+name = "precompile-utils"
+version = "0.1.0"
+source = "git+https://github.com/paritytech/frontier?branch=polkadot-v1.1.0#24cd3ea75262a33481d59d54de9746723ef298fb"
+dependencies = [
+ "environmental",
+ "evm",
+ "fp-evm",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "impl-trait-for-tuples",
+ "log",
+ "num_enum",
+ "pallet-evm",
+ "parity-scale-codec",
+ "precompile-utils-macro",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "precompile-utils-macro"
+version = "0.1.0"
+source = "git+https://github.com/paritytech/frontier?branch=polkadot-v1.1.0#24cd3ea75262a33481d59d54de9746723ef298fb"
+dependencies = [
+ "case",
+ "num_enum",
+ "prettyplease 0.2.15",
+ "proc-macro2",
+ "quote",
+ "sp-core-hashing",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "predicates"
