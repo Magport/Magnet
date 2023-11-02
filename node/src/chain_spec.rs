@@ -67,7 +67,7 @@ pub fn development_config() -> ChainSpec {
 	// Give your base currency a unit name and decimal places
 	let mut properties = sc_chain_spec::Properties::new();
 	properties.insert("tokenSymbol".into(), "DOT".into());
-	properties.insert("tokenDecimals".into(), 10.into());
+	properties.insert("tokenDecimals".into(), 18.into());
 	properties.insert("ss58Format".into(), 42.into());
 
 	ChainSpec::from_genesis(
@@ -207,8 +207,8 @@ fn testnet_genesis(
 			],
 			// Genesis metadata: Vec<(id, name, symbol, decimals)>
 			metadata: vec![
-				(1, "asset-1".into(), "ALT1".into(), 10),
-				(2, "asset-2".into(), "ALT2".into(), 10),
+				(1, "asset-1".into(), "ALT1".into(), 18),
+				(2, "asset-2".into(), "ALT2".into(), 18),
 			],
 			// Genesis accounts: Vec<(id, account_id, balance)>
 			accounts: vec![(1, alice.into(), 50_000_000_0000), (2, bob.into(), 50_000_000_0000)],
