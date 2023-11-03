@@ -365,10 +365,7 @@ pub mod pallet {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		#[transactional]
-		pub fn claim_account(
-			origin: OriginFor<T>,
-			eth_address: H160,
-		) -> DispatchResult {
+		pub fn claim_account(origin: OriginFor<T>, eth_address: H160) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			// ensure account_id and eth_address has not been mapped
