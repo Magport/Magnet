@@ -46,7 +46,7 @@ use sp_std::vec::Vec;
 
 use pallet_evm::{AddressMapping, ExitReason, Runner};
 
-pub type EcdsaSignature = ecdsa::Signature;
+//pub type EcdsaSignature = ecdsa::Signature;
 pub type AddressMappingOf<T> = <T as pallet_evm::Config>::AddressMapping;
 pub type BalanceOf<T> = <<T as pallet_evm::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
@@ -368,27 +368,12 @@ pub mod pallet {
 		pub fn claim_account(
 			origin: OriginFor<T>,
 			eth_address: H160,
-			eth_signature: EcdsaSignature,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			// ensure account_id and eth_address has not been mapped
 			ensure!(!EvmAccounts::<T>::contains_key(&who), Error::<T>::AccountIdHasMapped);
 			ensure!(!SubAccounts::<T>::contains_key(eth_address), Error::<T>::EthAddressHasMapped);
-
-			// recover evm address from signature
-			// let address = eth_recover(&eth_signature, &who.using_encoded(to_ascii_hex), &[][..])
-			// 	.ok_or(Error::<T>::BadSignature)?;
-
-			let address = beta_eth_recover(&eth_signature, &who.using_encoded(to_ascii_hex))
-				.ok_or(Error::<T>::BadSignature)?;
-
-			// let address = Self::eth_recover(&eth_signature).ok_or(Error::<T>::BadSignature)?;
-
-			// frame_support::runtime_print!("\n\n========================================================================who {:?},eth_address {:?}, address {:?}=============================\n\n",
-			// &who.using_encoded(to_ascii_hex),eth_address.as_bytes(),address.as_bytes());
-
-			ensure!(eth_address == address, Error::<T>::InvalidSignature);
 
 			<T as pallet_assets::Config>::Currency::reserve(&who, T::ClaimBond::get())?;
 

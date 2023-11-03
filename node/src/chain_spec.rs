@@ -198,12 +198,12 @@ fn testnet_genesis(
 			..Default::default()
 		},
 		balances: parachain_magnet_runtime::BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 81)).collect(),
 		},
 		assets: parachain_magnet_runtime::AssetsConfig {
 			assets: vec![
-				(1, alice.into(), true, 10_000_000_0000),
-				(2, bob.into(), true, 10_000_000_0000),
+				(1, alice.into(), true, 1_000_000_0000_0000_0000),
+				(2, bob.into(), true, 2_000_000_0000_0000_0000),
 			],
 			// Genesis metadata: Vec<(id, name, symbol, decimals)>
 			metadata: vec![
@@ -211,7 +211,10 @@ fn testnet_genesis(
 				(2, "asset-2".into(), "ALT2".into(), 18),
 			],
 			// Genesis accounts: Vec<(id, account_id, balance)>
-			accounts: vec![(1, alice.into(), 50_000_000_0000), (2, bob.into(), 50_000_000_0000)],
+			accounts: vec![
+				(1, alice.into(), 500_000_000_0000_0000_0000),
+				(2, bob.into(), 500_000_000_0000_0000_0000),
+			],
 		},
 		assets_bridge: parachain_magnet_runtime::AssetsBridgeConfig {
 			admin_key: Some(root.clone()),
