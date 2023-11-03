@@ -46,7 +46,7 @@ use sp_std::vec::Vec;
 
 use pallet_evm::{AddressMapping, ExitReason, Runner};
 
-//pub type EcdsaSignature = ecdsa::Signature;
+pub type EcdsaSignature = ecdsa::Signature;
 pub type AddressMappingOf<T> = <T as pallet_evm::Config>::AddressMapping;
 pub type BalanceOf<T> = <<T as pallet_evm::Config>::Currency as Currency<
 	<T as frame_system::Config>::AccountId,
