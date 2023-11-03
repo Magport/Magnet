@@ -24,6 +24,7 @@ smallvec = "1.11.0"
 # Local
 pallet-parachain-template = { path = "../pallets/template", default-features = false }
 pallet-motion = { path = "../pallets/motion", default-features = false }
+pallet-assets-bridge = { path = "../pallets/assets-bridge", default-features = false }
 pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
 pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
 
@@ -38,6 +39,7 @@ frame-try-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch
 pallet-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+pallet-assets = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-sudo = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-collective = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
@@ -166,6 +168,8 @@ std = [
 	"pallet-collective/std",
 	"pallet-motion/std",
 	"fp-self-contained/std",
+	"pallet-assets/std",
+	"pallet-assets-bridge/std",
 	"pallet-evm-utils/std",
 	"pallet-precompile-substrate-utils/std",
 ]
