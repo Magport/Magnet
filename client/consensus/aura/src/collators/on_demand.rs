@@ -26,14 +26,19 @@ use codec::{Codec, Decode};
 use cumulus_client_collator::service::ServiceInterface as CollatorServiceInterface;
 use cumulus_client_consensus_common::ParachainBlockImportMarker;
 use cumulus_client_consensus_proposer::ProposerInterface;
-use cumulus_primitives_core::{relay_chain::BlockId as RBlockId, CollectCollationInfo,relay_chain::Hash as PHash};
+use cumulus_primitives_core::{
+	relay_chain::BlockId as RBlockId, relay_chain::Hash as PHash, CollectCollationInfo,
+};
 use cumulus_relay_chain_interface::RelayChainInterface;
 
 use polkadot_node_primitives::CollationResult;
 use polkadot_overseer::Handle as OverseerHandle;
 use polkadot_primitives::{CollatorPair, Id as ParaId};
 
+use cumulus_primitives_core::PersistedValidationData;
+use futures::lock::Mutex;
 use futures::prelude::*;
+use magnet_primitives_order::OrderRecord;
 use sc_client_api::{backend::AuxStore, BlockBackend, BlockOf};
 use sc_consensus::BlockImport;
 use sp_api::ProvideRuntimeApi;
@@ -46,9 +51,6 @@ use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, Member};
 use std::{convert::TryFrom, sync::Arc, time::Duration};
-use futures::lock::Mutex;
-use magnet_primitives_order::OrderRecord;
-use cumulus_primitives_core::PersistedValidationData;
 
 /// Parameters for [`run`].
 pub struct Params<BI, CIDP, Client, RClient, SO, Proposer, CS> {
@@ -101,7 +103,11 @@ where
 		+ 'static,
 	Client::Api: AuraApi<Block, P::Public> + CollectCollationInfo<Block>,
 	RClient: RelayChainInterface + Send + Clone + 'static,
-	CIDP: CreateInherentDataProviders<Block, (PHash, Option<PersistedValidationData>, ParaId, u64, Option<P::Public>)> + Send + 'static,
+	CIDP: CreateInherentDataProviders<
+			Block,
+			(PHash, Option<PersistedValidationData>, ParaId, u64, Option<P::Public>),
+		> + Send
+		+ 'static,
 	CIDP::InherentDataProviders: Send,
 	BI: BlockImport<Block> + ParachainBlockImportMarker + Send + Sync + 'static,
 	SO: SyncOracle + Send + Sync + Clone + 'static,
@@ -159,7 +165,7 @@ where
 			let parent_hash = parent_header.hash();
 
 			if !collator.collator_service().check_block_status(parent_hash, &parent_header) {
-				continue
+				continue;
 			}
 
 			let relay_parent_header =

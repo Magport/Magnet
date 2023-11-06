@@ -1,17 +1,20 @@
+use cumulus_relay_chain_interface::RelayChainError;
+use futures::{
+	channel::oneshot::Sender as OneshotSender, future::BoxFuture, stream::FuturesUnordered,
+	FutureExt, StreamExt,
+};
 use jsonrpsee::{
-	core::{params::ArrayParams, Error as JsonRpseeError, client::{Client as JsonRpcClient, ClientT},},
-	rpc_params,ws_client::WsClientBuilder,
+	core::{
+		client::{Client as JsonRpcClient, ClientT},
+		params::ArrayParams,
+		Error as JsonRpseeError,
+	},
+	rpc_params,
+	ws_client::WsClientBuilder,
 };
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
-use futures::{
-	channel::oneshot::Sender as OneshotSender,
-	future::BoxFuture,
-	stream::FuturesUnordered,
-	FutureExt, StreamExt,
-};
 use url::Url;
-use cumulus_relay_chain_interface::RelayChainError;
 
 const LOG_TARGET: &str = "reconnecting-websocket-client";
 
@@ -20,7 +23,7 @@ fn url_to_string_with_port(url: Url) -> Option<String> {
 	// This is already validated on CLI side, just defensive here
 	if (url.scheme() != "ws" && url.scheme() != "wss") || url.host_str().is_none() {
 		tracing::warn!(target: LOG_TARGET, ?url, "Non-WebSocket URL or missing host.");
-		return None
+		return None;
 	}
 
 	// Either we have a user-supplied port or use the default for 'ws' or 'wss' here
@@ -63,7 +66,7 @@ async fn connect_next_available_rpc_server(
 impl ClientManager {
 	pub async fn new(urls: Vec<String>) -> Result<Self, ()> {
 		if urls.is_empty() {
-			return Err(())
+			return Err(());
 		}
 		let active_client = connect_next_available_rpc_server(&urls, 0).await?;
 		Ok(Self { urls, active_client: active_client.1, active_index: active_client.0 })
@@ -79,7 +82,7 @@ impl ClientManager {
 		async move {
 			let resp = future_client.request(&method, params.clone()).await;
 			if let Err(JsonRpseeError::RestartNeeded(_)) = resp {
-				return Err(())
+				return Err(());
 			}
 
 			if let Err(err) = response_sender.send(resp) {
@@ -96,28 +99,27 @@ impl ClientManager {
 }
 
 pub async fn submit_extrinsic_rpc_call(
-	url:&str,
+	url: &str,
 	method: String,
 	params: ArrayParams,
 	response_sender: OneshotSender<Result<JsonValue, JsonRpseeError>>,
 ) {
-    let urls = vec![Url::parse(url).unwrap()];
+	let urls = vec![Url::parse(url).unwrap()];
 	let urls_col = urls.into_iter().filter_map(url_to_string_with_port).collect();
 	let mut pending_requests = FuturesUnordered::new();
 	let Ok(client_manager) = ClientManager::new(urls_col).await else {
 		tracing::error!(target: LOG_TARGET, "No valid RPC url found. Stopping RPC worker.");
-		return
+		return;
 	};
 	pending_requests.push(client_manager.create_request(method, params, response_sender));
 	while !pending_requests.is_empty() {
-		pending_requests.next().await ;
+		pending_requests.next().await;
 	}
 }
 pub async fn build_rpc_for_submit_order(
-	url:&str,
-	extrinsic:String
-) -> Result<(), RelayChainError>
-{
+	url: &str,
+	extrinsic: String,
+) -> Result<(), RelayChainError> {
 	let (tx, rx) = futures::channel::oneshot::channel();
 	let params = rpc_params![extrinsic];
 	submit_extrinsic_rpc_call(url, "author_submitExtrinsic".into(), params, tx).await;

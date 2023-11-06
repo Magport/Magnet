@@ -78,10 +78,10 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
+use cumulus_primitives_core::{ParaId, PersistedValidationData};
+pub use pallet_order;
 /// Import the template pallet.
 pub use pallet_parachain_template;
-pub use pallet_order;
-use cumulus_primitives_core::{PersistedValidationData, ParaId};
 
 use fp_evm::weight_per_gas;
 use fp_rpc::TransactionStatus;
@@ -1321,11 +1321,11 @@ impl_runtime_apis! {
 			OrderPallet::sequence_number()
 		}
 		fn order_placed(
-            relay_storage_proof: sp_trie::StorageProof,
-            validation_data: PersistedValidationData,
-            author_pub: AuraId,
+			relay_storage_proof: sp_trie::StorageProof,
+			validation_data: PersistedValidationData,
+			author_pub: AuraId,
 			para_id:ParaId,
-        )-> bool {
+		)-> bool {
 			OrderPallet::order_placed(relay_storage_proof, validation_data, author_pub, para_id)
 		}
 
@@ -1407,28 +1407,26 @@ impl_runtime_apis! {
 	}
 }
 
-
-
 struct CheckInherents;
 
 #[allow(deprecated)]
 impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
-    fn check_inherents(
-        block: &Block,
-        relay_state_proof: &cumulus_pallet_parachain_system::RelayChainStateProof,
-    ) -> sp_inherents::CheckInherentsResult {
-        let relay_chain_slot = relay_state_proof
-            .read_slot()
-            .expect("Could not read the relay chain slot from the proof");
-        let inherent_data =
-            cumulus_primitives_timestamp::InherentDataProvider::from_relay_chain_slot_and_duration(
-                relay_chain_slot,
-                sp_std::time::Duration::from_secs(6),
-            )
-            .create_inherent_data()
-            .expect("Could not create the timestamp inherent data");
-        inherent_data.check_extrinsics(block)
-    }
+	fn check_inherents(
+		block: &Block,
+		relay_state_proof: &cumulus_pallet_parachain_system::RelayChainStateProof,
+	) -> sp_inherents::CheckInherentsResult {
+		let relay_chain_slot = relay_state_proof
+			.read_slot()
+			.expect("Could not read the relay chain slot from the proof");
+		let inherent_data =
+			cumulus_primitives_timestamp::InherentDataProvider::from_relay_chain_slot_and_duration(
+				relay_chain_slot,
+				sp_std::time::Duration::from_secs(6),
+			)
+			.create_inherent_data()
+			.expect("Could not create the timestamp inherent data");
+		inherent_data.check_extrinsics(block)
+	}
 }
 cumulus_pallet_parachain_system::register_validate_block! {
 	Runtime = Runtime,

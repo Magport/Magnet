@@ -39,7 +39,10 @@ use cumulus_relay_chain_interface::RelayChainInterface;
 use polkadot_node_primitives::{Collation, MaybeCompressedPoV};
 use polkadot_primitives::{Header as PHeader, Id as ParaId};
 
+use cumulus_client_consensus_aura::collator::seal;
+use futures::lock::Mutex;
 use futures::prelude::*;
+use magnet_primitives_order::OrderRecord;
 use sc_consensus::BlockImport;
 use sc_consensus_aura::standalone as aura_internal;
 use sp_api::ProvideRuntimeApi;
@@ -53,11 +56,8 @@ use sp_runtime::{
 	traits::{Block as BlockT, Member},
 };
 use sp_timestamp::Timestamp;
-use std::{convert::TryFrom, error::Error, time::Duration};
-use cumulus_client_consensus_aura::collator::seal;
-use futures::lock::Mutex;
-use magnet_primitives_order::OrderRecord;
 use std::sync::Arc;
+use std::{convert::TryFrom, error::Error, time::Duration};
 
 /// Parameters for instantiating a [`Collator`].
 pub struct Params<BI, CIDP, RClient, Proposer, CS> {
@@ -95,7 +95,10 @@ impl<Block, P, BI, CIDP, RClient, Proposer, CS> Collator<Block, P, BI, CIDP, RCl
 where
 	Block: BlockT,
 	RClient: RelayChainInterface,
-	CIDP: CreateInherentDataProviders<Block, (PHash, Option<PersistedValidationData>, ParaId, u64, Option<P::Public>)> + 'static,
+	CIDP: CreateInherentDataProviders<
+			Block,
+			(PHash, Option<PersistedValidationData>, ParaId, u64, Option<P::Public>),
+		> + 'static,
 	BI: BlockImport<Block> + ParachainBlockImportMarker + Send + Sync + 'static,
 	Proposer: ProposerInterface<Block>,
 	CS: CollatorServiceInterface<Block>,
@@ -137,43 +140,44 @@ where
 
 		let paras_inherent_data = match paras_inherent_data {
 			Some(p) => p,
-			None =>
+			None => {
 				return Err(
 					format!("Could not create paras inherent data at {:?}", relay_parent).into()
-				),
+				)
+			},
 		};
 		let order_record_local = order_record.lock().await;
 		let mut other_inherent_data;
 		if order_record_local.relay_parent.is_none() {
 			other_inherent_data = self
-			.create_inherent_data_providers
-			.create_inherent_data_providers(parent_hash, (
-				relay_parent,
-				None,
-				self.para_id,
-				order_record_local.sequence_number,
-				None,
-			))
-			.map_err(|e| e as Box<dyn Error + Send + Sync + 'static>)
-			.await?
-			.create_inherent_data()
-			.await
-			.map_err(Box::new)?;
+				.create_inherent_data_providers
+				.create_inherent_data_providers(
+					parent_hash,
+					(relay_parent, None, self.para_id, order_record_local.sequence_number, None),
+				)
+				.map_err(|e| e as Box<dyn Error + Send + Sync + 'static>)
+				.await?
+				.create_inherent_data()
+				.await
+				.map_err(Box::new)?;
 		} else {
 			other_inherent_data = self
-			.create_inherent_data_providers
-			.create_inherent_data_providers(parent_hash, (
-				order_record_local.relay_parent.expect("can not get relay_parent hash"),
-				order_record_local.validation_data.clone(),
-				self.para_id,
-				order_record_local.sequence_number,
-			    order_record_local.author_pub.clone(),
-			))
-			.map_err(|e| e as Box<dyn Error + Send + Sync + 'static>)
-			.await?
-			.create_inherent_data()
-			.await
-			.map_err(Box::new)?;
+				.create_inherent_data_providers
+				.create_inherent_data_providers(
+					parent_hash,
+					(
+						order_record_local.relay_parent.expect("can not get relay_parent hash"),
+						order_record_local.validation_data.clone(),
+						self.para_id,
+						order_record_local.sequence_number,
+						order_record_local.author_pub.clone(),
+					),
+				)
+				.map_err(|e| e as Box<dyn Error + Send + Sync + 'static>)
+				.await?
+				.create_inherent_data()
+				.await
+				.map_err(Box::new)?;
 		}
 
 		if let Some(timestamp) = timestamp.into() {

@@ -9,9 +9,9 @@ mod cli;
 mod client;
 mod command;
 mod eth;
+mod on_demand_order;
 mod rpc;
 mod submit_order;
-mod on_demand_order;
 
 fn main() -> sc_cli::Result<()> {
 	command::run()
