@@ -5,6 +5,7 @@ panic = "unwind"
 members = [
     "node",
     "runtime",
+    "pallets/order",
     "pallets/motion",
     "pallets/evm-utils",
 	"pallets/evm/precompile/substrate-utils",
