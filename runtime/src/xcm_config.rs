@@ -13,11 +13,12 @@ use polkadot_parachain_primitives::primitives::Sibling;
 use polkadot_runtime_common::impls::ToAuthor;
 use xcm::latest::prelude::*;
 use xcm_builder::{
-	AccountId32Aliases, AllowExplicitUnpaidExecutionFrom, AllowTopLevelPaidExecutionFrom,
-	CurrencyAdapter, DenyReserveTransferToRelayChain, DenyThenTry, EnsureXcmOrigin,
+	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
+	AllowUnpaidExecutionFrom,AllowTopLevelPaidExecutionFrom,
+	CurrencyAdapter, EnsureXcmOrigin,
 	FixedWeightBounds, IsConcrete, NativeAsset, ParentIsPreset, RelayChainAsNative,
 	SiblingParachainAsNative, SiblingParachainConvertsVia, SignedAccountId32AsNative,
-	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, TrailingSetTopicAsId,
+	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
 	UsingComponents, WithComputedOrigin, WithUniqueTopic,
 };
 use xcm_executor::XcmExecutor;
@@ -90,23 +91,24 @@ match_types! {
 	};
 }
 
-pub type Barrier = TrailingSetTopicAsId<
-	DenyThenTry<
-		DenyReserveTransferToRelayChain,
+pub type Barrier = (
+	// Weight that is paid for may be consumed.
+	TakeWeightCredit,
+	// Expected responses are OK.
+	AllowKnownQueryResponses<PolkadotXcm>,
+	WithComputedOrigin<
 		(
-			TakeWeightCredit,
-			WithComputedOrigin<
-				(
-					AllowTopLevelPaidExecutionFrom<Everything>,
-					AllowExplicitUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
-					// ^^^ Parent and its exec plurality get free execution
-				),
-				UniversalLocation,
-				ConstU32<8>,
-			>,
+			// If the message is one that immediately attemps to pay for execution, then allow it.
+			AllowTopLevelPaidExecutionFrom<Everything>,
+			AllowUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
+			// Subscriptions for version tracking are OK.
+			AllowSubscriptionsFrom<Everything>,
+
 		),
+		UniversalLocation,
+		ConstU32<8>,
 	>,
->;
+);
 
 pub struct XcmConfig;
 impl xcm_executor::Config for XcmConfig {
