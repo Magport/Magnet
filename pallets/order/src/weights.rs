@@ -4,7 +4,7 @@
 //! THIS FILE WAS AUTO-GENERATED USING THE SUBSTRATE BENCHMARK CLI VERSION 4.0.0-dev
 //! DATE: 2023-11-12, STEPS: `50`, REPEAT: `20`, LOW RANGE: `[]`, HIGH RANGE: `[]`
 //! WORST CASE MAP SIZE: `1000000`
-//! HOSTNAME: `sulijia-pc`, CPU: `AMD Ryzen 7 5800U with Radeon Graphics`
+//! HOSTNAME: `null`, CPU: `AMD Ryzen 7 5800U with Radeon Graphics`
 //! WASM-EXECUTION: `Compiled`, CHAIN: `Some("dev")`, DB CACHE: 1024
 
 // Executed Command:
@@ -33,6 +33,7 @@
 
 use frame_support::{traits::Get, weights::Weight};
 use core::marker::PhantomData;
+use frame_support::weights::constants::RocksDbWeight;
 
 pub trait WeightInfo {
 	fn set_parameter(s: u32, ) -> Weight;
@@ -55,5 +56,15 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			// Standard Error: 2_411
 			.saturating_add(Weight::from_parts(4_684, 0).saturating_mul(s.into()))
 			.saturating_add(T::DbWeight::get().writes(2))
+	}
+}
+
+impl WeightInfo for () {
+	fn set_parameter(s: u32, ) -> Weight {
+		Weight::from_parts(21_083_166, 0)
+			.saturating_add(Weight::from_parts(0, 0))
+			// Standard Error: 2_411
+			.saturating_add(Weight::from_parts(4_684, 0).saturating_mul(s.into()))
+			.saturating_add(RocksDbWeight::get().writes(2))
 	}
 }

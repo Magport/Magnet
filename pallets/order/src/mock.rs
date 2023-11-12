@@ -83,6 +83,7 @@ impl crate::Config for Test {
 	type OrderMaxAmount = OrderMaxAmount;
 	type SlotWidth = SlotWidth;
 	type TxPoolThreshold = TxPoolThreshold;
+	type WeightInfo = ();
 }
 
 pub struct ExtBuilder {
