@@ -60,6 +60,7 @@ sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release
 sp-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 sp-version = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 sp-trie = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+pallet-society ={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 
 # Polkadot
 pallet-xcm = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
@@ -205,6 +206,10 @@ runtime-benchmarks = [
 	"pallet-evm-utils/runtime-benchmarks",
 	"pallet-precompile-substrate-utils/runtime-benchmarks",
 	"pallet-order/runtime-benchmarks",
+	"pallet-collective/runtime-benchmarks",
+	"pallet-society/runtime-benchmarks",
+	"pallet-evm/runtime-benchmarks",
+	"pallet-ethereum/runtime-benchmarks",
 ]
 
 try-runtime = [

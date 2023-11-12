@@ -1,4 +1,4 @@
-use crate::submit_order::build_rpc_for_submit_order;
+use crate::submit_order::{build_rpc_for_submit_order, SubmitOrderError};
 use codec::{Codec, Decode};
 use cumulus_primitives_core::relay_chain::vstaging::Assignment;
 use cumulus_primitives_core::{
@@ -11,11 +11,10 @@ use magnet_primitives_order::{
 	self,
 	well_known_keys::paras_para_lifecycles,
 	well_known_keys::{ON_DEMAND_QUEUE, SYSTEM_ACCOUNT, SYSTEM_BLOCKHASH, SYSTEM_EVENTS},
-	OrderRecord, OrderRuntimeApi,
+	OrderRecord, OrderRuntimeApi, OrderStatus,
 };
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
-use polkadot_runtime_common::BlockHashCount;
 use rococo_runtime::{Runtime, RuntimeCall, SignedExtra, SignedPayload, UncheckedExtrinsic};
 use runtime_parachains::{
 	assigner_on_demand as parachains_assigner_on_demand, paras::ParaLifecycle,
@@ -72,18 +71,22 @@ async fn try_place_order<Balance>(
 	para_id: ParaId,
 	url: String,
 	max_amount: Balance,
-) -> Option<()>
+) -> Result<(), SubmitOrderError>
 where
 	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128>,
 {
-	let nonce =
-		get_relay_chain_nonce::<Balance>(relay_chain.clone(), hash, keystore.clone()).await?;
+	let nonce = get_relay_chain_nonce::<Balance>(relay_chain.clone(), hash, keystore.clone())
+		.await
+		.ok_or_else(|| SubmitOrderError::NonceGetError)?;
 	// key:System BlockHash 0x00000000(Twox64Concat)
-	let genesis_hash_storage = relay_chain.get_storage_by_key(hash, SYSTEM_BLOCKHASH).await.ok()?;
+	let genesis_hash_storage = relay_chain
+		.get_storage_by_key(hash, SYSTEM_BLOCKHASH)
+		.await
+		.map_err(|_e| SubmitOrderError::GenesisHashGetError)?;
 	let genesis_hash = genesis_hash_storage
 		.map(|raw| <H256>::decode(&mut &raw[..]))
 		.transpose()
-		.ok()?
+		.map_err(|_e| SubmitOrderError::GenesisHashGetError)?
 		.unwrap_or_default();
 	let max_amount_128 = max_amount.into();
 	let output = place_order_extrinsic(
@@ -95,8 +98,7 @@ where
 		para_id,
 		max_amount_128,
 	);
-	let result = build_rpc_for_submit_order(&url, output).await.ok()?;
-	Some(result)
+	build_rpc_for_submit_order(&url, output).await
 }
 
 async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
@@ -127,8 +129,10 @@ where
 			.query_fee_details(block_hash, pending_tx_data, utx_length)
 			.ok()?;
 		all_gas_value = query_fee.final_fee().add(all_gas_value);
-		is_place_order =
-			parachain.runtime_api().reach_txpool_threshold(block_hash, all_gas_value).ok()?;
+		if transaction_pool.status().ready != 0 {
+			is_place_order =
+				parachain.runtime_api().reach_txpool_threshold(block_hash, all_gas_value).ok()?;
+		}
 	}
 	Some(is_place_order)
 }
@@ -192,39 +196,44 @@ where
 	let idx = (height >> slot_width) % auth_len;
 	let collator_public =
 		magnet_client_consensus_aura::order_slot::<PB>(idx, &authorities, &keystore).await;
-	log::info!("=================={},{},{},{:?}", height, slot_width, idx, collator_public);
-	match collator_public {
-		Some(collator) => {
-			//your turn
-			let base = 2 as u32;
-			let slot_block = base.pow(slot_width);
-			if height % slot_block == 0 {
-				let mut order_record_local = order_record.lock().await;
-				order_record_local.order_complete = false;
-				order_record_local.relay_base = p_hash;
+	let base = 2 as u32;
+	let slot_block = base.pow(slot_width);
+	if height % slot_block == 0 {
+		let mut order_record_local = order_record.lock().await;
+		order_record_local.relay_base = p_hash;
+		order_record_local.relay_base_height = height;
+		order_record_local.order_status = OrderStatus::Init;
+	}
+	let mut relevant_keys = Vec::new();
+	//System Events
+	relevant_keys.push(SYSTEM_EVENTS.to_vec());
+	let storage_proof = relay_chain.prove_read(p_hash, &relevant_keys).await?;
+	let order_placed = parachain.runtime_api().order_placed(
+		hash,
+		storage_proof,
+		validation_data.clone(),
+		para_id,
+	)?;
+	match order_placed {
+		Some(author) => {
+			let mut order_record_local = order_record.lock().await;
+			order_record_local.relay_parent = Some(p_hash);
+			order_record_local.relay_height = height;
+			order_record_local.validation_data = Some(validation_data);
+			order_record_local.author_pub = Some(author);
+			order_record_local.para_id = para_id;
+			let sequence_number = parachain.runtime_api().sequence_number(hash)?;
+			order_record_local.sequence_number = sequence_number;
+		},
+		None => {
+			let sequence_number = parachain.runtime_api().sequence_number(hash)?;
+			let order_executed = parachain.runtime_api().order_executed(hash, sequence_number)?;
+			if order_executed {
+				return Ok(());
 			}
-			let mut relevant_keys = Vec::new();
-			//System Events
-			relevant_keys.push(SYSTEM_EVENTS.to_vec());
-			let storage_proof = relay_chain.prove_read(p_hash, &relevant_keys).await?;
-			let order_is_collator = parachain.runtime_api().order_placed(
-				hash,
-				storage_proof,
-				validation_data.clone(),
-				collator.clone(),
-				para_id,
-			)?;
-			if order_is_collator {
-				log::info!("==========order_is_collator==============");
-				let mut order_record_local = order_record.lock().await;
-				order_record_local.relay_parent = Some(p_hash);
-				order_record_local.relay_height = height;
-				order_record_local.validation_data = Some(validation_data);
-				order_record_local.author_pub = Some(collator);
-				order_record_local.para_id = para_id;
-				let sequence_number = parachain.runtime_api().sequence_number(hash)?;
-				order_record_local.sequence_number = sequence_number;
-			} else {
+			let mut order_record_local = order_record.lock().await;
+			if collator_public.is_some() {
+				//your turn
 				let reached =
 					reach_txpool_threshold::<_, _, _, _, PB>(parachain, transaction_pool).await;
 				if let Some(reach) = reached {
@@ -240,41 +249,38 @@ where
 							for vv in vvs.into_iter() {
 								if vv.para_id == para_id {
 									exist_order = true;
-									log::info!("===========order exist==============");
+									break;
 								}
 							}
 						}
 						if !exist_order {
-							log::info!("===========order not exist==============");
-							let sequence_number = parachain.runtime_api().sequence_number(hash)?;
-							let order_executed =
-								parachain.runtime_api().order_executed(hash, sequence_number)?;
-							log::info!("{:?},{:?},{:?}", sequence_number, order_executed, hash);
-							// if height% slot_block == 0 {
-							let mut order_record_local = order_record.lock().await;
-							if !order_executed && !order_record_local.order_complete {
-								log::info!("===========place_order==============");
-								let max_amount = parachain.runtime_api().order_max_amount(hash)?;
-								try_place_order::<Balance>(
-									relay_chain,
-									p_hash,
-									height,
-									keystore,
-									para_id,
-									url,
-									max_amount,
-								)
-								.await;
-								order_record_local.order_complete = true;
+							if height - order_record_local.relay_height > slot_block {
+								if order_record_local.order_status == OrderStatus::Init {
+									let max_amount =
+										parachain.runtime_api().order_max_amount(hash)?;
+									let order_result = try_place_order::<Balance>(
+										relay_chain,
+										order_record_local.relay_base,
+										order_record_local.relay_base_height,
+										keystore,
+										para_id,
+										url,
+										max_amount,
+									)
+									.await;
+									order_record_local.order_status = OrderStatus::Order;
+									if order_result.is_err() {
+										log::info!(
+											"===========place_order error:=============={:?}",
+											order_result
+										);
+									}
+								}
 							}
-							// }
 						}
 					}
 				}
 			}
-		},
-		_ => {
-			//not your turn,do nothing???
 		},
 	}
 	Ok(())
@@ -416,52 +422,8 @@ where
 		None,
 		on_demand_order_task,
 	);
-	// let spawn_handle = task_manager.spawn_handle();
-	// spawn_handle.spawn(
-	// 	"on-transaction-imported-magnet",
-	// 	Some("transaction-pool"),
-	// 	transaction_notifications(parachain.clone(), relay_chain.clone(), transaction_pool.clone()),
-	// );
 	Ok(())
 }
-
-// async fn transaction_notifications<T, R, ExPool,Block>(
-// 	client:Arc<T>,
-// 	relay_chain: R,
-// 	transaction_pool: Arc<ExPool>,
-// )
-// where
-// 	Block: BlockT,
-// 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash>+ 'static,
-// 	R: RelayChainInterface + Clone + 'static,
-// // 	T: ProvideRuntimeApi<Block>+ UsageProvider<Block> + Send + Sync+ 'static,
-// // 	Balance: Codec + MaybeDisplay+ 'static +Debug,
-// // T::Api: OrderRuntimeApi<Block> + TransactionPaymentApi<Block, Balance>,
-// {
-// 	// transaction notifications
-// 	transaction_pool
-// 		.import_notification_stream()
-// 		.for_each(move |hash| {
-// 			let clone_relay_chain = relay_chain.clone();
-// 			let clone_client = client.clone();
-// 			let clone_transaction_pool = transaction_pool.clone();
-// 			async move {
-// 				// let mut pending_iterator = clone_transaction_pool.ready();
-// 				// let mut all_tx_size = 0;
-// 				// let mut is_place_order = false;
-// 				// loop {
-// 				// 	let pending_tx = if let Some(pending_tx) = pending_iterator.next() {
-// 				// 		pending_tx
-// 				// 	} else {
-// 				// 		break
-// 				// 	};
-// 				// 	let pending_tx_data = pending_tx.data().clone();
-// 				// 	let pending_tx_hash = pending_tx.hash().clone();
-// 				// }
-// 			}
-// 		})
-// 		.await;
-// }
 
 pub fn construct_extrinsic(
 	current_block_hash: H256,
@@ -472,8 +434,7 @@ pub fn construct_extrinsic(
 	nonce: u32,
 ) -> UncheckedExtrinsic {
 	let function = function.into();
-	let period =
-		BlockHashCount::get().checked_next_power_of_two().map(|c| c / 2).unwrap_or(2) as u64;
+	let period = 4;
 	let tip = 0;
 	let extra: SignedExtra = (
 		frame_system::CheckNonZeroSender::<Runtime>::new(),

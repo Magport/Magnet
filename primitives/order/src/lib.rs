@@ -27,12 +27,21 @@ pub struct OrderInherentData<AuthorityId> {
 // Identifier of the order inherent
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"orderiht";
 
+#[derive(Clone, PartialEq)]
+pub enum OrderStatus {
+	Init,
+	Order,
+	Execute,
+	Complete,
+}
+
 #[derive(Clone)]
 pub struct OrderRecord<AuthorityId> {
 	pub relay_parent: Option<PHash>,
 	pub relay_height: RelayBlockNumber,
 	pub relay_base: PHash,
-	pub order_complete: bool,
+	pub relay_base_height: RelayBlockNumber,
+	pub order_status: OrderStatus,
 	pub validation_data: Option<PersistedValidationData>,
 	pub para_id: ParaId,
 	pub sequence_number: u64,
@@ -45,20 +54,20 @@ sp_api::decl_runtime_apis! {
 		Balance: Codec + MaybeDisplay,
 		AuthorityId:Codec
 	{
-		fn place_order()-> Option<u64>;
 
 		fn slot_width()-> u32;
 
 		fn sequence_number()-> u64;
+
+		fn current_relay_height()->u32;
 
 		fn order_max_amount() -> Balance;
 
 		fn order_placed(
 			relay_storage_proof: sp_trie::StorageProof,
 			validation_data: PersistedValidationData,
-			author_pub: AuthorityId,
 			para_id:ParaId,
-		)-> bool;
+		)-> Option<AuthorityId>;
 
 		fn reach_txpool_threshold(gas_balance:Balance) -> bool;
 

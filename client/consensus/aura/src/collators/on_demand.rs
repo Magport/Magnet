@@ -1,27 +1,3 @@
-// Copyright (C) Parity Technologies (UK) Ltd.
-// This file is part of Cumulus.
-
-// Cumulus is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// Cumulus is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Cumulus.  If not, see <http://www.gnu.org/licenses/>.
-
-//! This provides the option to run a basic relay-chain driven Aura implementation.
-//!
-//! This collator only builds on top of the most recently included block, limiting the
-//! block time to a maximum of two times the relay-chain block time, and requiring the
-//! block to be built and distributed to validators between two relay-chain blocks.
-//!
-//! For more information about AuRa, the Substrate crate should be checked.
-
 use codec::{Codec, Decode};
 use cumulus_client_collator::service::ServiceInterface as CollatorServiceInterface;
 use cumulus_client_consensus_common::ParachainBlockImportMarker;

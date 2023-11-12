@@ -48,7 +48,7 @@ use crate::eth::{
 };
 use crate::on_demand_order::spawn_on_demand_order;
 use futures::lock::Mutex;
-use magnet_primitives_order::OrderRecord;
+use magnet_primitives_order::{OrderRecord, OrderStatus};
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 
@@ -456,7 +456,8 @@ async fn start_node_impl(
 				relay_parent: None,
 				relay_height: 0,
 				relay_base: Default::default(),
-				order_complete: false,
+				relay_base_height: 0,
+				order_status: OrderStatus::Init,
 				validation_data: None,
 				para_id,
 				sequence_number: 0,

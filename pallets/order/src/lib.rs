@@ -1,20 +1,25 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
+use cumulus_pallet_parachain_system::{
+	relay_state_snapshot::Error as Relay_Error, RelayChainStateProof,
+};
 use frame_support::{
 	dispatch::DispatchResultWithPostInfo, dispatch::PostDispatchInfo, pallet_prelude::*,
 	traits::Currency,
 };
 use frame_system::pallet_prelude::*;
 use frame_system::{self, EventRecord};
-use magnet_chain_state_snapshot::{GenericStateProof, ReadEntryErr};
 use magnet_primitives_order::well_known_keys::SYSTEM_EVENTS;
 pub use pallet::*;
+use primitives::Balance;
 use primitives::{Id as ParaId, PersistedValidationData};
 use runtime_parachains::assigner_on_demand as parachains_assigner_on_demand;
 use sp_core::crypto::ByteArray;
 use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
-use sp_std::result;
+pub mod weights;
+use weights::WeightInfo;
+
 #[cfg(test)]
 mod mock;
 
@@ -29,12 +34,12 @@ type BalanceOf<T> =
 
 #[derive(Encode, Decode, Default, Clone, Copy, TypeInfo, MaxEncodedLen, Debug)]
 pub struct Order<AuthorityId> {
-	sequence_number: u64,
+	pub sequence_number: u64,
 	// relaychain_block_hash:Hash,
 	// relaychain_block_height:u32,
-	orderer: AuthorityId,
-	// price:Balance,
-	executed: bool,
+	pub orderer: AuthorityId,
+	pub price: Balance,
+	pub executed: bool,
 }
 #[frame_support::pallet]
 pub mod pallet {
@@ -42,7 +47,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_transaction_payment::Config {
+	pub trait Config: frame_system::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -52,7 +57,12 @@ pub mod pallet {
 			+ Parameter
 			+ RuntimeAppPublic
 			+ MaybeSerializeDeserialize
-			+ MaxEncodedLen;
+			+ MaxEncodedLen
+			+ for<'a> TryFrom<&'a [u8]>;
+
+		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+
+		type WeightInfo: WeightInfo;
 		/// The default value of w.
 		#[pallet::constant]
 		type SlotWidth: Get<u32>;
@@ -71,6 +81,10 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn sequence_number)]
 	pub type SequenceNumber<T> = StorageValue<_, u64, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn current_relay_height)]
+	pub type CurrentRelayHeight<T> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::type_value]
 	pub fn SlotWidthOnEmpty<T: Config>() -> u32 {
@@ -104,38 +118,50 @@ pub mod pallet {
 	pub type OrderMap<T: Config> =
 		StorageMap<_, Twox64Concat, u64, Order<T::AuthorityId>, OptionQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn block_2_sequence)]
+	pub type Block2Sequence<T: Config> =
+		StorageMap<_, Twox64Concat, BlockNumberFor<T>, u64, OptionQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		OrderCreate {},
+		OrderCreate { sequence_number: u64, orderer: T::AuthorityId },
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
 		FailedReading,
-		OrderNotExist,
+		OrderExist,
+		CreateOrderFail,
+		InvalidValidation,
+		WrongSequenceNumber,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_finalize(_: BlockNumberFor<T>) {
+		fn on_finalize(block_number: BlockNumberFor<T>) {
 			let old_sequence_number = SequenceNumber::<T>::get();
 			let order = OrderMap::<T>::get(old_sequence_number);
 			if let Some(t_order) = order {
-				let new_order = t_order.clone();
+				let orderer = t_order.orderer;
 				OrderMap::<T>::remove(old_sequence_number);
 				OrderMap::<T>::insert(
 					old_sequence_number,
 					Order::<T::AuthorityId> {
 						sequence_number: old_sequence_number,
-						orderer: new_order.orderer,
+						orderer: orderer.clone(),
+						price: t_order.price,
 						executed: true,
 					},
 				);
 				SequenceNumber::<T>::set(old_sequence_number + 1);
-				Self::deposit_event(Event::OrderCreate {});
+				Block2Sequence::<T>::insert(block_number, old_sequence_number);
+				Self::deposit_event(Event::OrderCreate {
+					sequence_number: old_sequence_number,
+					orderer,
+				});
 			}
-			log::info!("{:?}", OrderMap::<T>::get(old_sequence_number));
 		}
 	}
 
@@ -152,23 +178,14 @@ pub mod pallet {
 				.ok()
 				.flatten()
 				.expect("there is not data to be posted; qed");
-			Some(Call::check_order { data })
+			if data.validation_data.is_some() {
+				Some(Call::create_order { data })
+			} else {
+				None
+			}
 		}
 		fn is_inherent(call: &Self::Call) -> bool {
-			matches!(call, Call::check_order { .. })
-		}
-
-		fn check_inherent(
-			call: &Self::Call,
-			_data: &InherentData,
-		) -> result::Result<(), Self::Error> {
-			match call {
-				Call::check_order { .. } => {
-					log::info!("add order==========check_inherent");
-					return Ok(());
-				},
-				_ => return Ok(()),
-			};
+			matches!(call, Call::create_order { .. })
 		}
 	}
 
@@ -176,13 +193,12 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight((0, DispatchClass::Mandatory))]
-		pub fn check_order(
+		pub fn create_order(
 			origin: OriginFor<T>,
 			data: magnet_primitives_order::OrderInherentData<T::AuthorityId>,
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
 
-			let total_weight = T::DbWeight::get().reads_writes(1, 1);
 			let magnet_primitives_order::OrderInherentData {
 				relay_storage_proof,
 				validation_data,
@@ -190,51 +206,70 @@ pub mod pallet {
 				para_id,
 				author_pub,
 			} = data;
-			if let Some(validation_data) = validation_data {
-				if let Some(author_pub) = author_pub {
-					let _check_pass = Self::check_order_proof(
+			let total_weight = match validation_data {
+				Some(validation_data) => {
+					let (_, price) = Self::check_order_proof(
 						relay_storage_proof,
-						validation_data,
+						validation_data.clone(),
 						author_pub.clone(),
 						para_id,
-					);
+					)
+					.ok_or(Error::<T>::CreateOrderFail)?;
 					let old_sequence_number = SequenceNumber::<T>::get();
 					let order = OrderMap::<T>::get(old_sequence_number);
 					if sequence_number == old_sequence_number {
-						log::info!("add order================={:?}", order);
 						if order.is_none() {
-							log::info!("{:?}", old_sequence_number);
 							OrderMap::<T>::insert(
 								old_sequence_number,
 								Order::<T::AuthorityId> {
 									sequence_number: old_sequence_number,
-									orderer: author_pub,
+									orderer: author_pub.unwrap(),
+									price,
 									executed: false,
 								},
 							);
-							log::info!("{:?}", OrderMap::<T>::get(old_sequence_number));
+							CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
+						} else {
+							Err(Error::<T>::OrderExist)?;
 						}
+					} else {
+						Err(Error::<T>::WrongSequenceNumber)?;
 					}
-				}
-			}
-
+					T::DbWeight::get().reads_writes(2, 1)
+				},
+				None => T::DbWeight::get().reads_writes(0, 0),
+			};
 			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
+		pub fn set_parameter(
+			origin: OriginFor<T>,
+			slot_width: u32,
+			order_max_amount: BalanceOf<T>,
+		) -> DispatchResultWithPostInfo {
+			T::UpdateOrigin::ensure_origin(origin)?;
+
+			<SlotWidth<T>>::put(slot_width);
+
+			<OrderMaxAmount<T>>::put(order_max_amount);
+
+			Ok(().into())
 		}
 	}
 }
 
 impl<T: Config> Pallet<T> {
-	fn check_order_proof(
+	fn get_author_from_proof(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
-		author_pub: T::AuthorityId,
 		para_id: ParaId,
-	) -> bool {
+	) -> Option<(T::AuthorityId, Balance)> {
 		let relay_storage_root = validation_data.relay_parent_storage_root;
-		let relay_storage_rooted_proof: GenericStateProof<
-			cumulus_primitives_core::relay_chain::Block,
-		> = GenericStateProof::new(relay_storage_root, relay_storage_proof)
-			.expect("Invalid relay chain state proof");
+		let relay_storage_rooted_proof =
+			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
+				.expect("Invalid relay chain state proof");
 		// key = System Events
 		let head_data = relay_storage_rooted_proof
 			.read_entry::<Vec<Box<EventRecord<rococo_runtime::RuntimeEvent, T::Hash>>>>(
@@ -242,58 +277,95 @@ impl<T: Config> Pallet<T> {
 				None,
 			)
 			.map_err(|e| match e {
-				ReadEntryErr::Proof => panic!("Invalid proof provided for system events key"),
+				Relay_Error::ReadEntry(_) => panic!("Invalid proof provided for system events key"),
 				_ => Error::<T>::FailedReading,
 			})
 			.unwrap();
-		let mut spot_price: u128 = 0;
-		for i in 0..head_data.len() {
-			match head_data[i].event {
-				rococo_runtime::RuntimeEvent::OnDemandAssignmentProvider(
+		let v_price: Vec<u128> = head_data
+			.iter()
+			.filter_map(|item| {
+				if let rococo_runtime::RuntimeEvent::OnDemandAssignmentProvider(
 					parachains_assigner_on_demand::Event::OnDemandOrderPlaced {
 						para_id: pid,
 						spot_price: sprice,
 					},
-				) => {
+				) = item.event
+				{
 					if pid == para_id {
-						spot_price = sprice;
+						Some(sprice)
+					} else {
+						None
 					}
-				},
-				_ => continue,
-			};
-		}
-		let mut order_is_collator = false;
-		for i in 0..head_data.len() {
-			match head_data[i].event {
-				rococo_runtime::RuntimeEvent::Balances(pallet_balances::Event::Withdraw {
-					who: ref order,
-					amount: eprice,
-				}) => {
-					if spot_price == eprice {
-						if author_pub.encode() == order.as_slice() {
-							order_is_collator = true;
-							break;
+				} else {
+					None
+				}
+			})
+			.collect();
+
+		let orderer: Vec<(T::AuthorityId, u128)> = v_price
+			.iter()
+			.filter_map(|item| {
+				let mut orderer = None;
+				let _: Vec<_> = head_data
+					.iter()
+					.filter_map(|event| {
+						if let rococo_runtime::RuntimeEvent::Balances(
+							pallet_balances::Event::Withdraw { who: ref order, amount: eprice },
+						) = event.event
+						{
+							if eprice == *item {
+								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
+									Ok(order) => Some((order, eprice)),
+									Err(_) => None,
+								};
+								Some(())
+							} else {
+								None
+							}
+						} else {
+							None
 						}
-					}
-				},
-				_ => continue,
-			};
+					})
+					.collect();
+				orderer
+			})
+			.collect();
+		if orderer.len() > 0 {
+			Some(orderer[0].clone())
+		} else {
+			None
 		}
-		log::info!("========check_order_proof========={:?}", order_is_collator);
-		order_is_collator
 	}
 
-	pub fn place_order() -> Option<u64> {
-		Some(66)
+	fn check_order_proof(
+		relay_storage_proof: sp_trie::StorageProof,
+		validation_data: PersistedValidationData,
+		author_pub: Option<T::AuthorityId>,
+		para_id: ParaId,
+	) -> Option<(T::AuthorityId, Balance)> {
+		let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
+		match op_author {
+			Some((author, spot_price)) => {
+				if author_pub == Some(author.clone()) {
+					Some((author, spot_price))
+				} else {
+					None
+				}
+			},
+			None => None,
+		}
 	}
 
 	pub fn order_placed(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
-		author_pub: T::AuthorityId,
 		para_id: ParaId,
-	) -> bool {
-		Self::check_order_proof(relay_storage_proof, validation_data, author_pub, para_id)
+	) -> Option<T::AuthorityId> {
+		let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
+		match op_author {
+			Some((author, _)) => Some(author),
+			None => None,
+		}
 	}
 
 	pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>) -> bool {
@@ -302,7 +374,14 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub fn order_executed(sequence_number: u64) -> bool {
-		let order = OrderMap::<T>::get(sequence_number);
-		order.is_some()
+		let order_map = OrderMap::<T>::get(sequence_number);
+		match order_map {
+			Some(order) => order.executed,
+			None => false,
+		}
 	}
+}
+
+pub trait OrderGasCost<T: frame_system::Config> {
+	fn gas_cost(block_number: BlockNumberFor<T>) -> Balance;
 }

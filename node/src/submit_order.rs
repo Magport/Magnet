@@ -1,4 +1,3 @@
-use cumulus_relay_chain_interface::RelayChainError;
 use futures::{
 	channel::oneshot::Sender as OneshotSender, future::BoxFuture, stream::FuturesUnordered,
 	FutureExt, StreamExt,
@@ -18,6 +17,15 @@ use url::Url;
 
 const LOG_TARGET: &str = "reconnecting-websocket-client";
 
+#[derive(Debug)]
+pub enum SubmitOrderError {
+	RPCUrlError,
+	RPCConnectError,
+	RPCCallException,
+	DeconstructValueError,
+	NonceGetError,
+	GenesisHashGetError,
+}
 /// Format url and force addition of a port
 fn url_to_string_with_port(url: Url) -> Option<String> {
 	// This is already validated on CLI side, just defensive here
@@ -64,11 +72,13 @@ async fn connect_next_available_rpc_server(
 }
 
 impl ClientManager {
-	pub async fn new(urls: Vec<String>) -> Result<Self, ()> {
+	pub async fn new(urls: Vec<String>) -> Result<Self, SubmitOrderError> {
 		if urls.is_empty() {
-			return Err(());
+			return Err(SubmitOrderError::RPCUrlError);
 		}
-		let active_client = connect_next_available_rpc_server(&urls, 0).await?;
+		let active_client = connect_next_available_rpc_server(&urls, 0)
+			.await
+			.map_err(|_e| SubmitOrderError::RPCUrlError)?;
 		Ok(Self { urls, active_client: active_client.1, active_index: active_client.0 })
 	}
 
@@ -77,12 +87,12 @@ impl ClientManager {
 		method: String,
 		params: ArrayParams,
 		response_sender: OneshotSender<Result<JsonValue, JsonRpseeError>>,
-	) -> BoxFuture<'static, Result<(), ()>> {
+	) -> BoxFuture<'static, Result<(), SubmitOrderError>> {
 		let future_client = self.active_client.clone();
 		async move {
 			let resp = future_client.request(&method, params.clone()).await;
-			if let Err(JsonRpseeError::RestartNeeded(_)) = resp {
-				return Err(());
+			if let Err(_err) = resp {
+				return Err(SubmitOrderError::RPCCallException);
 			}
 
 			if let Err(err) = response_sender.send(resp) {
@@ -103,31 +113,23 @@ pub async fn submit_extrinsic_rpc_call(
 	method: String,
 	params: ArrayParams,
 	response_sender: OneshotSender<Result<JsonValue, JsonRpseeError>>,
-) {
+) -> Result<(), SubmitOrderError> {
 	let urls = vec![Url::parse(url).unwrap()];
 	let urls_col = urls.into_iter().filter_map(url_to_string_with_port).collect();
 	let mut pending_requests = FuturesUnordered::new();
 	let Ok(client_manager) = ClientManager::new(urls_col).await else {
-		tracing::error!(target: LOG_TARGET, "No valid RPC url found. Stopping RPC worker.");
-		return;
+		return Err(SubmitOrderError::RPCConnectError);
 	};
 	pending_requests.push(client_manager.create_request(method, params, response_sender));
-	while !pending_requests.is_empty() {
-		pending_requests.next().await;
-	}
+	pending_requests.next().await.expect("request should create success")
 }
 pub async fn build_rpc_for_submit_order(
 	url: &str,
 	extrinsic: String,
-) -> Result<(), RelayChainError> {
+) -> Result<(), SubmitOrderError> {
 	let (tx, rx) = futures::channel::oneshot::channel();
 	let params = rpc_params![extrinsic];
-	submit_extrinsic_rpc_call(url, "author_submitExtrinsic".into(), params, tx).await;
-	let _value = rx.await.map_err(|err| {
-		RelayChainError::WorkerCommunicationError(format!(
-			"Unexpected channel close on RPC worker side: {}",
-			err
-		))
-	})??;
+	submit_extrinsic_rpc_call(url, "author_submitExtrinsic".into(), params, tx).await?;
+	let _value = rx.await.map_err(|_err| SubmitOrderError::DeconstructValueError)?;
 	Ok(())
 }

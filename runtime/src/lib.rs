@@ -55,6 +55,7 @@ use frame_support::{
 };
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
+	pallet_prelude::BlockNumberFor,
 	EnsureRoot, EnsureSigned,
 };
 use pallet_balances::NegativeImbalance;
@@ -79,7 +80,7 @@ use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
 use cumulus_primitives_core::{ParaId, PersistedValidationData};
-pub use pallet_order;
+pub use pallet_order::{self, OrderGasCost};
 /// Import the template pallet.
 pub use pallet_parachain_template;
 
@@ -608,20 +609,45 @@ impl pallet_collator_selection::Config for Runtime {
 impl pallet_parachain_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
+pub struct OrderGasCostHandler();
 
+impl<T> OrderGasCost<T> for OrderGasCostHandler
+where
+	T: pallet_order::Config,
+{
+	fn gas_cost(block_number: BlockNumberFor<T>) -> Balance {
+		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number);
+		match sequece_number {
+			Some(sequence) => {
+				let order = <pallet_order::Pallet<T>>::order_map(sequence);
+				match order {
+					Some(od) => od.price,
+					None => 0,
+				}
+			},
+			None => 0,
+		}
+	}
+}
 parameter_types! {
-	pub const SlotWidth: u32 = 1;
+	pub const SlotWidth: u32 = 2;
 	pub const OrderMaxAmount:Balance = 200000000;
 	pub const TxPoolThreshold:Balance = 3000000000;
 }
+type EnsureRootOrHalf = EitherOfDiverse<
+	EnsureRoot<AccountId>,
+	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
+>;
 
 impl pallet_order::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type AuthorityId = AuraId;
 	type Currency = Balances;
+	type UpdateOrigin = EnsureRootOrHalf;
 	type OrderMaxAmount = OrderMaxAmount;
 	type SlotWidth = SlotWidth;
 	type TxPoolThreshold = TxPoolThreshold;
+	type WeightInfo = pallet_order::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -964,6 +990,7 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
+		[pallet_order, OrderPallet]
 	);
 }
 
@@ -1307,9 +1334,6 @@ impl_runtime_apis! {
 		}
 	}
 	impl magnet_primitives_order::OrderRuntimeApi<Block, Balance, AuraId> for Runtime {
-		fn place_order()-> Option<u64> {
-			OrderPallet::place_order()
-		}
 
 		fn slot_width()-> u32{
 			OrderPallet::slot_width()
@@ -1320,13 +1344,17 @@ impl_runtime_apis! {
 		fn sequence_number()-> u64 {
 			OrderPallet::sequence_number()
 		}
+
+		fn current_relay_height()-> u32 {
+			OrderPallet::current_relay_height()
+		}
+
 		fn order_placed(
 			relay_storage_proof: sp_trie::StorageProof,
 			validation_data: PersistedValidationData,
-			author_pub: AuraId,
 			para_id:ParaId,
-		)-> bool {
-			OrderPallet::order_placed(relay_storage_proof, validation_data, author_pub, para_id)
+		)-> Option<AuraId> {
+			OrderPallet::order_placed(relay_storage_proof, validation_data, para_id)
 		}
 
 		fn reach_txpool_threshold(gas_balance:Balance) -> bool {

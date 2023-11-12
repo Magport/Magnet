@@ -1,29 +1,3 @@
-// Copyright (C) Parity Technologies (UK) Ltd.
-// This file is part of Cumulus.
-
-// Cumulus is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-
-// Cumulus is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with Cumulus.  If not, see <http://www.gnu.org/licenses/>.
-
-//! The core collator logic for Aura - slot claiming, block proposing, and collation
-//! packaging.
-//!
-//! The [`Collator`] struct exposed here is meant to be a component of higher-level logic
-//! which actually manages the control flow of the collator - which slots to claim, how
-//! many collations to build, when to work, etc.
-//!
-//! This module also exposes some standalone functions for common operations when building
-//! aura-based collators.
-
 use codec::{Codec, Encode};
 use cumulus_client_collator::service::ServiceInterface as CollatorServiceInterface;
 use cumulus_client_consensus_common::{
