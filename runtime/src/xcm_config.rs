@@ -14,12 +14,11 @@ use polkadot_runtime_common::impls::ToAuthor;
 use xcm::latest::prelude::*;
 use xcm_builder::{
 	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
-	AllowUnpaidExecutionFrom,AllowTopLevelPaidExecutionFrom,
-	CurrencyAdapter, EnsureXcmOrigin,
+	AllowTopLevelPaidExecutionFrom, AllowUnpaidExecutionFrom, CurrencyAdapter, EnsureXcmOrigin,
 	FixedWeightBounds, IsConcrete, NativeAsset, ParentIsPreset, RelayChainAsNative,
 	SiblingParachainAsNative, SiblingParachainConvertsVia, SignedAccountId32AsNative,
-	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
-	UsingComponents, WithComputedOrigin, WithUniqueTopic,
+	SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit, UsingComponents,
+	WithComputedOrigin, WithUniqueTopic,
 };
 use xcm_executor::XcmExecutor;
 
@@ -103,7 +102,6 @@ pub type Barrier = (
 			AllowUnpaidExecutionFrom<ParentOrParentsExecutivePlurality>,
 			// Subscriptions for version tracking are OK.
 			AllowSubscriptionsFrom<Everything>,
-
 		),
 		UniversalLocation,
 		ConstU32<8>,
