@@ -614,18 +614,24 @@ pub struct OrderGasCostHandler();
 impl<T> OrderGasCost<T> for OrderGasCostHandler
 where
 	T: pallet_order::Config,
+	T::AccountId: From<[u8; 32]>,
 {
-	fn gas_cost(block_number: BlockNumberFor<T>) -> Balance {
+	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
 		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number);
 		match sequece_number {
 			Some(sequence) => {
 				let order = <pallet_order::Pallet<T>>::order_map(sequence);
 				match order {
-					Some(od) => od.price,
-					None => 0,
+					Some(od) => {
+						let mut r = [0u8; 32];
+						r.copy_from_slice(od.orderer.encode().as_slice());
+						let account = T::AccountId::try_from(r).unwrap();
+						Some((account, od.price))
+					},
+					None => None,
 				}
 			},
-			None => 0,
+			None => None,
 		}
 	}
 }

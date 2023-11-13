@@ -1,6 +1,8 @@
+use crate::OrderGasCost;
+use codec::Encode;
 use frame_support::{parameter_types, traits::Everything};
 use frame_system as system;
-use frame_system::EnsureRoot;
+use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{
@@ -19,6 +21,7 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Event<T>},
 		OrderPallet: crate::{Pallet, Call, Storage, Event<T>},
+		MockPallet: mock_pallet,
 	}
 );
 
@@ -85,7 +88,54 @@ impl crate::Config for Test {
 	type TxPoolThreshold = TxPoolThreshold;
 	type WeightInfo = ();
 }
+pub struct OrderGasCostHandler();
 
+impl<T> OrderGasCost<T> for OrderGasCostHandler
+where
+	T: crate::Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
+		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number);
+		match sequece_number {
+			Some(sequence) => {
+				let order = <crate::Pallet<T>>::order_map(sequence);
+				match order {
+					Some(od) => {
+						let mut r = [0u8; 32];
+						r.copy_from_slice(od.orderer.encode().as_slice());
+						let account = T::AccountId::try_from(r).unwrap();
+						Some((account, od.price))
+					},
+					None => None,
+				}
+			},
+			None => None,
+		}
+	}
+}
+
+#[frame_support::pallet]
+pub mod mock_pallet {
+	use super::*;
+	#[pallet::config]
+	pub trait Config: frame_system::Config {
+		type OrderGasCost: OrderGasCost<Self>;
+	}
+
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {}
+
+	#[pallet::pallet]
+	#[pallet::without_storage_info]
+	pub struct Pallet<T>(_);
+
+	impl<T: Config> Pallet<T> {}
+}
+
+impl mock_pallet::Config for Test {
+	type OrderGasCost = OrderGasCostHandler;
+}
 pub struct ExtBuilder {
 	balances: Vec<(AccountId32, u128)>,
 }

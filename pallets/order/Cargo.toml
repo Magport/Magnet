@@ -41,6 +41,7 @@ sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "releas
 
 [dev-dependencies]
 serde = { version = "1.0.188" }
+codec = { package = "parity-scale-codec", version = "3.0.0", features = ["derive"], default-features = false }
 
 # Substrate
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}

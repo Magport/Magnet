@@ -383,5 +383,5 @@ impl<T: Config> Pallet<T> {
 }
 
 pub trait OrderGasCost<T: frame_system::Config> {
-	fn gas_cost(block_number: BlockNumberFor<T>) -> Balance;
+	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)>;
 }
