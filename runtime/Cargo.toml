@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.1.3"
+version = "0.1.6"
 authors = ["Anonymous"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -22,11 +22,15 @@ scale-info = { version = "2.9.0", default-features = false, features = ["derive"
 smallvec = "1.11.0"
 
 # Local
+mp-system = { path = "../primitives/system", default-features = false }
 pallet-parachain-template = { path = "../pallets/template", default-features = false }
 pallet-motion = { path = "../pallets/motion", default-features = false }
 pallet-assets-bridge = { path = "../pallets/assets-bridge", default-features = false }
 pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
 pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
+pallet-pot = { path = "../pallets/pot", default-features = false }
+pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
+pallet-assurance = { path = "../pallets/assurance", default-features = false }
 
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
