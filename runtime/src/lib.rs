@@ -28,6 +28,8 @@ use sp_runtime::{
 	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature,
 };
 
+use scale_info::prelude::string::String;
+use sp_std::collections::btree_map::BTreeMap;
 use sp_std::{marker::PhantomData, prelude::*};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -44,8 +46,8 @@ use frame_support::{
 	dispatch::DispatchClass,
 	parameter_types,
 	traits::{
-		AsEnsureOriginWithArg, ConstBool, ConstU32, ConstU64, ConstU8, Currency, EitherOfDiverse,
-		Everything, FindAuthor, Imbalance, OnFinalize, OnUnbalanced,
+		AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency,
+		EitherOfDiverse, Everything, FindAuthor, Imbalance, OnFinalize, OnUnbalanced,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -97,6 +99,8 @@ use pallet_evm::{
 
 mod precompiles;
 use precompiles::FrontierPrecompiles;
+
+use pallet_pot::PotNameBtreemap;
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -935,6 +939,33 @@ impl pallet_evm_utils::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
 
+parameter_types! {
+	pub const PotNames: [&'static str;3] = ["system", "treasury", "maintenance"];
+	pub Pots: BTreeMap<String, AccountId> = pallet_pot
+											::HashedPotNameBtreemap
+											::<Runtime, pallet_pot::HashedPotNameMapping<BlakeTwo256>>
+											::pots_btreemap(&(PotNames::get()));
+}
+
+impl pallet_pot::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type PotNameMapping = pallet_pot::HashedPotNameMapping<BlakeTwo256>;
+	type Currency = Balances;
+	type Pots = Pots;
+}
+
+parameter_types! {
+	pub const SystemPotName: &'static str = "system";
+}
+
+impl pallet_assurance::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type SystemPotName = SystemPotName;
+	type Liquidate = ();
+	type DefaultBidThreshold = ConstU32<8u32>;
+	type DefaultLiquidateThreshold = ConstU128<100_000_000_000_000>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -983,6 +1014,8 @@ construct_runtime!(
 		//Magnet
 		OrderPallet: pallet_order = 51,
 		EVMUtils: pallet_evm_utils = 60,
+		Pot: pallet_pot = 61,
+		Assurance: pallet_assurance = 62,
 	}
 );
 
@@ -1367,10 +1400,27 @@ impl_runtime_apis! {
 			OrderPallet::reach_txpool_threshold(gas_balance)
 		}
 
+
 		fn order_executed(sequence_number:u64) -> bool {
 			OrderPallet::order_executed(sequence_number)
 		}
 	}
+
+	impl mp_system::OnRelayChainApi<Block> for Runtime {
+		fn on_relaychain(block_number: u32) -> i32 {
+			Assurance::on_relaychain(block_number)
+		}
+	}
+
+	impl pallet_pot_runtime_api::PotRPCApi<Block> for Runtime {
+		fn balance_of(pot_name: String) -> Result<u128, sp_runtime::DispatchError> {
+			Pot::balance_of(&pot_name).map_err(|_| sp_runtime::DispatchError::Other("NotPot"))
+		}
+		fn balance_of_base() -> Result<u128, sp_runtime::DispatchError> {
+			Pot::balance_of_base().map_err(|_| sp_runtime::DispatchError::Other("BaseBalanceError"))
+		}
+	}
+
 	#[cfg(feature = "try-runtime")]
 	impl frame_try_runtime::TryRuntime<Block> for Runtime {
 		fn on_runtime_upgrade(checks: frame_try_runtime::UpgradeCheckSelect) -> (Weight, Weight) {

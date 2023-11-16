@@ -6,15 +6,20 @@ members = [
     "node",
     "runtime",
     "pallets/order",
+	"primitives/system",
     "pallets/motion",
     "pallets/evm-utils",
 	"pallets/evm/precompile/substrate-utils",
+	"pallets/pot/runtime-api",
+	"pallets/pot/rpc",
+	"pallets/pot",
+	"pallets/assurance",
 ]
 resolver = "2"
 
 [workspace.package]
-authors = ["Anonymous"]
+authors = ["Magport/Magnet team"]
 edition = "2021"
 homepage = "https://magnet.magport.io/"
-license = "Unlicense"
+license = "Apache License 2.0"
 repository = "https://github.com/Magport/Magnet"

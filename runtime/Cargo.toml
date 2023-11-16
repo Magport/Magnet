@@ -22,6 +22,7 @@ scale-info = { version = "2.9.0", default-features = false, features = ["derive"
 smallvec = "1.11.0"
 
 # Local
+mp-system = { path = "../primitives/system", default-features = false }
 pallet-parachain-template = { path = "../pallets/template", default-features = false }
 pallet-motion = { path = "../pallets/motion", default-features = false }
 pallet-assets-bridge = { path = "../pallets/assets-bridge", default-features = false }
@@ -29,6 +30,9 @@ pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
 pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
 pallet-order = { path = "../pallets/order", default-features = false }
 magnet-primitives-order = { path = "../primitives/order", default-features = false }
+pallet-pot = { path = "../pallets/pot", default-features = false }
+pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
+pallet-assurance = { path = "../pallets/assurance", default-features = false }
 
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
