@@ -26,6 +26,8 @@ use parachain_magnet_runtime::{opaque::Block, AccountId, Balance, Hash, Nonce};
 mod eth;
 pub use self::eth::{create_eth, overrides_handle, EthDeps};
 
+use pallet_pot_rpc::PotApiServer;
+
 /// Full client dependencies.
 pub struct FullDeps<C, P, A: ChainApi, CT, CIDP> {
 	/// The client instance to use.
@@ -70,6 +72,7 @@ where
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: fp_rpc::ConvertTransactionRuntimeApi<Block>,
 	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
+	C::Api: pallet_pot_rpc::PotRPCApi<Block>,
 	C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
 	C: BlockchainEvents<Block> + AuxStore + UsageProvider<Block> + StorageProvider<Block, BE>,
 	BE: Backend<Block> + 'static,
@@ -86,7 +89,8 @@ where
 	let FullDeps { client, pool, deny_unsafe, command_sink, eth } = deps;
 
 	io.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
-	io.merge(TransactionPayment::new(client).into_rpc())?;
+	io.merge(TransactionPayment::new(client.clone()).into_rpc())?;
+	io.merge(pallet_pot_rpc::Pot::new(client).into_rpc())?;
 
 	if let Some(command_sink) = command_sink {
 		io.merge(
