@@ -1,3 +1,19 @@
+// Copyright (C) Magnet.
+// This file is part of Magnet.
+
+// Magnet is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// Magnet is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
+
 use crate::submit_order::{build_rpc_for_submit_order, SubmitOrderError};
 use codec::{Codec, Decode};
 use cumulus_primitives_core::relay_chain::vstaging::Assignment;
@@ -10,14 +26,19 @@ use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
 use magnet_primitives_order::{
 	self,
 	well_known_keys::paras_para_lifecycles,
-	well_known_keys::{ON_DEMAND_QUEUE, SYSTEM_ACCOUNT, SYSTEM_BLOCKHASH, SYSTEM_EVENTS},
+	well_known_keys::{
+		ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_ACCOUNT, SYSTEM_BLOCKHASH,
+		SYSTEM_EVENTS,
+	},
 	OrderRecord, OrderRuntimeApi, OrderStatus,
 };
+use mp_system::OnRelayChainApi;
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
 use rococo_runtime::{Runtime, RuntimeCall, SignedExtra, SignedPayload, UncheckedExtrinsic};
 use runtime_parachains::{
-	assigner_on_demand as parachains_assigner_on_demand, paras::ParaLifecycle,
+	assigner_on_demand as parachains_assigner_on_demand, configuration::HostConfiguration,
+	paras::ParaLifecycle,
 };
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
@@ -31,10 +52,42 @@ use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	codec::Encode,
 	generic,
-	traits::{AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, Member},
-	OpaqueExtrinsic,
+	traits::{
+		AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, Member,
+		SaturatedConversion,
+	},
+	FixedPointNumber, FixedU128, OpaqueExtrinsic,
 };
+use std::cmp::Ordering;
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
+
+async fn get_spot_price<Balance>(
+	relay_chain: impl RelayChainInterface + Clone,
+	hash: H256,
+) -> Option<Balance>
+where
+	Balance: Codec + MaybeDisplay + 'static + Debug + From<u128>,
+{
+	let spot_traffic_storage = relay_chain.get_storage_by_key(hash, SPOT_TRAFFIC).await.ok()?;
+	let p_spot_traffic = spot_traffic_storage
+		.map(|raw| <FixedU128>::decode(&mut &raw[..]))
+		.transpose()
+		.ok()?;
+	let active_config_storage = relay_chain.get_storage_by_key(hash, ACTIVE_CONFIG).await.ok()?;
+	let p_active_config = active_config_storage
+		.map(|raw| <HostConfiguration<u32>>::decode(&mut &raw[..]))
+		.transpose()
+		.ok()?;
+	if p_spot_traffic.is_some() && p_active_config.is_some() {
+		let spot_traffic = p_spot_traffic.unwrap();
+		let active_config = p_active_config.unwrap();
+		let spot_price = spot_traffic
+			.saturating_mul_int(active_config.on_demand_base_fee.saturated_into::<u128>());
+		Some(Balance::from(spot_price))
+	} else {
+		None
+	}
+}
 
 async fn get_relay_chain_nonce<Balance>(
 	relay_chain: impl RelayChainInterface + Clone,
@@ -104,12 +157,15 @@ where
 async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
 	parachain: &P,
 	transaction_pool: Arc<ExPool>,
+	height: RelayBlockNumber,
 ) -> Option<bool>
 where
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	Balance: Codec + MaybeDisplay + 'static + Debug + AtLeast32BitUnsigned + Copy,
-	P::Api: TransactionPaymentApi<Block, Balance> + OrderRuntimeApi<Block, Balance, PB::Public>,
+	P::Api: TransactionPaymentApi<Block, Balance>
+		+ OrderRuntimeApi<Block, Balance, PB::Public>
+		+ OnRelayChainApi<Block>,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 	PB: Pair,
 	PB::Public: AppPublic + Member + Codec,
@@ -118,11 +174,11 @@ where
 	let mut pending_iterator = transaction_pool.ready();
 	let mut is_place_order = false;
 	let mut all_gas_value = Balance::from(0u32);
+	let block_hash = parachain.usage_info().chain.best_hash;
 	loop {
 		let pending_tx =
 			if let Some(pending_tx) = pending_iterator.next() { pending_tx } else { break };
 		let pending_tx_data = pending_tx.data().clone();
-		let block_hash = parachain.usage_info().chain.best_hash;
 		let utx_length = pending_tx_data.encode().len() as u32;
 		let query_fee = parachain
 			.runtime_api()
@@ -132,6 +188,13 @@ where
 		if transaction_pool.status().ready != 0 {
 			is_place_order =
 				parachain.runtime_api().reach_txpool_threshold(block_hash, all_gas_value).ok()?;
+		}
+	}
+	if !is_place_order {
+		//check is need force bid coretime
+		let force_bid = parachain.runtime_api().on_relaychain(block_hash, height).ok()?;
+		if all_gas_value.cmp(&Balance::from(0u32)) == Ordering::Greater && force_bid == 1 {
+			is_place_order = true;
 		}
 	}
 	Some(is_place_order)
@@ -152,10 +215,18 @@ async fn handle_new_best_parachain_head<P, Block, PB, ExPool, Balance>(
 where
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128> + AtLeast32BitUnsigned + Copy,
+	Balance: Codec
+		+ MaybeDisplay
+		+ 'static
+		+ Debug
+		+ Into<u128>
+		+ AtLeast32BitUnsigned
+		+ Copy
+		+ From<u128>,
 	P::Api: AuraApi<Block, PB::Public>
 		+ OrderRuntimeApi<Block, Balance, PB::Public>
-		+ TransactionPaymentApi<Block, Balance>,
+		+ TransactionPaymentApi<Block, Balance>
+		+ OnRelayChainApi<Block>,
 	PB: Pair,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
@@ -235,7 +306,8 @@ where
 			if collator_public.is_some() {
 				//your turn
 				let reached =
-					reach_txpool_threshold::<_, _, _, _, PB>(parachain, transaction_pool).await;
+					reach_txpool_threshold::<_, _, _, _, PB>(parachain, transaction_pool, height)
+						.await;
 				if let Some(reach) = reached {
 					if reach {
 						let mut exist_order = false;
@@ -258,6 +330,15 @@ where
 								if order_record_local.order_status == OrderStatus::Init {
 									let max_amount =
 										parachain.runtime_api().order_max_amount(hash)?;
+									let p_spot_price =
+										get_spot_price::<Balance>(relay_chain.clone(), p_hash)
+											.await;
+									let spot_price;
+									if p_spot_price.is_some() {
+										spot_price = p_spot_price.unwrap();
+									} else {
+										spot_price = max_amount;
+									}
 									let order_result = try_place_order::<Balance>(
 										relay_chain,
 										order_record_local.relay_base,
@@ -265,7 +346,7 @@ where
 										keystore,
 										para_id,
 										url,
-										max_amount,
+										spot_price,
 									)
 									.await;
 									order_record_local.order_status = OrderStatus::Order;
@@ -317,11 +398,19 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 ) where
 	R: RelayChainInterface + Clone,
 	Block: BlockT,
-	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128> + AtLeast32BitUnsigned + Copy,
+	Balance: Codec
+		+ MaybeDisplay
+		+ 'static
+		+ Debug
+		+ Into<u128>
+		+ AtLeast32BitUnsigned
+		+ Copy
+		+ From<u128>,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	P::Api: AuraApi<Block, PB::Public>
 		+ OrderRuntimeApi<Block, Balance, PB::Public>
-		+ TransactionPaymentApi<Block, Balance>,
+		+ TransactionPaymentApi<Block, Balance>
+		+ OnRelayChainApi<Block>,
 	PB: Pair,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
@@ -361,10 +450,18 @@ pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
 	R: RelayChainInterface + Clone,
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128> + AtLeast32BitUnsigned + Copy,
+	Balance: Codec
+		+ MaybeDisplay
+		+ 'static
+		+ Debug
+		+ Into<u128>
+		+ AtLeast32BitUnsigned
+		+ Copy
+		+ From<u128>,
 	P::Api: AuraApi<Block, PB::Public>
 		+ OrderRuntimeApi<Block, Balance, PB::Public>
-		+ TransactionPaymentApi<Block, Balance>,
+		+ TransactionPaymentApi<Block, Balance>
+		+ OnRelayChainApi<Block>,
 	PB: Pair,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
@@ -397,13 +494,21 @@ pub fn spawn_on_demand_order<T, R, ExPool, Block, PB, Balance>(
 where
 	Block: BlockT,
 	R: RelayChainInterface + Clone + 'static,
-	Balance:
-		Codec + MaybeDisplay + 'static + Debug + Send + Into<u128> + AtLeast32BitUnsigned + Copy,
+	Balance: Codec
+		+ MaybeDisplay
+		+ 'static
+		+ Debug
+		+ Send
+		+ Into<u128>
+		+ AtLeast32BitUnsigned
+		+ Copy
+		+ From<u128>,
 	T: Send + Sync + 'static + ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 	T::Api: AuraApi<Block, PB::Public>
 		+ OrderRuntimeApi<Block, Balance, PB::Public>
-		+ TransactionPaymentApi<Block, Balance>,
+		+ TransactionPaymentApi<Block, Balance>
+		+ OnRelayChainApi<Block>,
 	PB: Pair + 'static,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,

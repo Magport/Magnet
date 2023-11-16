@@ -1,3 +1,19 @@
+// Copyright (C) Magnet.
+// This file is part of Magnet.
+
+// Magnet is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// Magnet is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
+
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use {cumulus_primitives_core::ParaId, sp_core::Encode, sp_io::hashing::twox_64, sp_std::vec::Vec};
@@ -29,3 +45,11 @@ pub const SYSTEM_EVENTS: &[u8] =
 //OnDemandAssignmentProvider OnDemandQueue
 pub const ON_DEMAND_QUEUE: &[u8] =
 	&hex_literal::hex!["8f32430b49607f8d60bfd3a003ddf4b53f35b69d817556cf6b886e5b4f01fbdc"];
+
+//OnDemandAssignmentProvider SpotTraffic
+pub const SPOT_TRAFFIC: &[u8] =
+	&hex_literal::hex!["8f32430b49607f8d60bfd3a003ddf4b5c9308a8e0e640735727536bd9069b11e"];
+
+//Configuration ActiveConfig
+pub const ACTIVE_CONFIG: &[u8] =
+	&hex_literal::hex!["06de3d8a54d27e44a9d5ce189618f22db4b49d95320d9021994c850f25b8e385"];

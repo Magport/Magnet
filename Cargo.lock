@@ -6260,6 +6260,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mp-system"
+version = "0.1.0"
+dependencies = [
+ "frame-support",
+ "sp-api",
+ "sp-core",
+]
+
+[[package]]
 name = "multiaddr"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6855,6 +6864,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-assurance"
+version = "0.1.0"
+dependencies = [
+ "cumulus-pallet-parachain-system",
+ "cumulus-primitives-core",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "mp-system",
+ "pallet-balances",
+ "pallet-pot",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-aura"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
@@ -7292,19 +7323,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-evm-test-vector-support"
-version = "1.0.0-dev"
-source = "git+https://github.com/paritytech/frontier?branch=polkadot-v1.1.0#24cd3ea75262a33481d59d54de9746723ef298fb"
-dependencies = [
- "evm",
- "fp-evm",
- "hex",
- "serde",
- "serde_json",
- "sp-core",
-]
-
-[[package]]
 name = "pallet-evm-utils"
 version = "0.1.0"
 dependencies = [
@@ -7313,8 +7331,10 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "pallet-balances",
  "pallet-evm",
  "pallet-evm-chain-id",
+ "pallet-timestamp",
  "parity-scale-codec",
  "scale-info",
  "serde",
@@ -7639,6 +7659,7 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "hex",
  "hex-literal 0.3.4",
  "log",
  "magnet-primitives-order",
@@ -7646,6 +7667,7 @@ dependencies = [
  "pallet-collective",
  "pallet-society",
  "pallet-xcm",
+ "parachains-common",
  "parity-scale-codec",
  "polkadot-primitives",
  "polkadot-runtime-parachains",
@@ -7676,15 +7698,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-pot"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "mp-system",
+ "pallet-balances",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
+name = "pallet-pot-rpc"
+version = "0.1.0"
+dependencies = [
+ "jsonrpsee",
+ "pallet-pot-runtime-api",
+ "sp-api",
+ "sp-blockchain",
+ "sp-runtime",
+]
+
+[[package]]
+name = "pallet-pot-runtime-api"
+version = "0.1.0"
+dependencies = [
+ "scale-info",
+ "sp-api",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-precompile-substrate-utils"
 version = "0.1.0"
 dependencies = [
  "fp-account",
  "fp-evm",
  "frame-support",
+ "frame-system",
+ "pallet-balances",
  "pallet-evm",
- "pallet-evm-test-vector-support",
+ "pallet-timestamp",
+ "parity-scale-codec",
  "precompile-utils",
+ "scale-info",
  "sp-core",
  "sp-io",
  "sp-runtime",
@@ -8169,7 +8234,9 @@ dependencies = [
  "log",
  "magnet-client-consensus-aura",
  "magnet-primitives-order",
+ "mp-system",
  "pallet-balances",
+ "pallet-pot-rpc",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc",
  "pallet-transaction-payment-rpc-runtime-api",
@@ -8254,8 +8321,10 @@ dependencies = [
  "hex-literal 0.4.1",
  "log",
  "magnet-primitives-order",
+ "mp-system",
  "pallet-assets",
  "pallet-assets-bridge",
+ "pallet-assurance",
  "pallet-aura",
  "pallet-authorship",
  "pallet-balances",
@@ -8274,6 +8343,8 @@ dependencies = [
  "pallet-motion",
  "pallet-order",
  "pallet-parachain-template",
+ "pallet-pot",
+ "pallet-pot-runtime-api",
  "pallet-precompile-substrate-utils",
  "pallet-session",
  "pallet-society",

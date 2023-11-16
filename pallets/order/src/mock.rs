@@ -1,6 +1,25 @@
-use crate::OrderGasCost;
+// Copyright (C) Magnet.
+// This file is part of Magnet.
+
+// Magnet is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+
+// Magnet is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+
+// You should have received a copy of the GNU General Public License
+// along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
+
+use crate::{self as order_pallet, OrderGasCost};
 use codec::Encode;
-use frame_support::{parameter_types, traits::Everything};
+pub use frame_support::{
+	construct_runtime, parameter_types,
+	traits::{Everything, Hooks},
+};
 use frame_system as system;
 use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
@@ -15,12 +34,12 @@ type Signature = MultiSignature;
 type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Balance = u128;
 // Configure a mock runtime to test the pallet.
-frame_support::construct_runtime!(
+construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Event<T>},
-		OrderPallet: crate::{Pallet, Call, Storage, Event<T>},
+		OrderPallet: order_pallet::{Pallet, Call, Storage, Event<T>},
 		MockPallet: mock_pallet,
 	}
 );
