@@ -16,6 +16,11 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+mod tests;
+
 use frame_support::traits::Currency;
 pub use pallet::*;
 use pallet_evm::{AddressMapping, BalanceOf};
