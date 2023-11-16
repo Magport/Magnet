@@ -42,5 +42,6 @@ std = [
 
 	"pallet-assets/std",
 	"pallet-evm/std",
+	"pallet-balances/std",
 ]
 try-runtime = ["frame-support/try-runtime"]
