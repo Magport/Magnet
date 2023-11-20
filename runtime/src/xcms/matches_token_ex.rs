@@ -15,6 +15,7 @@
 // along with Polkadot.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Various implementations for the `MatchesFungible` trait.
+
 // Modified by Alex Wang for extending xcm transmit currency and token
 // with different precision.
 
@@ -36,7 +37,7 @@ use xcm_executor::traits::{MatchesFungible, MatchesNonFungible};
 ///
 /// ```
 /// use xcm::latest::{MultiLocation, Parent};
-/// use staging_xcm_builder::IsConcrete;
+/// use xcm_builder::IsConcrete;
 /// use xcm_executor::traits::MatchesFungible;
 ///
 /// frame_support::parameter_types! {
@@ -80,7 +81,7 @@ impl<T: Get<MultiLocation>, I: TryFrom<AssetInstance>, M> MatchesNonFungible<I>
 ///
 /// ```
 /// use xcm::latest::prelude::*;
-/// use staging_xcm_builder::IsAbstract;
+/// use xcm_builder::IsAbstract;
 /// use xcm_executor::traits::{MatchesFungible, MatchesNonFungible};
 ///
 /// frame_support::parameter_types! {
