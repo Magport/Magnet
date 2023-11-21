@@ -33,6 +33,7 @@ magnet-primitives-order = { path = "../primitives/order", default-features = fal
 pallet-pot = { path = "../pallets/pot", default-features = false }
 pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
+pallet-xcm = {  path = "../pallets/pallet-xcm", default-features = false}
 
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
@@ -67,7 +68,6 @@ sp-trie = { git = "https://github.com/paritytech/polkadot-sdk", branch = "releas
 pallet-society ={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 
 # Polkadot
-pallet-xcm = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 polkadot-parachain-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 polkadot-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}

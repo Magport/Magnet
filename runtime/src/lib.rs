@@ -8,6 +8,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 mod weights;
 pub mod xcm_config;
+pub mod xcms;
 
 use codec::{Decode, Encode};
 
@@ -962,8 +963,8 @@ impl pallet_assurance::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type SystemPotName = SystemPotName;
 	type Liquidate = ();
-	type DefaultBidThreshold = ConstU32<8u32>;
-	type DefaultLiquidateThreshold = ConstU128<100_000_000_000_000>;
+	type DefaultBidThreshold = ConstU32<8>;
+	type DefaultLiquidateThreshold = ConstU128<0>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.

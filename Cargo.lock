@@ -7667,7 +7667,7 @@ dependencies = [
  "pallet-balances",
  "pallet-collective",
  "pallet-society",
- "pallet-xcm",
+ "pallet-xcm 1.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "parachains-common",
  "parity-scale-codec",
  "polkadot-primitives",
@@ -8147,6 +8147,31 @@ dependencies = [
 [[package]]
 name = "pallet-xcm"
 version = "1.0.0"
+dependencies = [
+ "bounded-collections",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "pallet-assets",
+ "pallet-balances",
+ "parity-scale-codec",
+ "polkadot-parachain-primitives",
+ "polkadot-runtime-parachains",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+ "staging-xcm",
+ "staging-xcm-builder",
+ "staging-xcm-executor",
+]
+
+[[package]]
+name = "pallet-xcm"
+version = "1.0.0"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
 dependencies = [
  "bounded-collections",
@@ -8353,7 +8378,7 @@ dependencies = [
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
- "pallet-xcm",
+ "pallet-xcm 1.0.0",
  "parachain-info",
  "parachains-common",
  "parity-scale-codec",
@@ -9612,7 +9637,7 @@ dependencies = [
  "pallet-utility",
  "pallet-vesting",
  "pallet-whitelist",
- "pallet-xcm",
+ "pallet-xcm 1.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-xcm-benchmarks",
  "parity-scale-codec",
  "polkadot-primitives",
@@ -10763,7 +10788,7 @@ dependencies = [
  "pallet-treasury",
  "pallet-utility",
  "pallet-vesting",
- "pallet-xcm",
+ "pallet-xcm 1.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-xcm-benchmarks",
  "parity-scale-codec",
  "polkadot-parachain-primitives",
@@ -13799,7 +13824,7 @@ dependencies = [
  "pallet-utility",
  "pallet-vesting",
  "pallet-whitelist",
- "pallet-xcm",
+ "pallet-xcm 1.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-xcm-benchmarks",
  "parity-scale-codec",
  "polkadot-primitives",
@@ -15708,7 +15733,7 @@ dependencies = [
  "pallet-treasury",
  "pallet-utility",
  "pallet-vesting",
- "pallet-xcm",
+ "pallet-xcm 1.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-xcm-benchmarks",
  "parity-scale-codec",
  "polkadot-parachain-primitives",
