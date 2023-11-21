@@ -189,6 +189,7 @@ where
 			is_place_order =
 				parachain.runtime_api().reach_txpool_threshold(block_hash, all_gas_value).ok()?;
 		}
+		log::info!("=============={:?},{:?}",all_gas_value, is_place_order);
 	}
 	if !is_place_order {
 		//check is need force bid coretime

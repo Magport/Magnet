@@ -149,7 +149,11 @@ pub mod mock_pallet {
 	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
-	impl<T: Config> Pallet<T> {}
+	impl<T: Config> Pallet<T> {
+		pub fn get_gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
+			T::OrderGasCost::gas_cost(block_number)
+		}
+	}
 }
 
 impl mock_pallet::Config for Test {

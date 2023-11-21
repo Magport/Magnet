@@ -71,5 +71,12 @@ fn order_normal_test() {
 			.expect("dispatch succeeded");
 		OrderPallet::on_finalize(1);
 		assert_eq!(OrderPallet::sequence_number(), 1);
+		let gas_cost = MockPallet::get_gas_cost(1).unwrap();
+		assert_eq!(
+			gas_cost.0,
+			AccountId::from(hex_literal::hex!(
+				"d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d"
+			))
+		);
 	});
 }

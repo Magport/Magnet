@@ -7,6 +7,7 @@ license = "Unlicense"
 version = "0.1.0"
 
 [dependencies]
+log = { version = "0.4.14", default-features = false }
 hex-literal = { version = "0.3.4" }
 async-trait = { version = "0.1", optional = true }
 scale-info = { version = "2.1.1", default-features = false }

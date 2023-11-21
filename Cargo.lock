@@ -6016,6 +6016,7 @@ dependencies = [
  "cumulus-primitives-core",
  "cumulus-relay-chain-interface",
  "hex-literal 0.3.4",
+ "log",
  "parity-scale-codec",
  "scale-info",
  "sp-api",

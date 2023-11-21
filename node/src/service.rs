@@ -599,7 +599,6 @@ fn start_consensus(
 						"Failed to create order inherent",
 					)
 				})?;
-				log::info!("{:?}", order_inherent);
 				Ok(order_inherent)
 			}
 		},
