@@ -233,11 +233,11 @@ pub mod pallet {
 					// )
 					// .ok_or(Error::<T>::CreateOrderFail)?;
 					let xxx = Self::check_order_proof(
-							relay_storage_proof,
-							validation_data.clone(),
-							author_pub.clone(),
-							para_id,
-						);
+						relay_storage_proof,
+						validation_data.clone(),
+						author_pub.clone(),
+						para_id,
+					);
 					log::info!("============{:?}", xxx);
 					let (_, price) = xxx.ok_or(Error::<T>::CreateOrderFail)?;
 					let old_sequence_number = SequenceNumber::<T>::get();
@@ -259,7 +259,12 @@ pub mod pallet {
 							Err(Error::<T>::OrderExist)?;
 						}
 					} else {
-						log::info!("xxxx:{:?},{:?},{:?}", sequence_number, old_sequence_number, order);
+						log::info!(
+							"xxxx:{:?},{:?},{:?}",
+							sequence_number,
+							old_sequence_number,
+							order
+						);
 						Err(Error::<T>::WrongSequenceNumber)?;
 					}
 					T::DbWeight::get().reads_writes(2, 1)

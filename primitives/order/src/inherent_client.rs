@@ -32,11 +32,11 @@ async fn collect_relay_storage_proof(
 			.to_vec(),
 	);
 
-	let result = relay_chain_interface.prove_read(relay_parent, &relevant_keys).await;
-	match result {
-		Ok(xx)=> Some(xx),
-		Err(err)=> {
-			log::info!("xxx{:?}",err);
+	let relay_storage_proof = relay_chain_interface.prove_read(relay_parent, &relevant_keys).await;
+	match relay_storage_proof {
+		Ok(proof) => Some(proof),
+		Err(err) => {
+			log::info!("RelayChainError:{:?}", err);
 			None
 		},
 	}
@@ -55,7 +55,7 @@ impl OrderInherentData<AuthorityId> {
 			collect_relay_storage_proof(relay_chain_interface, relay_parent).await?;
 
 		Some(OrderInherentData {
-			relay_storage_proof:relay_storage_proof.clone(),
+			relay_storage_proof: relay_storage_proof.clone(),
 			validation_data: validation_data.clone(),
 			para_id,
 			sequence_number,
