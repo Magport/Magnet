@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.1.9"
+version = "0.2.0"
 authors = ["Anonymous"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -28,6 +28,8 @@ pallet-motion = { path = "../pallets/motion", default-features = false }
 pallet-assets-bridge = { path = "../pallets/assets-bridge", default-features = false }
 pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
 pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
+pallet-order = { path = "../pallets/order", default-features = false }
+magnet-primitives-order = { path = "../primitives/order", default-features = false }
 pallet-pot = { path = "../pallets/pot", default-features = false }
 pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
@@ -62,6 +64,8 @@ sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "rel
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 sp-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 sp-version = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+sp-trie = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+pallet-society ={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 
 # Polkadot
 polkadot-parachain-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
@@ -83,6 +87,7 @@ cumulus-primitives-utility = { git = "https://github.com/paritytech/polkadot-sdk
 pallet-collator-selection = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 parachain-info = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 parachains-common = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+cumulus-primitives-timestamp ={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 
 #Frontier FRAME
 pallet-evm-chain-id = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
@@ -176,6 +181,10 @@ std = [
 	"pallet-assets-bridge/std",
 	"pallet-evm-utils/std",
 	"pallet-precompile-substrate-utils/std",
+	"magnet-primitives-order/std",
+	"pallet-order/std",
+	"sp-trie/std",
+	"cumulus-primitives-timestamp/std",
 ]
 
 runtime-benchmarks = [
@@ -200,6 +209,11 @@ runtime-benchmarks = [
 	"xcm-executor/runtime-benchmarks",
 	"pallet-evm-utils/runtime-benchmarks",
 	"pallet-precompile-substrate-utils/runtime-benchmarks",
+	"pallet-order/runtime-benchmarks",
+	"pallet-collective/runtime-benchmarks",
+	"pallet-society/runtime-benchmarks",
+	"pallet-evm/runtime-benchmarks",
+	"pallet-ethereum/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -227,6 +241,7 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 	"pallet-evm-utils/try-runtime",
 	"pallet-precompile-substrate-utils/try-runtime",
+	"pallet-order/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]
