@@ -6,7 +6,6 @@ members = [
     "node",
     "runtime",
 	"primitives/system",
-    "pallets/motion",
     "pallets/evm-utils",
 	"pallets/evm/precompile/substrate-utils",
 	"pallets/pot/runtime-api",
@@ -14,6 +13,7 @@ members = [
 	"pallets/pot",
 	"pallets/assurance",
 	"pallets/pallet-xcm",
+	"pallets/preimage",
 ]
 resolver = "2"
 
