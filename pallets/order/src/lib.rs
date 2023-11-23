@@ -225,21 +225,13 @@ pub mod pallet {
 			} = data;
 			let total_weight = match validation_data {
 				Some(validation_data) => {
-					// let (_, price) = Self::check_order_proof(
-					// 	relay_storage_proof,
-					// 	validation_data.clone(),
-					// 	author_pub.clone(),
-					// 	para_id,
-					// )
-					// .ok_or(Error::<T>::CreateOrderFail)?;
-					let xxx = Self::check_order_proof(
+					let (_, price) = Self::check_order_proof(
 						relay_storage_proof,
 						validation_data.clone(),
 						author_pub.clone(),
 						para_id,
-					);
-					log::info!("============{:?}", xxx);
-					let (_, price) = xxx.ok_or(Error::<T>::CreateOrderFail)?;
+					)
+					.ok_or(Error::<T>::CreateOrderFail)?;
 					let old_sequence_number = SequenceNumber::<T>::get();
 					let order = OrderMap::<T>::get(old_sequence_number);
 					if sequence_number == old_sequence_number {
@@ -255,17 +247,15 @@ pub mod pallet {
 							);
 							CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
 						} else {
-							log::info!("yyy");
 							Err(Error::<T>::OrderExist)?;
 						}
 					} else {
-						log::info!(
-							"xxxx:{:?},{:?},{:?}",
-							sequence_number,
-							old_sequence_number,
-							order
-						);
 						Err(Error::<T>::WrongSequenceNumber)?;
+						// if old_sequence_number == sequence_number + 1 {
+						// 	// two same relaychain block,write same again or do nothing??
+						// } else {
+						// 	Err(Error::<T>::WrongSequenceNumber)?;
+						// }
 					}
 					T::DbWeight::get().reads_writes(2, 1)
 				},

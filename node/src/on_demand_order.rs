@@ -189,14 +189,23 @@ where
 			is_place_order =
 				parachain.runtime_api().reach_txpool_threshold(block_hash, all_gas_value).ok()?;
 		}
-		log::info!("=============={:?},{:?}", all_gas_value, is_place_order);
+		log::info!(
+			"tx_fee:{:?},all_fee:{:?},can_order:{:?},status:{:?}",
+			query_fee.final_fee(),
+			all_gas_value,
+			is_place_order,
+			transaction_pool.status()
+		);
 	}
 	if !is_place_order {
 		//check is need force bid coretime
 		let force_bid = parachain.runtime_api().on_relaychain(block_hash, height).ok()?;
 		if all_gas_value.cmp(&Balance::from(0u32)) == Ordering::Greater && force_bid == 1 {
 			is_place_order = true;
+			log::info!("============force place order======================");
 		}
+	} else {
+		log::info!("============normal place order======================");
 	}
 	Some(is_place_order)
 }
@@ -254,6 +263,11 @@ where
 		order_record_local.author_pub = None;
 		order_record_local.relay_parent = None;
 		return Ok(());
+	} else {
+		let order_record_local = order_record.lock().await;
+		if order_record_local.relay_height == height {
+			return Ok(());
+		}
 	}
 	let head = validation_data.clone().parent_head.0;
 	let parachain_head = match <<Block as BlockT>::Header>::decode(&mut &head[..]) {

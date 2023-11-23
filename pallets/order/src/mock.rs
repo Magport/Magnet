@@ -115,22 +115,12 @@ where
 	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
-		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number);
-		match sequece_number {
-			Some(sequence) => {
-				let order = <crate::Pallet<T>>::order_map(sequence);
-				match order {
-					Some(od) => {
-						let mut r = [0u8; 32];
-						r.copy_from_slice(od.orderer.encode().as_slice());
-						let account = T::AccountId::try_from(r).unwrap();
-						Some((account, od.price))
-					},
-					None => None,
-				}
-			},
-			None => None,
-		}
+		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number)?;
+		let order = <crate::Pallet<T>>::order_map(sequece_number)?;
+		let mut r = [0u8; 32];
+		r.copy_from_slice(order.orderer.encode().as_slice());
+		let account = T::AccountId::try_from(r).unwrap();
+		Some((account, order.price))
 	}
 }
 
