@@ -58,6 +58,7 @@ use frame_support::{
 };
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
+	pallet_prelude::BlockNumberFor,
 	EnsureRoot, EnsureSigned,
 };
 use pallet_balances::NegativeImbalance;
@@ -81,6 +82,8 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 use xcm::latest::prelude::BodyId;
 use xcm_executor::XcmExecutor;
 
+use cumulus_primitives_core::{ParaId, PersistedValidationData};
+pub use pallet_order::{self, OrderGasCost};
 /// Import the template pallet.
 pub use pallet_parachain_template;
 
@@ -611,6 +614,43 @@ impl pallet_collator_selection::Config for Runtime {
 impl pallet_parachain_template::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 }
+pub struct OrderGasCostHandler();
+
+impl<T> OrderGasCost<T> for OrderGasCostHandler
+where
+	T: pallet_order::Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
+		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number)?;
+		let order = <pallet_order::Pallet<T>>::order_map(sequece_number)?;
+		let mut r = [0u8; 32];
+		r.copy_from_slice(order.orderer.encode().as_slice());
+		let account = T::AccountId::try_from(r).unwrap();
+		Some((account, order.price))
+	}
+}
+
+parameter_types! {
+	pub const SlotWidth: u32 = 2;
+	pub const OrderMaxAmount:Balance = 200000000;
+	pub const TxPoolThreshold:Balance = 3000000000;
+}
+type EnsureRootOrHalf = EitherOfDiverse<
+	EnsureRoot<AccountId>,
+	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
+>;
+
+impl pallet_order::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type AuthorityId = AuraId;
+	type Currency = Balances;
+	type UpdateOrigin = EnsureRootOrHalf;
+	type OrderMaxAmount = OrderMaxAmount;
+	type SlotWidth = SlotWidth;
+	type TxPoolThreshold = TxPoolThreshold;
+	type WeightInfo = pallet_order::weights::SubstrateWeight<Runtime>;
+}
 
 parameter_types! {
 	pub const CouncilMotionDuration: BlockNumber = 7 * DAYS;
@@ -964,6 +1004,7 @@ construct_runtime!(
 		TemplatePallet: pallet_parachain_template = 50,
 
 		//Magnet
+		OrderPallet: pallet_order = 51,
 		EVMUtils: pallet_evm_utils = 60,
 		Pot: pallet_pot = 61,
 		Assurance: pallet_assurance = 62,
@@ -980,6 +1021,7 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
+		[pallet_order, OrderPallet]
 	);
 }
 
@@ -1322,6 +1364,39 @@ impl_runtime_apis! {
 			ParachainSystem::collect_collation_info(header)
 		}
 	}
+	impl magnet_primitives_order::OrderRuntimeApi<Block, Balance, AuraId> for Runtime {
+
+		fn slot_width()-> u32{
+			OrderPallet::slot_width()
+		}
+		fn order_max_amount() -> Balance {
+			OrderPallet::order_max_amount()
+		}
+		fn sequence_number()-> u64 {
+			OrderPallet::sequence_number()
+		}
+
+		fn current_relay_height()-> u32 {
+			OrderPallet::current_relay_height()
+		}
+
+		fn order_placed(
+			relay_storage_proof: sp_trie::StorageProof,
+			validation_data: PersistedValidationData,
+			para_id:ParaId,
+		)-> Option<AuraId> {
+			OrderPallet::order_placed(relay_storage_proof, validation_data, para_id)
+		}
+
+		fn reach_txpool_threshold(gas_balance:Balance) -> bool {
+			OrderPallet::reach_txpool_threshold(gas_balance)
+		}
+
+
+		fn order_executed(sequence_number:u64) -> bool {
+			OrderPallet::order_executed(sequence_number)
+		}
+	}
 
 	impl mp_system::OnRelayChainApi<Block> for Runtime {
 		fn on_relaychain(block_number: u32) -> i32 {
@@ -1408,7 +1483,29 @@ impl_runtime_apis! {
 	}
 }
 
+struct CheckInherents;
+
+#[allow(deprecated)]
+impl cumulus_pallet_parachain_system::CheckInherents<Block> for CheckInherents {
+	fn check_inherents(
+		block: &Block,
+		relay_state_proof: &cumulus_pallet_parachain_system::RelayChainStateProof,
+	) -> sp_inherents::CheckInherentsResult {
+		let relay_chain_slot = relay_state_proof
+			.read_slot()
+			.expect("Could not read the relay chain slot from the proof");
+		let inherent_data =
+			cumulus_primitives_timestamp::InherentDataProvider::from_relay_chain_slot_and_duration(
+				relay_chain_slot,
+				sp_std::time::Duration::from_secs(6),
+			)
+			.create_inherent_data()
+			.expect("Could not create the timestamp inherent data");
+		inherent_data.check_extrinsics(block)
+	}
+}
 cumulus_pallet_parachain_system::register_validate_block! {
 	Runtime = Runtime,
 	BlockExecutor = cumulus_pallet_aura_ext::BlockExecutor::<Runtime, Executive>,
+	CheckInherents = CheckInherents,
 }

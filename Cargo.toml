@@ -5,6 +5,7 @@ panic = "unwind"
 members = [
     "node",
     "runtime",
+    "pallets/order",
 	"primitives/system",
     "pallets/motion",
     "pallets/evm-utils",
