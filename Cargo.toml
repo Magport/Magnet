@@ -15,6 +15,7 @@ members = [
 	"pallets/pot",
 	"pallets/assurance",
 	"pallets/pallet-xcm",
+    "pallets/liquidation",
 ]
 resolver = "2"
 

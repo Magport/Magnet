@@ -16,7 +16,7 @@ use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
 use sp_core::{
-	crypto::{ByteArray, KeyTypeId},
+	crypto::{AccountId32, ByteArray, KeyTypeId},
 	OpaqueMetadata, H160, H256, U256,
 };
 use sp_runtime::{
@@ -958,6 +958,47 @@ impl pallet_assurance::Config for Runtime {
 	type DefaultLiquidateThreshold = ConstU128<0>;
 }
 
+//5CFuj7WxZAyinLxoqAJ8NH4yEEVXUUSHi9LRhodC3HyzHvN4
+const SYSTEM_ACCOUNT_BYTES: [u8; 32] = [
+	8, 139, 168, 18, 14, 184, 226, 123, 114, 69, 124, 17, 79, 202, 4, 114, 183, 48, 67, 120, 77,
+	143, 251, 172, 151, 76, 0, 87, 230, 143, 13, 43,
+];
+
+//5DCuTPUUndiEqGVkBjRszSXNXU7qcRmcBxLGeQ1Na7MUD4Kc
+const TREASURY_ACCOUNT_BYTES: [u8; 32] = [
+	50, 125, 61, 184, 171, 173, 10, 11, 187, 139, 230, 96, 113, 69, 118, 31, 117, 65, 248, 220,
+	157, 20, 168, 30, 107, 172, 19, 217, 149, 40, 139, 41,
+];
+//5CyfsNHFmqzq3HPhr1iLJom3w4tSGcq2dWoiBR7bVHAsfYmt
+const OPERATION_ACCOUNT_BYTES: [u8; 32] = [
+	40, 101, 80, 124, 111, 233, 85, 65, 63, 122, 201, 162, 126, 193, 254, 42, 74, 108, 128, 14,
+	150, 147, 18, 15, 25, 135, 59, 147, 193, 97, 56, 78,
+];
+
+parameter_types! {
+	pub const SystemRatio: Perbill = Perbill::from_percent(30); // 30%
+	pub const TreasuryRatio: Perbill = Perbill::from_percent(20); // 20%
+	pub const OperationRatio: Perbill = Perbill::from_percent(30); // 30%
+	pub const ProfitDistributionCycle: BlockNumber = 10; //TODO: fixme
+	pub const SystemAccount: AccountId32 = AccountId32::new(SYSTEM_ACCOUNT_BYTES);
+	pub const TreasuryAccount: AccountId32 = AccountId32::new(TREASURY_ACCOUNT_BYTES);
+	pub const OperationAccount: AccountId32 = AccountId32::new(OPERATION_ACCOUNT_BYTES);
+}
+
+impl pallet_liquidation::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type WeightToFee = WeightToFee;
+	type OrderGasCost = OrderGasCostHandler;
+	type SystemRatio = SystemRatio;
+	type TreasuryRatio = TreasuryRatio;
+	type OperationRatio = OperationRatio;
+	type SystemAccount = SystemAccount;
+	type TreasuryAccount = TreasuryAccount;
+	type OperationAccount = OperationAccount;
+	type ProfitDistributionCycle = ProfitDistributionCycle;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -1008,6 +1049,7 @@ construct_runtime!(
 		EVMUtils: pallet_evm_utils = 60,
 		Pot: pallet_pot = 61,
 		Assurance: pallet_assurance = 62,
+		Liquidation: pallet_liquidation = 63,
 	}
 );
 

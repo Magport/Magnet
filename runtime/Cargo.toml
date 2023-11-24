@@ -34,6 +34,7 @@ pallet-pot = { path = "../pallets/pot", default-features = false }
 pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
 pallet-xcm = {  path = "../pallets/pallet-xcm", default-features = false}
+pallet-liquidation = {path = "../pallets/liquidation", default-features = false}
 
 # Substrate
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
@@ -185,6 +186,7 @@ std = [
 	"pallet-order/std",
 	"sp-trie/std",
 	"cumulus-primitives-timestamp/std",
+    "pallet-liquidation/std",
 ]
 
 runtime-benchmarks = [
@@ -214,6 +216,7 @@ runtime-benchmarks = [
 	"pallet-society/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",
 	"pallet-ethereum/runtime-benchmarks",
+    "pallet-liquidation/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -242,6 +245,7 @@ try-runtime = [
 	"pallet-evm-utils/try-runtime",
 	"pallet-precompile-substrate-utils/try-runtime",
 	"pallet-order/try-runtime",
+    "pallet-liquidation/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]
