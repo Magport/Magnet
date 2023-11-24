@@ -1,0 +1,210 @@
+pub(crate) use crate as pallet_liquidation;
+pub(crate) use crate::Event as LiquidationEvent;
+use frame_support::{
+	parameter_types,
+	traits::{ConstU32, ConstU64},
+	weights::{
+		constants::ExtrinsicBaseWeight, WeightToFeeCoefficient, WeightToFeeCoefficients,
+		WeightToFeePolynomial,
+	},
+};
+use frame_system as system;
+use smallvec::smallvec;
+use sp_core::H256;
+use sp_runtime::{
+	traits::{BlakeTwo256, IdentityLookup},
+	AccountId32, BuildStorage, Perbill,
+};
+
+use frame_system::pallet_prelude::BlockNumberFor;
+use pallet_order::OrderGasCost;
+use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+
+type Balance = u128;
+type BlockNumber = u32;
+type Block = frame_system::mocking::MockBlock<Test>;
+
+const MILLIUNIT: Balance = 1_000_000_000;
+
+frame_support::construct_runtime!(
+	pub enum Test
+	{
+		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
+		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
+		OrderPallet: pallet_order::{Pallet, Storage, Event<T>},
+		Liquidation: pallet_liquidation::{Pallet, Storage, Event<T>},
+	}
+);
+
+//5CFuj7WxZAyinLxoqAJ8NH4yEEVXUUSHi9LRhodC3HyzHvN4
+const SYSTEM_ACCOUNT_BYTES: [u8; 32] = [
+	8, 139, 168, 18, 14, 184, 226, 123, 114, 69, 124, 17, 79, 202, 4, 114, 183, 48, 67, 120, 77,
+	143, 251, 172, 151, 76, 0, 87, 230, 143, 13, 43,
+];
+
+//5DCuTPUUndiEqGVkBjRszSXNXU7qcRmcBxLGeQ1Na7MUD4Kc
+const TREASURY_ACCOUNT_BYTES: [u8; 32] = [
+	50, 125, 61, 184, 171, 173, 10, 11, 187, 139, 230, 96, 113, 69, 118, 31, 117, 65, 248, 220,
+	157, 20, 168, 30, 107, 172, 19, 217, 149, 40, 139, 41,
+];
+//5CyfsNHFmqzq3HPhr1iLJom3w4tSGcq2dWoiBR7bVHAsfYmt
+const OPERATION_ACCOUNT_BYTES: [u8; 32] = [
+	40, 101, 80, 124, 111, 233, 85, 65, 63, 122, 201, 162, 126, 193, 254, 42, 74, 108, 128, 14,
+	150, 147, 18, 15, 25, 135, 59, 147, 193, 97, 56, 78,
+];
+
+//ALICE
+const COLLATOR_BYTES: [u8; 32] = [
+	212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133,
+	76, 205, 227, 154, 86, 132, 231, 165, 109, 162, 125,
+];
+
+const COLLATOR: AccountId32 = AccountId32::new(COLLATOR_BYTES);
+
+parameter_types! {
+	pub const SystemRatio: Perbill = Perbill::from_percent(30); // 30%
+	pub const TreasuryRatio: Perbill = Perbill::from_percent(20); // 20%
+	pub const OperationRatio: Perbill = Perbill::from_percent(30); // 30%
+	pub const ProfitDistributionCycle: BlockNumber = 10;
+	pub const SystemAccount: AccountId32 = AccountId32::new(SYSTEM_ACCOUNT_BYTES);
+	pub const TreasuryAccount: AccountId32 = AccountId32::new(TREASURY_ACCOUNT_BYTES);
+	pub const OperationAccount: AccountId32 = AccountId32::new(OPERATION_ACCOUNT_BYTES);
+}
+
+impl system::Config for Test {
+	type BaseCallFilter = frame_support::traits::Everything;
+	type BlockWeights = ();
+	type BlockLength = ();
+	type DbWeight = ();
+	type Nonce = u64;
+	type Block = Block;
+	type Hash = H256;
+	type Hashing = BlakeTwo256;
+	type AccountId = AccountId32;
+	type Lookup = IdentityLookup<Self::AccountId>;
+	type BlockHashCount = ConstU64<250>;
+	type Version = ();
+	type PalletInfo = PalletInfo;
+	type AccountData = pallet_balances::AccountData<u128>;
+	type OnNewAccount = ();
+	type OnKilledAccount = ();
+	type SystemWeightInfo = ();
+	type SS58Prefix = ();
+	type OnSetCode = ();
+	type MaxConsumers = ConstU32<5>;
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type RuntimeOrigin = RuntimeOrigin;
+}
+
+parameter_types! {
+	pub const ExistentialDeposit: u64 = 1;
+}
+
+impl pallet_balances::Config for Test {
+	type Balance = u128;
+	type DustRemoval = ();
+	type RuntimeEvent = RuntimeEvent;
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
+	type WeightInfo = ();
+	type MaxLocks = ();
+	type MaxReserves = ();
+	type ReserveIdentifier = [u8; 8];
+	type RuntimeHoldReason = ();
+	type FreezeIdentifier = ();
+	type MaxHolds = ();
+	type MaxFreezes = ();
+}
+
+parameter_types! {
+	pub const SlotWidth: u32 = 2;
+	pub const OrderMaxAmount:Balance = 200000000;
+	pub const TxPoolThreshold:Balance = 3000000000;
+}
+
+impl pallet_order::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type AuthorityId = AuraId;
+	type Currency = Balances;
+	type UpdateOrigin = frame_system::EnsureRoot<Self::AccountId>;
+	type OrderMaxAmount = OrderMaxAmount;
+	type SlotWidth = SlotWidth;
+	type TxPoolThreshold = TxPoolThreshold;
+	type WeightInfo = ();
+}
+
+impl pallet_liquidation::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type WeightToFee = WeightToFee;
+	type OrderGasCost = MockOrderGasCostHandler;
+	type SystemRatio = SystemRatio;
+	type TreasuryRatio = TreasuryRatio;
+	type OperationRatio = OperationRatio;
+	type SystemAccount = SystemAccount;
+	type TreasuryAccount = TreasuryAccount;
+	type OperationAccount = OperationAccount;
+	type ProfitDistributionCycle = ProfitDistributionCycle;
+}
+
+pub struct WeightToFee;
+impl WeightToFeePolynomial for WeightToFee {
+	type Balance = Balance;
+	fn polynomial() -> WeightToFeeCoefficients<Self::Balance> {
+		let p = MILLIUNIT / 10;
+		let q = 100 * Balance::from(ExtrinsicBaseWeight::get().ref_time());
+		smallvec![WeightToFeeCoefficient {
+			degree: 1,
+			negative: false,
+			coeff_frac: Perbill::from_rational(p % q, q),
+			coeff_integer: p / q,
+		}]
+	}
+}
+
+pub struct MockOrderGasCostHandler;
+impl<T: pallet_liquidation::Config> OrderGasCost<T> for MockOrderGasCostHandler
+where
+	T: pallet_order::Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	fn gas_cost(_block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
+		let account = T::AccountId::try_from(COLLATOR_BYTES).unwrap();
+		Some((account, 100000000 as u128))
+	}
+}
+
+pub struct ExtBuilder {
+	existential_deposit: u128,
+}
+
+impl Default for ExtBuilder {
+	fn default() -> Self {
+		Self { existential_deposit: 1 }
+	}
+}
+
+impl ExtBuilder {
+	pub fn existential_deposit(mut self, existential_deposit: u128) -> Self {
+		self.existential_deposit = existential_deposit;
+		self
+	}
+
+	pub fn build(self) -> sp_io::TestExternalities {
+		let mut storage = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
+
+		let balances_config = pallet_balances::GenesisConfig::<Test> {
+			balances: vec![(COLLATOR, self.existential_deposit)],
+		};
+		balances_config.assimilate_storage(&mut storage).unwrap();
+
+		let mut ext = sp_io::TestExternalities::new(storage);
+		ext.execute_with(|| System::set_block_number(1));
+		ext
+	}
+}
+
+pub(crate) fn expected_event(event: &LiquidationEvent<Test>) -> bool {
+	matches!(event, LiquidationEvent::ProfitDistributed | LiquidationEvent::CollatorsCompensated)
+}
