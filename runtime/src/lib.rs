@@ -976,9 +976,9 @@ const OPERATION_ACCOUNT_BYTES: [u8; 32] = [
 ];
 
 parameter_types! {
-	pub const SystemRatio: Perbill = Perbill::from_percent(30); // 30%
-	pub const TreasuryRatio: Perbill = Perbill::from_percent(20); // 20%
-	pub const OperationRatio: Perbill = Perbill::from_percent(30); // 30%
+	pub const SystemRatio: Perbill = Perbill::from_percent(20); // 20%
+	pub const TreasuryRatio: Perbill = Perbill::from_percent(33); // 33%
+	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25%
 	pub const ProfitDistributionCycle: BlockNumber = 10; //TODO: fixme
 	pub const SystemAccount: AccountId32 = AccountId32::new(SYSTEM_ACCOUNT_BYTES);
 	pub const TreasuryAccount: AccountId32 = AccountId32::new(TREASURY_ACCOUNT_BYTES);
