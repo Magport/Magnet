@@ -8247,7 +8247,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-node"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "array-bytes",
  "clap",
@@ -8343,7 +8343,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-runtime"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cumulus-pallet-aura-ext",
  "cumulus-pallet-dmp-queue",

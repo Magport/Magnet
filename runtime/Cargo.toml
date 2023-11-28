@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Anonymous"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -99,14 +99,13 @@ pallet-dynamic-fee = { version = "4.0.0-dev", git = "https://github.com/parityte
 pallet-evm-precompile-modexp = { version = "2.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
 pallet-evm-precompile-sha3fips = { version = "2.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
 pallet-evm-precompile-simple = { version = "2.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-#pallet-evm-test-vector-support = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false}
 pallet-hotfix-sufficients = { version = "1.0.0", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
 # Frontier Primitive
 fp-evm = { version = "3.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
 fp-account = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
 fp-dynamic-fee = { version = "1.0.0", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
 fp-rpc = { version = "3.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fp-self-contained = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false, features = ["serde"] }
+fp-self-contained = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false, features = ["serde", "try-runtime"] }
 
 [features]
 default = ["std", "with-rocksdb-weights"]
@@ -220,11 +219,13 @@ runtime-benchmarks = [
 ]
 
 try-runtime = [
+	"cumulus-pallet-parachain-system/try-runtime",
 	"cumulus-pallet-aura-ext/try-runtime",
 	"cumulus-pallet-dmp-queue/try-runtime",
 	"cumulus-pallet-parachain-system/try-runtime",
 	"cumulus-pallet-xcm/try-runtime",
 	"cumulus-pallet-xcmp-queue/try-runtime",
+	"cumulus-pallet-xcm/try-runtime",
 	"frame-executive/try-runtime",
 	"frame-support/try-runtime",
 	"frame-system/try-runtime",
@@ -246,6 +247,19 @@ try-runtime = [
 	"pallet-precompile-substrate-utils/try-runtime",
 	"pallet-order/try-runtime",
     "pallet-liquidation/try-runtime",
+	"pallet-assets/try-runtime",
+	"pallet-assets-bridge/try-runtime",
+	"pallet-collective/try-runtime",
+	"pallet-collator-selection/try-runtime",
+	"pallet-evm-chain-id/try-runtime",
+	"pallet-evm/try-runtime",
+	"pallet-ethereum/try-runtime",
+	"pallet-base-fee/try-runtime",
+	"pallet-dynamic-fee/try-runtime",
+	"pallet-hotfix-sufficients/try-runtime",
+	"pallet-pot/try-runtime",
+	"pallet-assurance/try-runtime",
+	"pallet-motion/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]
