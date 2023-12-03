@@ -8,13 +8,14 @@ mod tests;
 
 use frame_support::{
 	storage::types::StorageMap,
-	traits::{Currency, Get},
-	weights::{Weight, WeightToFee, WeightToFeePolynomial},
+	traits::{Currency, ExistenceRequirement, Get},
+	weights::{WeightToFeePolynomial},
 	Twox64Concat,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
+use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
-use sp_runtime::{traits::Zero, Perbill, Saturating};
+use sp_runtime::{traits::Zero, AccountId32, Perbill, Saturating};
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -33,12 +34,13 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_order::Config {
+	pub trait Config: frame_system::Config + pallet_order::Config + pallet_pot::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		///handle transfer
-		type Currency: frame_support::traits::Currency<Self::AccountId>;
+		type Currency: frame_support::traits::Currency<Self::AccountId>
+			+ frame_support::traits::ReservableCurrency<Self::AccountId>;
 
 		///Handles converting weight to fee value
 		type WeightToFee: WeightToFeePolynomial<Balance = Balance>;
@@ -58,22 +60,30 @@ pub mod pallet {
 		#[pallet::constant]
 		type OperationRatio: Get<Perbill>;
 
+		/// ED necessitate the account to exist
+		#[pallet::constant]
+		type ExistentialDeposit: Get<Balance>;
+
 		/// system accountId
 		#[pallet::constant]
-		type SystemAccount: Get<Self::AccountId>;
+		type SystemAccountName: Get<&'static str>;
 
 		/// treasury accountId
 		#[pallet::constant]
-		type TreasuryAccount: Get<Self::AccountId>;
+		type TreasuryAccountName: Get<&'static str>;
 
 		/// operation accountId
 		#[pallet::constant]
-		type OperationAccount: Get<Self::AccountId>;
+		type OperationAccountName: Get<&'static str>;
 
 		///how many blocks to distribute a profit distribution
 		#[pallet::constant]
 		type ProfitDistributionCycle: Get<BlockNumberFor<Self>>;
 	}
+
+	#[pallet::storage]
+	#[pallet::getter(fn base_account_balance)]
+	pub type BaseAccountReserved<T: Config> = StorageValue<_, Balance, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn collator_real_gas_costs)]
@@ -95,38 +105,43 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// parameters. [blockNumber, weight, weightBalance, costBalance, collator]
+		/// parameters. [blockNumber, blockFee, orderCost, collator]
 		/// block has been handled include weight and fee
-		BlockProcessed(BlockNumberFor<T>, Weight, Balance, Balance, T::AccountId),
+		BlockProcessed(BlockNumberFor<T>, BalanceOf<T>, Balance, T::AccountId),
 
 		/// parameters. [accountId, balance]
-		///mint native coin on system account
-		DepositSystemAccount(T::AccountId, BalanceOf<T>),
+		///transfer profit from BaseAccount to SystemAccount
+		SystemAccountProfit(T::AccountId, BalanceOf<T>),
 
 		/// parameters. [accountId, balance]
-		///mint native coin on treasury account
-		DepositTreasuryAccount(T::AccountId, BalanceOf<T>),
+		///transfer total fee from BaseAccount to SystemAccount
+		TransferBaseToSystem(T::AccountId, T::AccountId, BalanceOf<T>),
 
 		/// parameters. [accountId, balance]
-		///mint native coin on operation account
-		DepositOperaionAccount(T::AccountId, BalanceOf<T>),
+		///transfer profit from BaseAccount to TreasuryAccount
+		TreasuryAccountProfit(T::AccountId, BalanceOf<T>),
 
 		/// parameters. [accountId, balance]
-		///mint native coin on collator account for profit
-		DepositCollatorProfit(T::AccountId, BalanceOf<T>),
+		///transfer profit from BaseAccount to operationAccount
+		OperationAccountProfit(T::AccountId, BalanceOf<T>),
 
 		/// parameters. [accountId, balance]
-		///mint native coin on collator account for compensate
-		DepositCollatorCompensate(T::AccountId, BalanceOf<T>),
+		///transfer profit from BaseAccount to collators account
+		CollatorProfit(T::AccountId, BalanceOf<T>),
+
+		/// parameters. [accountId, balance]
+		///transfer principal from BaseAccount to system account if deficit
+		CollatorPrincipal(T::AccountId, BalanceOf<T>),
+
+		/// parameters. [accountId, balance]
+		///transfer from SystemAccount to collators account for compensate
+		CollatorCompensate(T::AccountId, BalanceOf<T>),
 
 		/// profit distributed succeed
 		ProfitDistributed,
 
 		/// collators compensated
 		CollatorsCompensated,
-
-		///Deducts up to value from the combined balance of who
-		Slash(T::AccountId, BalanceOf<T>),
 
 		/// error occurred
 		Error(Error<T>),
@@ -142,19 +157,14 @@ pub mod pallet {
 		InternalError,
 	}
 
-	fn weight_to_fee<T: Config>(weight: Weight) -> Balance {
-		T::WeightToFee::weight_to_fee(&weight)
-	}
-
-	fn convert_u128_to_balance<T: Config>(value: u128) -> Option<BalanceOf<T>> {
-		value.try_into().ok()
-	}
-
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
+	where
+		T::AccountId: From<AccountId32>,
+	{
 		fn on_finalize(n: BlockNumberFor<T>) {
-			let block_weight = <frame_system::Pallet<T>>::block_weight().total();
-			let balance_weight = weight_to_fee::<T>(block_weight);
+			let base_account = <T::AccountId>::from(BASE_ACCOUNT);
+			let base_account_balance = <T as pallet::Config>::Currency::free_balance(&base_account);
 
 			let (collator, real_gas_cost) = match T::OrderGasCost::gas_cost(n) {
 				Some((collator, real_gas_cost)) => (collator, real_gas_cost),
@@ -164,40 +174,80 @@ pub mod pallet {
 				},
 			};
 
-			frame_support::runtime_print!(
-				"\n=== block: {:?}, blockFee: {:?}, collator: {:?}, realGasCost: {:?} ====\n",
-				&n,
-				&balance_weight,
-				&collator,
-				&real_gas_cost
-			);
 			CollatorRealGasCosts::<T>::mutate(collator.clone(), |cost| {
 				*cost = cost.saturating_add(real_gas_cost);
 			});
 
-			TotalIncome::<T>::mutate(|income| *income = income.saturating_add(balance_weight));
+			let reserved_balance: BalanceOf<T> =
+				T::ExistentialDeposit::get().try_into().unwrap_or_else(|_| Zero::zero());
+
+			let block_fee_except_ed = base_account_balance.saturating_sub(reserved_balance);
+			let current_block_fee_u128: Balance =
+				block_fee_except_ed.try_into().unwrap_or_else(|_| 0);
+
+			let base_account = <T::AccountId>::from(BASE_ACCOUNT);
+			let system_account =
+				pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()).unwrap();
+
+			match Self::transfer_funds(&base_account, &system_account, block_fee_except_ed.clone())
+			{
+				Ok(_) => {
+					Self::deposit_event(Event::TransferBaseToSystem(
+						base_account.clone(),
+						system_account.clone(),
+						block_fee_except_ed.clone(),
+					));
+				},
+				Err(err) => {
+					log::error!("Transfer to system account failed: {:?}", err);
+				},
+			}
+
+			TotalIncome::<T>::mutate(|income| {
+				*income = income.saturating_add(current_block_fee_u128)
+			});
 			TotalCost::<T>::mutate(|cost| *cost = cost.saturating_add(real_gas_cost));
 
 			let mut count = DistributionBlockCount::<T>::get();
 			count = count.saturating_add(1u32.into());
 			DistributionBlockCount::<T>::put(count);
 			if count % T::ProfitDistributionCycle::get() == Zero::zero() {
-				// reset cycle count
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
 				let _ = Self::distribute_profit();
 			}
 
 			Self::deposit_event(Event::BlockProcessed(
 				n,
-				block_weight,
-				balance_weight,
+				block_fee_expect_ed.clone(),
 				real_gas_cost,
 				collator,
 			));
 		}
 	}
 
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>
+	where
+		T::AccountId: From<AccountId32>,
+	{
+		fn transfer_funds(
+			source: &T::AccountId,
+			to: &T::AccountId,
+			amount: BalanceOf<T>,
+		) -> DispatchResult {
+			ensure!(
+				<T as pallet::Config>::Currency::free_balance(source) >= amount,
+				"Not enough balance"
+			);
+			<T as pallet::Config>::Currency::transfer(
+				source,
+				to,
+				amount,
+				ExistenceRequirement::KeepAlive,
+			)?;
+
+			Ok(())
+		}
+
 		fn distribute_profit() -> DispatchResult {
 			let total_income = TotalIncome::<T>::get();
 			let total_cost = TotalCost::<T>::get();
@@ -227,6 +277,13 @@ pub mod pallet {
 			let total_cost = TotalCost::<T>::get();
 			let total_profit = total_income.saturating_sub(total_cost);
 
+			let system_account =
+				pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()).unwrap();
+			let treasury_account =
+				pallet_pot::Pallet::<T>::ensure_pot(T::TreasuryAccountName::get()).unwrap();
+			let operation_account =
+				pallet_pot::Pallet::<T>::ensure_pot(T::OperationAccountName::get()).unwrap();
+
 			let system_ratio = T::SystemRatio::get();
 			let treasury_ratio = T::TreasuryRatio::get();
 			let operation_ratio = T::OperationRatio::get();
@@ -237,63 +294,70 @@ pub mod pallet {
 			let total_collators_profit =
 				total_profit.saturating_sub(treasury_amount + operation_amount + system_amount);
 
-			if let Some(system_account_balance) = convert_u128_to_balance::<T>(system_amount) {
-				<T as pallet::Config>::Currency::deposit_creating(
-					&T::SystemAccount::get(),
-					system_account_balance,
-				);
-				Self::deposit_event(Event::DepositSystemAccount(
-					T::SystemAccount::get(),
-					system_account_balance,
-				));
-			}
-			if let Some(treasury_account_balance) = convert_u128_to_balance::<T>(treasury_amount) {
-				<T as pallet::Config>::Currency::deposit_creating(
-					&T::TreasuryAccount::get(),
-					treasury_account_balance,
-				);
-
-				Self::deposit_event(Event::DepositTreasuryAccount(
-					T::TreasuryAccount::get(),
-					treasury_account_balance,
-				));
-			}
-			if let Some(operation_account_balance) = convert_u128_to_balance::<T>(operation_amount)
+			let treasury_account_profit =
+				treasury_amount.try_into().unwrap_or_else(|_| Zero::zero());
+			match Self::transfer_funds(&system_account, &treasury_account, treasury_account_profit)
 			{
-				<T as pallet::Config>::Currency::deposit_creating(
-					&T::OperationAccount::get(),
-					operation_account_balance,
-				);
+				Ok(_) => {
+					Self::deposit_event(Event::TreasuryAccountProfit(
+						treasury_account.clone(),
+						treasury_account_profit,
+					));
+				},
+				Err(err) => {
+					log::error!("Transfer to treasury account failed: {:?}", err);
+				},
+			}
 
-				Self::deposit_event(Event::DepositOperaionAccount(
-					T::OperationAccount::get(),
-					operation_account_balance,
-				));
+			let operation_account_profit =
+				operation_amount.try_into().unwrap_or_else(|_| Zero::zero());
+			match Self::transfer_funds(
+				&system_account,
+				&operation_account,
+				operation_account_profit,
+			) {
+				Ok(_) => {
+					Self::deposit_event(Event::OperationAccountProfit(
+						operation_account.clone(),
+						operation_account_profit,
+					));
+				},
+				Err(err) => {
+					log::error!("Transfer to maintenance account failed: {:?}", err);
+				},
 			}
 
 			// distribute profit and compensate cost to every collator
 			for (collator, collator_cost) in CollatorRealGasCosts::<T>::iter() {
 				let collator_ratio = Perbill::from_rational(collator_cost, total_cost);
 				let collator_profit = collator_ratio * total_collators_profit;
-				if let Some(collator_addr_profit) = convert_u128_to_balance::<T>(collator_profit) {
-					<T as pallet::Config>::Currency::deposit_creating(
-						&collator.clone(),
-						collator_addr_profit,
-					);
-					Self::deposit_event(Event::DepositCollatorProfit(
-						collator.clone(),
-						collator_addr_profit,
-					));
+
+				let collator_addr_profit =
+					collator_profit.try_into().unwrap_or_else(|_| Zero::zero());
+				match Self::transfer_funds(&system_account, &collator.clone(), collator_addr_profit)
+				{
+					Ok(_) => {
+						Self::deposit_event(Event::CollatorProfit(
+							collator.clone(),
+							collator_addr_profit,
+						));
+					},
+					Err(err) => {
+						log::error!("Transfer profit to collator account failed: {:?}", err);
+					},
 				}
-				if let Some(collator_addr_cost) = convert_u128_to_balance::<T>(collator_cost) {
-					<T as pallet::Config>::Currency::deposit_creating(
-						&collator.clone(),
-						collator_addr_cost,
-					);
-					Self::deposit_event(Event::DepositCollatorCompensate(
-						collator.clone(),
-						collator_addr_cost,
-					));
+
+				let collator_addr_cost = collator_cost.try_into().unwrap_or_else(|_| Zero::zero());
+				match Self::transfer_funds(&system_account, &collator.clone(), collator_addr_cost) {
+					Ok(_) => {
+						Self::deposit_event(Event::CollatorCompensate(
+							collator.clone(),
+							collator_addr_cost,
+						));
+					},
+					Err(err) => {
+						log::error!("Transfer principal to collator account failed: {:?}", err);
+					},
 				}
 			}
 
@@ -301,41 +365,22 @@ pub mod pallet {
 		}
 
 		fn compensate_collators() -> DispatchResult {
-			let total_income = TotalIncome::<T>::get();
-			let total_cost = TotalCost::<T>::get();
-
-			if total_cost > total_income {
-				let diff = total_cost.saturating_sub(total_income);
-				if let Some(collator_compensate) = convert_u128_to_balance::<T>(diff) {
-					<T as pallet::Config>::Currency::slash(
-						&T::SystemAccount::get(),
-						collator_compensate,
-					);
-					Self::deposit_event(Event::Slash(T::SystemAccount::get(), collator_compensate));
-				}
-			}
-			frame_support::runtime_print!(
-				"compensate collators: totalIncome:{:?}, totalCost:{:?}\n",
-				&total_income,
-				&total_cost
-			);
+			let system_account =
+				pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()).unwrap();
 
 			// compensate for every collator
 			for (collator, collator_cost) in CollatorRealGasCosts::<T>::iter() {
-				if let Some(collator_addr_cost) = convert_u128_to_balance::<T>(collator_cost) {
-					frame_support::runtime_print!(
-						"\n+-+-+-+ compensate collators-->> collator:{:?}, cost:{:?} +-+-+-+\n",
-						&collator,
-						&collator_cost
-					);
-					<T as pallet::Config>::Currency::deposit_creating(
-						&collator,
-						collator_addr_cost,
-					);
-					Self::deposit_event(Event::DepositCollatorCompensate(
-						collator,
-						collator_addr_cost,
-					));
+				let collator_addr_cost = collator_cost.try_into().unwrap_or_else(|_| Zero::zero());
+				match Self::transfer_funds(&system_account, &collator.clone(), collator_addr_cost) {
+					Ok(_) => {
+						Self::deposit_event(Event::CollatorCompensate(
+							collator,
+							collator_addr_cost,
+						));
+					},
+					Err(err) => {
+						log::error!("Transfer principal to collator account failed: {:?}", err);
+					},
 				}
 			}
 
