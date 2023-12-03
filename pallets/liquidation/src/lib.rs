@@ -9,7 +9,7 @@ mod tests;
 use frame_support::{
 	storage::types::StorageMap,
 	traits::{Currency, ExistenceRequirement, Get},
-	weights::{WeightToFeePolynomial},
+	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
 use frame_system::pallet_prelude::BlockNumberFor;
