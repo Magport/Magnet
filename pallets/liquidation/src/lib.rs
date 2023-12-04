@@ -218,7 +218,7 @@ pub mod pallet {
 
 			Self::deposit_event(Event::BlockProcessed(
 				n,
-				block_fee_expect_ed.clone(),
+				block_fee_except_ed.clone(),
 				real_gas_cost,
 				collator,
 			));
