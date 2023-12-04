@@ -19,11 +19,13 @@ use sp_runtime::{
 use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_order::OrderGasCost;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_std::collections::btree_map::BTreeMap;
 
 type Balance = u128;
 type BlockNumber = u32;
 type Block = frame_system::mocking::MockBlock<Test>;
 
+pub const UNIT: Balance = 1_000_000_000_000_000_000;
 const MILLIUNIT: Balance = 1_000_000_000;
 
 frame_support::construct_runtime!(
@@ -32,10 +34,12 @@ frame_support::construct_runtime!(
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		OrderPallet: pallet_order::{Pallet, Storage, Event<T>},
+		Pot: pallet_pot::{Pallet, Call, Storage, Event<T>},
 		Liquidation: pallet_liquidation::{Pallet, Storage, Event<T>},
 	}
 );
 
+/*
 //5CFuj7WxZAyinLxoqAJ8NH4yEEVXUUSHi9LRhodC3HyzHvN4
 const SYSTEM_ACCOUNT_BYTES: [u8; 32] = [
 	8, 139, 168, 18, 14, 184, 226, 123, 114, 69, 124, 17, 79, 202, 4, 114, 183, 48, 67, 120, 77,
@@ -53,14 +57,6 @@ const OPERATION_ACCOUNT_BYTES: [u8; 32] = [
 	150, 147, 18, 15, 25, 135, 59, 147, 193, 97, 56, 78,
 ];
 
-//ALICE
-const COLLATOR_BYTES: [u8; 32] = [
-	212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133,
-	76, 205, 227, 154, 86, 132, 231, 165, 109, 162, 125,
-];
-
-const COLLATOR: AccountId32 = AccountId32::new(COLLATOR_BYTES);
-
 parameter_types! {
 	pub const SystemRatio: Perbill = Perbill::from_percent(30); // 30%
 	pub const TreasuryRatio: Perbill = Perbill::from_percent(20); // 20%
@@ -69,6 +65,34 @@ parameter_types! {
 	pub const SystemAccount: AccountId32 = AccountId32::new(SYSTEM_ACCOUNT_BYTES);
 	pub const TreasuryAccount: AccountId32 = AccountId32::new(TREASURY_ACCOUNT_BYTES);
 	pub const OperationAccount: AccountId32 = AccountId32::new(OPERATION_ACCOUNT_BYTES);
+}
+*/
+
+//ALICE
+const COLLATOR_BYTES: [u8; 32] = [
+	212, 53, 147, 199, 21, 253, 211, 28, 97, 20, 26, 189, 4, 169, 159, 214, 130, 44, 133, 88, 133,
+	76, 205, 227, 154, 86, 132, 231, 165, 109, 162, 125,
+];
+const SYSTEM_ACCOUNT_BYTES: [u8; 32] = [
+	54, 99, 32, 239, 79, 115, 118, 121, 15, 239, 57, 41, 2, 255, 91, 189, 21, 193, 175, 83, 111,
+	196, 75, 126, 82, 14, 205, 184, 6, 168, 148, 234,
+];
+
+const COLLATOR: AccountId32 = AccountId32::new(COLLATOR_BYTES);
+const SYSTEM_ACCOUNT: AccountId32 = AccountId32::new(SYSTEM_ACCOUNT_BYTES);
+
+/// The existential deposit. Set to 1/10 of the Connected Relay Chain.
+pub const EXISTENTIAL_DEPOSIT: Balance = MILLIUNIT;
+
+parameter_types! {
+	pub const SystemRatio: Perbill = Perbill::from_percent(20); // 20% for system
+	pub const TreasuryRatio: Perbill = Perbill::from_percent(33); // 33% for treasury
+	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
+	pub const ProfitDistributionCycle: BlockNumber = 10;
+	pub const ExistDeposit: Balance = EXISTENTIAL_DEPOSIT;
+	pub const SystemAccountName: &'static str = "system";
+	pub const TreasuryAccountName: &'static str = "treasury";
+	pub const OperationAccountName: &'static str = "maintenance";
 }
 
 impl system::Config for Test {
@@ -98,7 +122,7 @@ impl system::Config for Test {
 }
 
 parameter_types! {
-	pub const ExistentialDeposit: u64 = 1;
+	pub const ExistentialDeposit: u128 = EXISTENTIAL_DEPOSIT;
 }
 
 impl pallet_balances::Config for Test {
@@ -133,7 +157,7 @@ impl pallet_order::Config for Test {
 	type TxPoolThreshold = TxPoolThreshold;
 	type WeightInfo = ();
 }
-
+/*
 impl pallet_liquidation::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
@@ -145,6 +169,38 @@ impl pallet_liquidation::Config for Test {
 	type SystemAccount = SystemAccount;
 	type TreasuryAccount = TreasuryAccount;
 	type OperationAccount = OperationAccount;
+	type ProfitDistributionCycle = ProfitDistributionCycle;
+}
+*/
+
+use pallet_pot::PotNameBtreemap;
+pub type AccountId = AccountId32;
+parameter_types! {
+	pub const PotNames: [&'static str;3] = ["system", "treasury", "maintenance"];
+	pub Pots: BTreeMap<String, AccountId> = pallet_pot
+											::HashedPotNameBtreemap
+											::<Test, pallet_pot::HashedPotNameMapping<BlakeTwo256>>
+											::pots_btreemap(&(PotNames::get()));
+}
+impl pallet_pot::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type PotNameMapping = pallet_pot::HashedPotNameMapping<BlakeTwo256>;
+	type Currency = Balances;
+	type Pots = Pots;
+}
+
+impl pallet_liquidation::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type WeightToFee = WeightToFee;
+	type OrderGasCost = MockOrderGasCostHandler;
+	type SystemRatio = SystemRatio;
+	type TreasuryRatio = TreasuryRatio;
+	type OperationRatio = OperationRatio;
+	type ExistentialDeposit = ExistDeposit;
+	type SystemAccountName = SystemAccountName;
+	type TreasuryAccountName = TreasuryAccountName;
+	type OperationAccountName = OperationAccountName;
 	type ProfitDistributionCycle = ProfitDistributionCycle;
 }
 
@@ -171,7 +227,7 @@ where
 {
 	fn gas_cost(_block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
 		let account = T::AccountId::try_from(COLLATOR_BYTES).unwrap();
-		Some((account, 100000000 as u128))
+		Some((account, 10000000 as u128))
 	}
 }
 
@@ -195,7 +251,7 @@ impl ExtBuilder {
 		let mut storage = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
 
 		let balances_config = pallet_balances::GenesisConfig::<Test> {
-			balances: vec![(COLLATOR, self.existential_deposit)],
+			balances: vec![(COLLATOR, UNIT), (SYSTEM_ACCOUNT, UNIT)],
 		};
 		balances_config.assimilate_storage(&mut storage).unwrap();
 
