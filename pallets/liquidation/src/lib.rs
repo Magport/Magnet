@@ -155,6 +155,12 @@ pub mod pallet {
 
 		/// internal errors
 		InternalError,
+
+		///get pot account errors
+		PotAccountError,
+
+		///failed to process liquidation
+		ProcessLiquidationError,
 	}
 
 	#[pallet::hooks]
@@ -187,7 +193,14 @@ pub mod pallet {
 
 			let base_account = <T::AccountId>::from(BASE_ACCOUNT);
 			let system_account =
-				pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()).unwrap();
+				match pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()) {
+					Ok(account) => account,
+					Err(err) => {
+						log::error!("get system account err:{:?}", err);
+						Self::deposit_event(Event::Error(Error::<T>::InternalError.into()));
+						return;
+					},
+				};
 
 			match Self::transfer_funds(&base_account, &system_account, block_fee_except_ed.clone())
 			{
@@ -200,6 +213,8 @@ pub mod pallet {
 				},
 				Err(err) => {
 					log::error!("Transfer to system account failed: {:?}", err);
+					Self::deposit_event(Event::Error(Error::<T>::InternalError.into()));
+					return;
 				},
 			}
 
@@ -213,15 +228,23 @@ pub mod pallet {
 			DistributionBlockCount::<T>::put(count);
 			if count % T::ProfitDistributionCycle::get() == Zero::zero() {
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
-				let _ = Self::distribute_profit();
+				match Self::distribute_profit() {
+					Ok(_) => {
+						Self::deposit_event(Event::BlockProcessed(
+							n,
+							block_fee_except_ed.clone(),
+							real_gas_cost,
+							collator,
+						));
+					},
+					Err(err) => {
+						log::error!("process liquidation failed: {:?}", err);
+						Self::deposit_event(Event::Error(
+							Error::<T>::ProcessLiquidationError.into(),
+						));
+					},
+				}
 			}
-
-			Self::deposit_event(Event::BlockProcessed(
-				n,
-				block_fee_except_ed.clone(),
-				real_gas_cost,
-				collator,
-			));
 		}
 	}
 
@@ -278,11 +301,29 @@ pub mod pallet {
 			let total_profit = total_income.saturating_sub(total_cost);
 
 			let system_account =
-				pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()).unwrap();
+				match pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()) {
+					Ok(account) => account,
+					Err(err) => {
+						log::error!("get system account err:{:?}", err);
+						Err(Error::<T>::PotAccountError)?
+					},
+				};
 			let treasury_account =
-				pallet_pot::Pallet::<T>::ensure_pot(T::TreasuryAccountName::get()).unwrap();
+				match pallet_pot::Pallet::<T>::ensure_pot(T::TreasuryAccountName::get()) {
+					Ok(account) => account,
+					Err(err) => {
+						log::error!("get treasury account err:{:?}", err);
+						Err(Error::<T>::PotAccountError)?
+					},
+				};
 			let operation_account =
-				pallet_pot::Pallet::<T>::ensure_pot(T::OperationAccountName::get()).unwrap();
+				match pallet_pot::Pallet::<T>::ensure_pot(T::OperationAccountName::get()) {
+					Ok(account) => account,
+					Err(err) => {
+						log::error!("get maintenance account err:{:?}", err);
+						Err(Error::<T>::PotAccountError)?
+					},
+				};
 
 			let system_ratio = T::SystemRatio::get();
 			let treasury_ratio = T::TreasuryRatio::get();
@@ -366,7 +407,13 @@ pub mod pallet {
 
 		fn compensate_collators() -> DispatchResult {
 			let system_account =
-				pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()).unwrap();
+				match pallet_pot::Pallet::<T>::ensure_pot(T::SystemAccountName::get()) {
+					Ok(account) => account,
+					Err(err) => {
+						log::error!("get system account err:{:?}", err);
+						Err(Error::<T>::PotAccountError)?
+					},
+				};
 
 			// compensate for every collator
 			for (collator, collator_cost) in CollatorRealGasCosts::<T>::iter() {
