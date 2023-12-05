@@ -16,7 +16,7 @@ use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
 use smallvec::smallvec;
 use sp_api::impl_runtime_apis;
 use sp_core::{
-	crypto::{ByteArray, KeyTypeId},
+	crypto::{AccountId32, ByteArray, KeyTypeId},
 	OpaqueMetadata, H160, H256, U256,
 };
 use sp_runtime::{
@@ -94,8 +94,7 @@ use pallet_ethereum::{
 	TransactionData,
 };
 use pallet_evm::{
-	Account as EVMAccount, EVMCurrencyAdapter, EnsureAddressTruncated, FeeCalculator,
-	HashedAddressMapping, OnChargeEVMTransaction, Runner,
+	Account as EVMAccount, EnsureAddressTruncated, FeeCalculator, HashedAddressMapping, Runner,
 };
 
 mod precompiles;
@@ -488,6 +487,39 @@ impl pallet_balances::Config for Runtime {
 	type MaxFreezes = ConstU32<0>;
 }
 
+use pallet_liquidation;
+pub struct MagnetToStakingPot<R>(PhantomData<R>);
+impl<R> OnUnbalanced<NegativeImbalance<R>> for MagnetToStakingPot<R>
+where
+	R: pallet_balances::Config,
+	AccountIdOf<R>: From<polkadot_primitives::AccountId> + Into<polkadot_primitives::AccountId>,
+	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
+	R::AccountId: From<AccountId32>,
+{
+	fn on_nonzero_unbalanced(amount: NegativeImbalance<R>) {
+		let staking_pot = mp_system::BASE_ACCOUNT;
+		<pallet_balances::Pallet<R>>::resolve_creating(&staking_pot.into(), amount);
+	}
+}
+
+pub struct MagnetDealWithFees<R>(PhantomData<R>);
+impl<R> OnUnbalanced<NegativeImbalance<R>> for MagnetDealWithFees<R>
+where
+	R: pallet_balances::Config,
+	AccountIdOf<R>: From<polkadot_primitives::AccountId> + Into<polkadot_primitives::AccountId>,
+	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
+	R::AccountId: From<AccountId32>,
+{
+	fn on_unbalanceds<B>(mut fees_then_tips: impl Iterator<Item = NegativeImbalance<R>>) {
+		if let Some(mut fees) = fees_then_tips.next() {
+			if let Some(tips) = fees_then_tips.next() {
+				tips.merge_into(&mut fees);
+			}
+			<MagnetToStakingPot<R> as OnUnbalanced<_>>::on_unbalanced(fees);
+		}
+	}
+}
+
 parameter_types! {
 	/// Relay Chain `TransactionByteFee` / 10
 	pub const TransactionByteFee: Balance = 10 * MICROUNIT;
@@ -495,7 +527,8 @@ parameter_types! {
 
 impl pallet_transaction_payment::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type OnChargeTransaction = pallet_transaction_payment::CurrencyAdapter<Balances, ()>;
+	type OnChargeTransaction =
+		pallet_transaction_payment::CurrencyAdapter<Balances, MagnetDealWithFees<Runtime>>;
 	type WeightToFee = WeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = SlowAdjustingFeeUpdate<Self>;
@@ -702,64 +735,6 @@ impl<F: FindAuthor<u32>> FindAuthor<H160> for FindAuthorTruncated<F> {
 	}
 }
 
-/// Handles transaction fees from the EVM, depositing priority fee in a staking pot
-pub struct EVMDealWithFees<R>(PhantomData<R>);
-
-impl<R> OnUnbalanced<NegativeImbalance<R>> for EVMDealWithFees<R>
-where
-	R: pallet_balances::Config + pallet_collator_selection::Config + core::fmt::Debug,
-	AccountIdOf<R>: From<polkadot_primitives::AccountId> + Into<polkadot_primitives::AccountId>,
-	<R as frame_system::Config>::RuntimeEvent: From<pallet_balances::Event<R>>,
-{
-	fn on_nonzero_unbalanced(amount: NegativeImbalance<R>) {
-		// deposit the fee into the collator_selection reward pot
-		let staking_pot = <pallet_collator_selection::Pallet<R>>::account_id();
-		<pallet_balances::Pallet<R>>::resolve_creating(&staking_pot, amount);
-	}
-}
-
-pub struct EVMTransactionChargeHandler<OU>(PhantomData<OU>);
-
-type BalanceOf<R> = <<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::Balance;
-type PositiveImbalanceOf<R> =
-	<<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::PositiveImbalance;
-type NegativeImbalanceOf<R> =
-	<<R as pallet_evm::Config>::Currency as Currency<AccountIdOf<R>>>::NegativeImbalance;
-
-impl<R, OU> OnChargeEVMTransaction<R> for EVMTransactionChargeHandler<OU>
-where
-	R: pallet_evm::Config,
-	PositiveImbalanceOf<R>: Imbalance<BalanceOf<R>, Opposite = NegativeImbalanceOf<R>>,
-	NegativeImbalanceOf<R>: Imbalance<BalanceOf<R>, Opposite = PositiveImbalanceOf<R>>,
-	OU: OnUnbalanced<NegativeImbalanceOf<R>>,
-	U256: UniqueSaturatedInto<BalanceOf<R>>,
-{
-	type LiquidityInfo = Option<NegativeImbalanceOf<R>>;
-
-	fn withdraw_fee(
-		who: &H160,
-		fee: sp_core::U256,
-	) -> Result<Self::LiquidityInfo, pallet_evm::Error<R>> {
-		EVMCurrencyAdapter::<<R as pallet_evm::Config>::Currency, ()>::withdraw_fee(who, fee)
-	}
-
-	fn correct_and_deposit_fee(
-		who: &H160,
-		corrected_fee: sp_core::U256,
-		base_fee: sp_core::U256,
-		already_withdrawn: Self::LiquidityInfo,
-	) -> Self::LiquidityInfo {
-		<EVMCurrencyAdapter::<<R as pallet_evm::Config>::Currency, OU>
-		as OnChargeEVMTransaction<R>>::correct_and_deposit_fee(who, corrected_fee, base_fee, already_withdrawn)
-	}
-
-	fn pay_priority_fee(tip: Self::LiquidityInfo) {
-		if let Some(tip) = tip {
-			OU::on_unbalanced(tip);
-		}
-	}
-}
-
 const BLOCK_GAS_LIMIT: u64 = 75_000_000;
 const MAX_POV_SIZE: u64 = 5 * 1024 * 1024;
 
@@ -777,7 +752,6 @@ impl pallet_evm::Config for Runtime {
 	type BlockHashMapping = pallet_ethereum::EthereumBlockHashMapping<Self>;
 	type CallOrigin = EnsureAddressTruncated;
 	type WithdrawOrigin = EnsureAddressTruncated;
-	//type AddressMapping = IdentityAddressMapping;
 	type AddressMapping = HashedAddressMapping<BlakeTwo256>;
 	type Currency = Balances;
 	type RuntimeEvent = RuntimeEvent;
@@ -786,8 +760,7 @@ impl pallet_evm::Config for Runtime {
 	type ChainId = EVMChainId;
 	type BlockGasLimit = BlockGasLimit;
 	type Runner = pallet_evm::runner::stack::Runner<Self>;
-	//type OnChargeTransaction = ();
-	type OnChargeTransaction = EVMTransactionChargeHandler<EVMDealWithFees<Runtime>>;
+	type OnChargeTransaction = ();
 	type OnCreate = ();
 	type FindAuthor = FindAuthorTruncated<Aura>;
 	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
@@ -847,40 +820,6 @@ impl pallet_hotfix_sufficients::Config for Runtime {
 pub const fn deposit(items: u32, bytes: u32) -> Balance {
 	(items as Balance * 20 * UNIT + (bytes as Balance) * 100 * MICROUNIT) / 100
 }
-
-/*
-parameter_types! {
-	pub const AssetDeposit: Balance = 10 * UNIT;
-	pub const AssetAccountDeposit: Balance = deposit(1, 16);
-	pub const ApprovalDeposit: Balance = EXISTENTIAL_DEPOSIT;
-	pub const StringLimit: u32 = 50;
-	pub const MetadataDepositBase: Balance = deposit(1, 68);
-	pub const MetadataDepositPerByte: Balance = deposit(0, 1);
-}
-
-impl pallet_assets::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type Balance = Balance;
-	type RemoveItemsLimit = ConstU32<1000>;
-	type AssetId = u32;
-	type AssetIdParameter = codec::Compact<u32>;
-	type Currency = Balances;
-	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId>>;
-	type ForceOrigin = EnsureRoot<AccountId>;
-	type AssetDeposit = AssetDeposit;
-	type AssetAccountDeposit = AssetAccountDeposit;
-	type MetadataDepositBase = MetadataDepositBase;
-	type MetadataDepositPerByte = MetadataDepositPerByte;
-	type ApprovalDeposit = ApprovalDeposit;
-	type StringLimit = StringLimit;
-	type Freezer = ();
-	type Extra = ();
-	type CallbackHandle = ();
-	type WeightInfo = pallet_assets::weights::SubstrateWeight<Runtime>;
-	#[cfg(feature = "runtime-benchmarks")]
-	type BenchmarkHelper = ();
-}
-*/
 
 parameter_types! {
 	pub const AssetDeposit: Balance = 10 * UNIT; // 10 UNITS deposit to create fungible asset class
@@ -958,6 +897,32 @@ impl pallet_assurance::Config for Runtime {
 	type DefaultLiquidateThreshold = ConstU128<0>;
 }
 
+parameter_types! {
+	pub const SystemRatio: Perbill = Perbill::from_percent(20); // 20% for system
+	pub const TreasuryRatio: Perbill = Perbill::from_percent(33); // 33% for treasury
+	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
+	pub const ProfitDistributionCycle: BlockNumber = 10;
+	pub const ExistDeposit: Balance = EXISTENTIAL_DEPOSIT;
+	pub const SystemAccountName: &'static str = "system";
+	pub const TreasuryAccountName: &'static str = "treasury";
+	pub const OperationAccountName: &'static str = "maintenance";
+}
+
+impl pallet_liquidation::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type WeightToFee = WeightToFee;
+	type OrderGasCost = OrderGasCostHandler;
+	type SystemRatio = SystemRatio;
+	type TreasuryRatio = TreasuryRatio;
+	type OperationRatio = OperationRatio;
+	type ExistentialDeposit = ExistDeposit;
+	type SystemAccountName = SystemAccountName;
+	type TreasuryAccountName = TreasuryAccountName;
+	type OperationAccountName = OperationAccountName;
+	type ProfitDistributionCycle = ProfitDistributionCycle;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -1008,6 +973,7 @@ construct_runtime!(
 		EVMUtils: pallet_evm_utils = 60,
 		Pot: pallet_pot = 61,
 		Assurance: pallet_assurance = 62,
+		Liquidation: pallet_liquidation = 63,
 	}
 );
 

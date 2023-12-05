@@ -7456,6 +7456,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-liquidation"
+version = "0.1.0"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "log",
+ "mp-system",
+ "pallet-assets",
+ "pallet-balances",
+ "pallet-order",
+ "pallet-pot",
+ "pallet-transaction-payment",
+ "parity-scale-codec",
+ "scale-info",
+ "smallvec",
+ "sp-consensus-aura",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
+]
+
+[[package]]
 name = "pallet-membership"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
@@ -8225,7 +8249,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-node"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "array-bytes",
  "clap",
@@ -8321,7 +8345,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-runtime"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "cumulus-pallet-aura-ext",
  "cumulus-pallet-dmp-queue",
@@ -8366,6 +8390,7 @@ dependencies = [
  "pallet-evm-precompile-simple",
  "pallet-evm-utils",
  "pallet-hotfix-sufficients",
+ "pallet-liquidation",
  "pallet-motion",
  "pallet-order",
  "pallet-parachain-template",
