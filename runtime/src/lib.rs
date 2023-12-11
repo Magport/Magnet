@@ -659,7 +659,7 @@ where
 		let order = <pallet_order::Pallet<T>>::order_map(sequece_number)?;
 		let mut r = [0u8; 32];
 		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r).unwrap();
+		let account = T::AccountId::try_from(r).ok()?;
 		Some((account, order.price))
 	}
 }
