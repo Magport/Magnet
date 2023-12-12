@@ -221,7 +221,11 @@ async fn relay_chain_xcm_event(
 		.retrieve_all_inbound_hrmp_channel_contents(para_id, relay_parent)
 		.await
 		.ok()?;
-	return Some(downward_messages.len() > 0 || horizontal_messages.len() > 0);
+	let can_order = downward_messages.len() > 0 || horizontal_messages.len() > 0;
+	if can_order {
+		log::info!("============xcm place order======================");
+	}
+	return Some(can_order);
 }
 
 async fn handle_new_best_parachain_head<P, Block, PB, ExPool, Balance>(
@@ -388,6 +392,7 @@ where
 								spot_price,
 							)
 							.await;
+							log::info!("===========place order completed==============",);
 							order_record_local.order_status = OrderStatus::Order;
 							if order_result.is_err() {
 								log::info!(
