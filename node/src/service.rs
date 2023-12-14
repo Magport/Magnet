@@ -46,7 +46,9 @@ use crate::eth::{
 	FrontierBlockImport as TFrontierBlockImport,
 	FrontierPartialComponents,
 };
-
+use crate::on_demand_order::spawn_on_demand_order;
+use futures::lock::Mutex;
+use magnet_primitives_order::{OrderRecord, OrderStatus};
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 
@@ -232,7 +234,13 @@ async fn start_node_impl(
 	let client = params.client.clone();
 	let backend = params.backend.clone();
 	let mut task_manager = params.task_manager;
-
+	let mut rpc_address = String::from("ws://");
+	rpc_address.push_str(
+		&polkadot_config
+			.rpc_addr
+			.expect("Should set rpc address for submit order extrinic")
+			.to_string(),
+	);
 	let (relay_chain_interface, collator_key) = build_relay_chain_interface(
 		polkadot_config,
 		&parachain_config,
@@ -442,8 +450,29 @@ async fn start_node_impl(
 		recovery_handle: Box::new(overseer_handle.clone()),
 		sync_service: sync_service.clone(),
 	})?;
-
 	if validator {
+		let order_record =
+			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
+				relay_parent: None,
+				relay_height: 0,
+				relay_base: Default::default(),
+				relay_base_height: 0,
+				order_status: OrderStatus::Init,
+				validation_data: None,
+				para_id,
+				sequence_number: 0,
+				author_pub: None,
+			}));
+		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+			client.clone(),
+			para_id,
+			relay_chain_interface.clone(),
+			transaction_pool.clone(),
+			&task_manager,
+			params.keystore_container.keystore(),
+			order_record.clone(),
+			rpc_address,
+		)?;
 		start_consensus(
 			client.clone(),
 			block_import,
@@ -459,6 +488,7 @@ async fn start_node_impl(
 			collator_key.expect("Command line arguments do not allow this. qed"),
 			overseer_handle,
 			announce_block,
+			order_record,
 		)?;
 	}
 
@@ -513,9 +543,13 @@ fn start_consensus(
 	collator_key: CollatorPair,
 	overseer_handle: OverseerHandle,
 	announce_block: Arc<dyn Fn(Hash, Option<Vec<u8>>) + Send + Sync>,
+	order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
 ) -> Result<(), sc_service::Error> {
-	use cumulus_client_consensus_aura::collators::basic::{
-		self as basic_aura, Params as BasicAuraParams,
+	// use cumulus_client_consensus_aura::collators::basic::{
+	// 	self as basic_aura, Params as BasicAuraParams,
+	// };
+	use magnet_client_consensus_aura::collators::on_demand::{
+		self as on_demand_aura, Params as BasicAuraParams,
 	};
 
 	// NOTE: because we use Aura here explicitly, we can use `CollatorSybilResistance::Resistant`
@@ -539,12 +573,38 @@ fn start_consensus(
 		announce_block,
 		client.clone(),
 	);
-
+	let relay_chain_interface_clone = relay_chain_interface.clone();
 	let params = BasicAuraParams {
-		create_inherent_data_providers: move |_, ()| async move { Ok(()) },
+		create_inherent_data_providers: move |_block_hash,
+		                                      (
+			relay_parent,
+			validation_data,
+			para_id,
+			sequence_number,
+			author_pub,
+		)| {
+			let relay_chain_interface = relay_chain_interface.clone();
+			async move {
+				let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
+					relay_parent,
+					&relay_chain_interface,
+					&validation_data,
+					para_id,
+					sequence_number,
+					&author_pub,
+				)
+				.await;
+				let order_inherent = order_inherent.ok_or_else(|| {
+					Box::<dyn std::error::Error + Send + Sync>::from(
+						"Failed to create order inherent",
+					)
+				})?;
+				Ok(order_inherent)
+			}
+		},
 		block_import,
 		para_client: client,
-		relay_client: relay_chain_interface,
+		relay_client: relay_chain_interface_clone,
 		sync_oracle,
 		keystore,
 		collator_key,
@@ -558,11 +618,18 @@ fn start_consensus(
 		authoring_duration: Duration::from_millis(500),
 	};
 
-	let fut =
-		basic_aura::run::<Block, sp_consensus_aura::sr25519::AuthorityPair, _, _, _, _, _, _, _>(
-			params,
-		);
-	task_manager.spawn_essential_handle().spawn("aura", None, fut);
+	let fut = on_demand_aura::run::<
+		Block,
+		sp_consensus_aura::sr25519::AuthorityPair,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+		_,
+	>(params, order_record);
+	task_manager.spawn_essential_handle().spawn("on_demand_aura", None, fut);
 
 	Ok(())
 }

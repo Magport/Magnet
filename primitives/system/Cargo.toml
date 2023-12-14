@@ -1,0 +1,27 @@
+[package]
+name = "mp-system"
+version = "0.1.0"
+authors = ["Alex Wang"]
+description = "System trait and type."
+license = "Apache-2.0"
+homepage = "https://magnet.magport.io/"
+repository.workspace = true
+edition.workspace = true
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+
+# Substrate
+sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+
+[features]
+default = [ "std" ]
+std = [
+	"sp-api/std",
+	"sp-core/std",
+	"frame-support/std",
+]
