@@ -210,6 +210,24 @@ where
 	Some(is_place_order)
 }
 
+async fn relay_chain_xcm_event(
+	relay_chain_interface: impl RelayChainInterface + Clone,
+	para_id: ParaId,
+	relay_parent: H256,
+) -> Option<bool> {
+	let downward_messages =
+		relay_chain_interface.retrieve_dmq_contents(para_id, relay_parent).await.ok()?;
+	let horizontal_messages = relay_chain_interface
+		.retrieve_all_inbound_hrmp_channel_contents(para_id, relay_parent)
+		.await
+		.ok()?;
+	let can_order = downward_messages.len() > 0 || horizontal_messages.len() > 0;
+	if can_order {
+		log::info!("============xcm place order======================");
+	}
+	return Some(can_order);
+}
+
 async fn handle_new_best_parachain_head<P, Block, PB, ExPool, Balance>(
 	validation_data: PersistedValidationData,
 	height: RelayBlockNumber,
@@ -323,6 +341,7 @@ where
 				let reached =
 					reach_txpool_threshold::<_, _, _, _, PB>(parachain, transaction_pool, height)
 						.await;
+				let mut can_order = false;
 				if let Some(reach) = reached {
 					if reach {
 						let mut exist_order = false;
@@ -341,37 +360,45 @@ where
 							}
 						}
 						if !exist_order {
-							if height - order_record_local.relay_height > slot_block {
-								if order_record_local.order_status == OrderStatus::Init {
-									let max_amount =
-										parachain.runtime_api().order_max_amount(hash)?;
-									let p_spot_price =
-										get_spot_price::<Balance>(relay_chain.clone(), p_hash)
-											.await;
-									let spot_price;
-									if p_spot_price.is_some() {
-										spot_price = p_spot_price.unwrap();
-									} else {
-										spot_price = max_amount;
-									}
-									let order_result = try_place_order::<Balance>(
-										relay_chain,
-										order_record_local.relay_base,
-										order_record_local.relay_base_height,
-										keystore,
-										para_id,
-										url,
-										spot_price,
-									)
-									.await;
-									order_record_local.order_status = OrderStatus::Order;
-									if order_result.is_err() {
-										log::info!(
-											"===========place_order error:=============={:?}",
-											order_result
-										);
-									}
-								}
+							can_order = true;
+						}
+					} else {
+						let trig_xcm_event =
+							relay_chain_xcm_event(relay_chain.clone(), para_id, p_hash).await;
+						if let Some(trig_flag) = trig_xcm_event {
+							can_order = trig_flag;
+						}
+					}
+				}
+				if can_order {
+					if height - order_record_local.relay_height > slot_block {
+						if order_record_local.order_status == OrderStatus::Init {
+							let max_amount = parachain.runtime_api().order_max_amount(hash)?;
+							let p_spot_price =
+								get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
+							let spot_price;
+							if p_spot_price.is_some() {
+								spot_price = p_spot_price.unwrap();
+							} else {
+								spot_price = max_amount;
+							}
+							let order_result = try_place_order::<Balance>(
+								relay_chain,
+								order_record_local.relay_base,
+								order_record_local.relay_base_height,
+								keystore,
+								para_id,
+								url,
+								spot_price,
+							)
+							.await;
+							log::info!("===========place order completed==============",);
+							order_record_local.order_status = OrderStatus::Order;
+							if order_result.is_err() {
+								log::info!(
+									"===========place_order error:=============={:?}",
+									order_result
+								);
 							}
 						}
 					}
