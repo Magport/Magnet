@@ -67,7 +67,7 @@ pub fn development_config() -> ChainSpec {
 	// Give your base currency a unit name and decimal places
 	let mut properties = sc_chain_spec::Properties::new();
 	properties.insert("tokenSymbol".into(), "DOT".into());
-	properties.insert("tokenDecimals".into(), 10.into());
+	properties.insert("tokenDecimals".into(), 18.into());
 	properties.insert("ss58Format".into(), 42.into());
 
 	ChainSpec::from_genesis(
@@ -123,7 +123,7 @@ pub fn local_testnet_config() -> ChainSpec {
 	// Give your base currency a unit name and decimal places
 	let mut properties = sc_chain_spec::Properties::new();
 	properties.insert("tokenSymbol".into(), "DOT".into());
-	properties.insert("tokenDecimals".into(), 10.into());
+	properties.insert("tokenDecimals".into(), 18.into());
 	properties.insert("ss58Format".into(), 42.into());
 
 	ChainSpec::from_genesis(
@@ -187,6 +187,9 @@ fn testnet_genesis(
 	root: AccountId,
 	id: ParaId,
 ) -> parachain_magnet_runtime::RuntimeGenesisConfig {
+	let alice = get_from_seed::<sr25519::Public>("Alice");
+	let bob = get_from_seed::<sr25519::Public>("Bob");
+
 	parachain_magnet_runtime::RuntimeGenesisConfig {
 		system: parachain_magnet_runtime::SystemConfig {
 			code: parachain_magnet_runtime::WASM_BINARY
@@ -195,7 +198,26 @@ fn testnet_genesis(
 			..Default::default()
 		},
 		balances: parachain_magnet_runtime::BalancesConfig {
-			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 60)).collect(),
+			balances: endowed_accounts.iter().cloned().map(|k| (k, 1 << 81)).collect(),
+		},
+		assets: parachain_magnet_runtime::AssetsConfig {
+			assets: vec![
+				(1, alice.into(), true, 1_000_000_0000_0000_0000),
+				(2, bob.into(), true, 2_000_000_0000_0000_0000),
+			],
+			// Genesis metadata: Vec<(id, name, symbol, decimals)>
+			metadata: vec![
+				(1, "asset-1".into(), "ALT1".into(), 18),
+				(2, "asset-2".into(), "ALT2".into(), 18),
+			],
+			// Genesis accounts: Vec<(id, account_id, balance)>
+			accounts: vec![
+				(1, alice.into(), 500_000_000_0000_0000_0000),
+				(2, bob.into(), 500_000_000_0000_0000_0000),
+			],
+		},
+		assets_bridge: parachain_magnet_runtime::AssetsBridgeConfig {
+			admin_key: Some(root.clone()),
 		},
 		council: parachain_magnet_runtime::CouncilConfig {
 			phantom: PhantomData,
@@ -236,7 +258,7 @@ fn testnet_genesis(
 			..Default::default()
 		},
 		transaction_payment: Default::default(),
-		sudo: parachain_magnet_runtime::SudoConfig { key: Some(root) },
+		sudo: parachain_magnet_runtime::SudoConfig { key: Some(root.clone()) },
 
 		// EVM compatibility
 		evm_chain_id: parachain_magnet_runtime::EVMChainIdConfig {
@@ -294,5 +316,6 @@ fn testnet_genesis(
 		ethereum: Default::default(),
 		dynamic_fee: Default::default(),
 		base_fee: Default::default(),
+		assurance: Default::default(),
 	}
 }
