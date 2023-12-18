@@ -243,15 +243,15 @@ chmod +x magnet_executable # Replace with the actual name of the downloaded file
 - a. Generate the default chain specification:
 
 ```sh
-./target/release/parachain-magnet-node build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
+./target/release/parachain-magnet-node build-spec --disable-default-bootnode >magnet-2000.json
 ```
 
 
-Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `parachainid` to 2000.
+Modify the `magnet-2000.json` file, change `para_id` to 2000 and `parachainid` to 2000.
 - b. Convert the spec file to a raw file:
 
 ```sh
-./target/release/parachain-magnet-node build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
+./target/release/parachain-magnet-node build-spec --disable-default-bootnode --chain magnet-2000.json --raw>raw-magnet-2000.json
 ```
 
 
@@ -259,21 +259,21 @@ Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `para
 - a. Export the wasm file:
 
 ```sh
-./target/release/parachain-magnet-node export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
+./target/release/parachain-magnet-node export-genesis-wasm --chain raw-magnet-2000.json magnet-2000-wasm
 ```
 
 
 - b. Generate the genesis state of the parachain:
 
 ```sh
-./target/release/parachain-magnet-node  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
+./target/release/parachain-magnet-node export-genesis-state --chain raw-magnet-2000.json magnet-2000-state
 ```
 
 
 - c. Start the collator node:
 
 ```sh
-Nohow ./target/release/parachain-magnet-node --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
+nohup ./target/release/parachain-magnet-node --alice --collator --force-authoring --chain raw-magnet-2000.json --base-path ./alice --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/rococo/raw-rococo-local.json  --port 30343 --rpc-port 9977 > magnet-2000.log 2>&1 &
 ```
 
 
