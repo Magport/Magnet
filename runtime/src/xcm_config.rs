@@ -2,8 +2,10 @@ use super::{
 	AccountId, AllPalletsWithSystem, BTreeMap, Balances, ParachainInfo, ParachainSystem,
 	PolkadotXcm, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin, WeightToFee, XcmpQueue,
 };
-use crate::xcms::matches_token_ex::IsConcreteEx;
-use crate::MagnetToStakingPot;
+use crate::{
+	xcms::{matches_token_ex::IsConcreteEx, xcm_weight::UsingComponentsEx},
+	MagnetToStakingPot,
+};
 use frame_support::{
 	match_types, parameter_types,
 	traits::{ConstU32, Everything, Nothing},
@@ -18,7 +20,7 @@ use xcm_builder::{
 	AllowUnpaidExecutionFrom, CurrencyAdapter, EnsureXcmOrigin, FixedWeightBounds, NativeAsset,
 	ParentIsPreset, RelayChainAsNative, SiblingParachainAsNative, SiblingParachainConvertsVia,
 	SignedAccountId32AsNative, SignedToAccountId32, SovereignSignedViaLocation, TakeWeightCredit,
-	UsingComponents, WithComputedOrigin, WithUniqueTopic,
+	WithComputedOrigin, WithUniqueTopic,
 };
 use xcm_executor::XcmExecutor;
 
@@ -124,7 +126,7 @@ impl xcm_executor::Config for XcmConfig {
 	type UniversalLocation = UniversalLocation;
 	type Barrier = Barrier;
 	type Weigher = FixedWeightBounds<UnitWeightCost, RuntimeCall, MaxInstructions>;
-	type Trader = UsingComponents<
+	type Trader = UsingComponentsEx<
 		WeightToFee,
 		RelayLocation,
 		AccountId,
