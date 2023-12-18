@@ -199,62 +199,85 @@ nohup ./target/release/polkadot --bob --validator --chain custom-spec-raw.json -
 
 
 ### II. Connecting to the Local Parachain 
-#### 1.Build the Magnet node
+#### 1. Build the Magnet Node from Source Code
+
+This method involves cloning the Magnet project repository from GitHub and compiling the project using Cargo, the package manager and build tool for Rust. Follow these steps:
 
 ```sh
+# Clone the repository
 git clone https://github.com/Magport/Magnet.git
 
+# Navigate to the project directory
 cd Magnet
 
+# Build the project using Cargo
 cargo build --release
 ```
-Compiling the node can take 30 minuets to complete.
-#### 2. Create a new `paraid` in the browser 
+
+
+
+Compiling the node may take about 30 minutes to complete, depending on your system's performance.
+#### 2. Run the Pre-Compiled Executable from GitHub
+
+If you prefer not to build from source, you can directly download the pre-compiled executable file of the Magnet node from GitHub. This is usually faster as it bypasses the compilation process. Follow these steps: 
+1. Visit the Magnet project's GitHub releases page: [Magnet Releases](https://github.com/Magport/Magnet/releases) . 
+2. Select the latest version and download the pre-compiled executable suitable for your operating system. 
+3. After downloading, you may need to grant execution permissions to the file, depending on your operating system. On Linux or macOS, you can use the following command:
+
+```sh
+chmod +x magnet_executable # Replace with the actual name of the downloaded file
+``` 
+4. Run the executable to start the Magnet node:
+
+```sh
+./magnet_executable # Replace with the actual name of the downloaded file
+```
+#### 3. Create a new `paraid` in the browser 
 - a. Click on `network`, select `parachains`. 
 ![](https://github.com/y19818/Magnet/blob/main/Img/1a.png)
 - b. Click on `parathreads`, click on `paraid`.
 ![](https://github.com/y19818/Magnet/blob/main/Img/1b.png)
 - c. Choose an account and submit. 
 - d. The registered `paraid` for this session is 2000.
-#### 3. Modify the Default Chain Specification
+#### 4. Modify the Default Chain Specification
 - a. Generate the default chain specification:
 
 ```sh
-./target/release/parachain-magnet-node build-spec --disable-default-bootnode  --chain=dev  >custom-parachain-spec.json
+./target/release/parachain-magnet-node build-spec --disable-default-bootnode >magnet-2000.json
 ```
 
 
-Modify the `custom-parachain-spec.json` file, change `para_id` to 2000 and `parachainid` to 2000.
+Modify the `magnet-2000.json` file, change `para_id` to 2000 and `parachainid` to 2000.
 - b. Convert the spec file to a raw file:
 
 ```sh
-./target/release/parachain-magnet-node build-spec --chain custom-parachain-spec.json  --disable-default-bootnode --raw > custom-parachain-spec-raw.json
+./target/release/parachain-magnet-node build-spec --disable-default-bootnode --chain magnet-2000.json --raw>raw-magnet-2000.json
 ```
 
 
-#### 4. Prepare the Parachain Collator
+#### 5. Prepare the Parachain Collator
 - a. Export the wasm file:
 
 ```sh
-./target/release/parachain-magnet-node export-genesis-wasm --chain ./custom-parachain-spec-raw.json para-2000-wasm
+./target/release/parachain-magnet-node export-genesis-wasm --chain raw-magnet-2000.json magnet-2000-wasm
 ```
 
 
 - b. Generate the genesis state of the parachain:
 
 ```sh
-./target/release/parachain-magnet-node  export-genesis-state --chain ./custom-parachain-spec-raw.json para-2000-genesis-state
+./target/release/parachain-magnet-node export-genesis-state --chain raw-magnet-2000.json magnet-2000-state
 ```
 
 
 - c. Start the collator node:
 
 ```sh
-Nohow ./target/release/parachain-magnet-node --alice --collator --force-authoring --chain custom-parachain-spec-raw.json --base-path /data/zachary/alice/ --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/custom-spec-raw.json  --port 30343 --rpc-port 9977 > log.log 2>&1 &
+nohup ./target/release/parachain-magnet-node --alice --collator --force-authoring --chain raw-magnet-2000.json --base-path ./alice --port 40333 --rpc-port 8844 --rpc-cors all --unsafe-rpc-external -- --execution wasm --chain ../polkadot-sdk/rococo/raw-rococo-local.json  --port 30343 --rpc-port 9977 > magnet-2000.log 2>&1 &
 ```
 
 
-#### 5. Register on the Local Relay Chain 
+#### 6. Register on the Local Relay Chain 
 - a. Open the browser, click on `Developer`, select `Sudo`. 
 ![](https://github.com/y19818/Magnet/blob/main/Img/4a.png)
 - b. On the left, select `paraSudoWrapper`, on the right, select `sudoScheduleParaInitialize(id,genesis)`. 
@@ -268,7 +291,7 @@ For `paraKind`, select yes.
 
 Click `submit`, followed by `sign and submit`. Then, check the explorer to verify that the parachain is syncing with the relay chain.
 ![](https://github.com/y19818/Magnet/blob/main/Img/5.png)
-#### 6. Test Parachain Block Production
+#### 7. Test Parachain Block Production
 
 Using polkadot.js, connect to port 8844, initiate a transfer, and verify that blocks are generated as expected.
 ![](https://github.com/y19818/Magnet/blob/main/Img/6a.png)
