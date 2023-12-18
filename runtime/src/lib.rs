@@ -30,8 +30,7 @@ use sp_runtime::{
 };
 
 use scale_info::prelude::string::String;
-use sp_std::collections::btree_map::BTreeMap;
-use sp_std::{marker::PhantomData, prelude::*};
+use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, prelude::*};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;

@@ -2,8 +2,10 @@ use super::{
 	AccountId, AllPalletsWithSystem, BTreeMap, Balances, ParachainInfo, ParachainSystem,
 	PolkadotXcm, Runtime, RuntimeCall, RuntimeEvent, RuntimeOrigin, WeightToFee, XcmpQueue,
 };
-use crate::xcms::matches_token_ex::IsConcreteEx;
-use crate::MagnetToStakingPot;
+use crate::{
+	xcms::{matches_token_ex::IsConcreteEx, xcm_weight::UsingComponentsEx},
+	MagnetToStakingPot,
+};
 use frame_support::{
 	match_types, parameter_types,
 	traits::{ConstU32, Everything, Nothing},
@@ -21,7 +23,6 @@ use xcm_builder::{
 	WithComputedOrigin, WithUniqueTopic,
 };
 use xcm_executor::XcmExecutor;
-use crate::xcms::xcm_weight::UsingComponentsEx;
 
 parameter_types! {
 	pub const RelayLocation: MultiLocation = MultiLocation::parent();

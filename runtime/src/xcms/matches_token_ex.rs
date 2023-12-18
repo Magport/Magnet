@@ -20,8 +20,7 @@
 // with different precision.
 
 use frame_support::traits::Get;
-use sp_std::collections::btree_map::BTreeMap;
-use sp_std::marker::PhantomData;
+use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData};
 use xcm::latest::{
 	AssetId::{Abstract, Concrete},
 	AssetInstance,

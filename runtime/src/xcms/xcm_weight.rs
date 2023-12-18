@@ -16,6 +16,7 @@
 
 // Modified by Alex Wang  2023/12
 
+use codec::Decode;
 use frame_support::{
 	dispatch::GetDispatchInfo,
 	traits::{tokens::currency::Currency as CurrencyT, Get, OnUnbalanced as OnUnbalancedT},
@@ -24,7 +25,6 @@ use frame_support::{
 		WeightToFee as WeightToFeeT,
 	},
 };
-use codec::Decode;
 use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
 use sp_std::{marker::PhantomData, result::Result};
 use xcm::latest::{prelude::*, Weight};
@@ -154,11 +154,11 @@ impl<T: Get<(AssetId, u128, u128)>, R: TakeRevenue> WeightTrader for FixedRateOf
 			weight, payment, context,
 		);
 		let (id, units_per_second, units_per_mb) = T::get();
-		let amount = (units_per_second * (weight.ref_time() as u128) /
-			(WEIGHT_REF_TIME_PER_SECOND as u128)) +
-			(units_per_mb * (weight.proof_size() as u128) / (WEIGHT_PROOF_SIZE_PER_MB as u128));
+		let amount = (units_per_second * (weight.ref_time() as u128)
+			/ (WEIGHT_REF_TIME_PER_SECOND as u128))
+			+ (units_per_mb * (weight.proof_size() as u128) / (WEIGHT_PROOF_SIZE_PER_MB as u128));
 		if amount == 0 {
-			return Ok(payment)
+			return Ok(payment);
 		}
 		let unused =
 			payment.checked_sub((id, amount).into()).map_err(|_| XcmError::TooExpensive)?;
@@ -171,9 +171,9 @@ impl<T: Get<(AssetId, u128, u128)>, R: TakeRevenue> WeightTrader for FixedRateOf
 		log::trace!(target: "xcm::weight", "FixedRateOfFungible::refund_weight weight: {:?}, context: {:?}", weight, context);
 		let (id, units_per_second, units_per_mb) = T::get();
 		let weight = weight.min(self.0);
-		let amount = (units_per_second * (weight.ref_time() as u128) /
-			(WEIGHT_REF_TIME_PER_SECOND as u128)) +
-			(units_per_mb * (weight.proof_size() as u128) / (WEIGHT_PROOF_SIZE_PER_MB as u128));
+		let amount = (units_per_second * (weight.ref_time() as u128)
+			/ (WEIGHT_REF_TIME_PER_SECOND as u128))
+			+ (units_per_mb * (weight.proof_size() as u128) / (WEIGHT_PROOF_SIZE_PER_MB as u128));
 		self.0 -= weight;
 		self.1 = self.1.saturating_sub(amount);
 		if amount > 0 {
@@ -264,7 +264,7 @@ impl<
 // places any weight bought into the right account.
 // use PrecisionMultiplier for different precision between relaychain and Magnet
 use frame_support::traits::Imbalance;
-const  PRECISION_MULTIPLIER: u128 = 1_000_000;
+const PRECISION_MULTIPLIER: u128 = 1_000_000;
 
 pub struct UsingComponentsEx<
 	WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
@@ -297,7 +297,7 @@ impl<
 	) -> Result<Assets, XcmError> {
 		log::trace!(target: "runtime::xcm_weight", "UsingComponentsEx::buy_weight weight: {:?}, payment: {:?}, context: {:?}", weight, payment, context);
 		let amount = WeightToFee::weight_to_fee(&weight);
-		
+
 		let mut u128_amount: u128 = amount.saturated_into();
 		let is_radix: bool = u128_amount % PRECISION_MULTIPLIER > 0;
 		u128_amount = u128_amount / PRECISION_MULTIPLIER;
@@ -306,7 +306,7 @@ impl<
 		}
 		let required = (Concrete(AssetId::get()), u128_amount).into();
 		let unused = payment.checked_sub(required).map_err(|_| XcmError::TooExpensive)?;
-		
+
 		let amount: Currency::Balance = u128_amount.saturated_into();
 		self.0 = self.0.saturating_add(weight);
 		self.1 = self.1.saturating_add(amount);
@@ -318,10 +318,10 @@ impl<
 		log::trace!(target: "runtime::xcm_weight", "UsingComponentsEx::refund_weight weight: {:?}, context: {:?}", weight, context);
 		let weight = weight.min(self.0);
 		let amount = WeightToFee::weight_to_fee(&weight);
-		
+
 		let mut u128_amount: u128 = amount.saturated_into();
 		u128_amount = u128_amount / PRECISION_MULTIPLIER;
-		
+
 		let amount: Currency::Balance = u128_amount.saturated_into();
 		self.0 -= weight;
 		self.1 = self.1.saturating_sub(amount);
@@ -342,8 +342,7 @@ impl<
 	> Drop for UsingComponentsEx<WeightToFee, AssetId, AccountId, Currency, OnUnbalanced>
 {
 	fn drop(&mut self) {
-		let amount: Currency::Balance = self.1 * PRECISION_MULTIPLIER.saturated_into();	
+		let amount: Currency::Balance = self.1 * PRECISION_MULTIPLIER.saturated_into();
 		OnUnbalanced::on_unbalanced(Currency::issue(amount));
 	}
 }
-
