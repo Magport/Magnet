@@ -61,6 +61,13 @@ use sp_runtime::{
 use std::cmp::Ordering;
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
 
+#[derive(Clone, PartialEq)]
+pub enum OrderType {
+	Normal,
+	Force,
+	XCMEvent,
+}
+
 async fn get_spot_price<Balance>(
 	relay_chain: impl RelayChainInterface + Clone,
 	hash: H256,
@@ -158,7 +165,8 @@ async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
 	parachain: &P,
 	transaction_pool: Arc<ExPool>,
 	height: RelayBlockNumber,
-) -> Option<bool>
+	snap_txs: Vec<H256>,
+) -> Option<(bool, OrderType)>
 where
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
@@ -175,6 +183,7 @@ where
 	let mut is_place_order = false;
 	let mut all_gas_value = Balance::from(0u32);
 	let block_hash = parachain.usage_info().chain.best_hash;
+	let mut back_txs: Vec<H256> = vec![];
 	loop {
 		let pending_tx =
 			if let Some(pending_tx) = pending_iterator.next() { pending_tx } else { break };
@@ -196,18 +205,55 @@ where
 			is_place_order,
 			transaction_pool.status()
 		);
+		back_txs.push(H256::from_slice(pending_tx.hash().as_ref()));
 	}
+	let mut order_type = OrderType::Normal;
 	if !is_place_order {
 		//check is need force bid coretime
 		let force_bid = parachain.runtime_api().on_relaychain(block_hash, height).ok()?;
 		if all_gas_value.cmp(&Balance::from(0u32)) == Ordering::Greater && force_bid == 1 {
 			is_place_order = true;
-			log::info!("============force place order======================");
+			order_type = OrderType::Force;
 		}
-	} else {
-		log::info!("============normal place order======================");
 	}
-	Some(is_place_order)
+	if is_place_order {
+		if back_txs == snap_txs {
+			is_place_order = false;
+		}
+	}
+	log::info!("back_txs:{:?}", back_txs);
+	log::info!("snap_txs:{:?}", snap_txs);
+	Some((is_place_order, order_type))
+}
+
+async fn relay_chain_xcm_event(
+	relay_chain_interface: impl RelayChainInterface + Clone,
+	para_id: ParaId,
+	relay_parent: H256,
+) -> Option<(bool, OrderType)> {
+	let downward_messages =
+		relay_chain_interface.retrieve_dmq_contents(para_id, relay_parent).await.ok()?;
+	let horizontal_messages = relay_chain_interface
+		.retrieve_all_inbound_hrmp_channel_contents(para_id, relay_parent)
+		.await
+		.ok()?;
+	let can_order = downward_messages.len() > 0 || horizontal_messages.len() > 0;
+	return Some((can_order, OrderType::XCMEvent));
+}
+
+async fn get_txs<Block, ExPool>(transaction_pool: Arc<ExPool>) -> Vec<H256>
+where
+	Block: BlockT,
+	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
+{
+	let mut pending_iterator = transaction_pool.ready();
+	let mut back_txs: Vec<H256> = vec![];
+	loop {
+		let pending_tx =
+			if let Some(pending_tx) = pending_iterator.next() { pending_tx } else { break };
+		back_txs.push(H256::from_slice(pending_tx.hash().as_ref()));
+	}
+	return back_txs;
 }
 
 async fn handle_new_best_parachain_head<P, Block, PB, ExPool, Balance>(
@@ -310,6 +356,7 @@ where
 			order_record_local.para_id = para_id;
 			let sequence_number = parachain.runtime_api().sequence_number(hash)?;
 			order_record_local.sequence_number = sequence_number;
+			order_record_local.txs = get_txs(transaction_pool.clone()).await;
 		},
 		None => {
 			let sequence_number = parachain.runtime_api().sequence_number(hash)?;
@@ -320,11 +367,18 @@ where
 			let mut order_record_local = order_record.lock().await;
 			if collator_public.is_some() {
 				//your turn
-				let reached =
-					reach_txpool_threshold::<_, _, _, _, PB>(parachain, transaction_pool, height)
-						.await;
-				if let Some(reach) = reached {
+				let reached = reach_txpool_threshold::<_, _, _, _, PB>(
+					parachain,
+					transaction_pool,
+					height,
+					order_record_local.txs.clone(),
+				)
+				.await;
+				let mut can_order = false;
+				let mut order_type = OrderType::Normal;
+				if let Some((reach, o_t)) = reached {
 					if reach {
+						order_type = o_t;
 						let mut exist_order = false;
 						// key = OnDemandAssignmentProvider OnDemandQueue
 						let on_demand_queue_storage =
@@ -341,37 +395,61 @@ where
 							}
 						}
 						if !exist_order {
-							if height - order_record_local.relay_height > slot_block {
-								if order_record_local.order_status == OrderStatus::Init {
-									let max_amount =
-										parachain.runtime_api().order_max_amount(hash)?;
-									let p_spot_price =
-										get_spot_price::<Balance>(relay_chain.clone(), p_hash)
-											.await;
-									let spot_price;
-									if p_spot_price.is_some() {
-										spot_price = p_spot_price.unwrap();
-									} else {
-										spot_price = max_amount;
-									}
-									let order_result = try_place_order::<Balance>(
-										relay_chain,
-										order_record_local.relay_base,
-										order_record_local.relay_base_height,
-										keystore,
-										para_id,
-										url,
-										spot_price,
-									)
-									.await;
-									order_record_local.order_status = OrderStatus::Order;
-									if order_result.is_err() {
-										log::info!(
-											"===========place_order error:=============={:?}",
-											order_result
-										);
-									}
-								}
+							can_order = true;
+						}
+					} else {
+						let trig_xcm_event =
+							relay_chain_xcm_event(relay_chain.clone(), para_id, p_hash).await;
+						if let Some((trig_flag, o_t)) = trig_xcm_event {
+							can_order = trig_flag;
+							order_type = o_t;
+						}
+					}
+				}
+				if can_order {
+					if height - order_record_local.relay_height > slot_block {
+						if order_record_local.order_status == OrderStatus::Init {
+							let max_amount = parachain.runtime_api().order_max_amount(hash)?;
+							let p_spot_price =
+								get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
+							let spot_price;
+							if p_spot_price.is_some() {
+								spot_price = p_spot_price.unwrap();
+							} else {
+								spot_price = max_amount;
+							}
+							match order_type {
+								OrderType::Normal => {
+									log::info!(
+										"============normal place order======================"
+									);
+								},
+								OrderType::Force => {
+									log::info!(
+										"============force place order======================"
+									);
+								},
+								OrderType::XCMEvent => {
+									log::info!("============xcm place order======================");
+								},
+							}
+							let order_result = try_place_order::<Balance>(
+								relay_chain,
+								order_record_local.relay_base,
+								order_record_local.relay_base_height,
+								keystore,
+								para_id,
+								url,
+								spot_price,
+							)
+							.await;
+							log::info!("===========place order completed==============",);
+							order_record_local.order_status = OrderStatus::Order;
+							if order_result.is_err() {
+								log::info!(
+									"===========place_order error:=============={:?}",
+									order_result
+								);
 							}
 						}
 					}

@@ -234,28 +234,27 @@ pub mod pallet {
 					.ok_or(Error::<T>::CreateOrderFail)?;
 					let old_sequence_number = SequenceNumber::<T>::get();
 					let order = OrderMap::<T>::get(old_sequence_number);
-					if sequence_number == old_sequence_number {
-						if order.is_none() {
-							OrderMap::<T>::insert(
-								old_sequence_number,
-								Order::<T::AuthorityId> {
-									sequence_number: old_sequence_number,
-									orderer: author_pub.unwrap(),
-									price,
-									executed: false,
-								},
-							);
-							CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
-						} else {
-							Err(Error::<T>::OrderExist)?;
-						}
+					if sequence_number != old_sequence_number {
+						// In the worst-case scenario, if there are multiple orders at the same time,
+						//  it may be due to system issues or it may be due to human intervention.
+						//   Currently, we only support running one order at the same time
+						// Err(Error::<T>::WrongSequenceNumber)?;
+						// Continuing to produce blocks, recording errors
+						log::info!("========WrongSequenceNumber:{:?}========", sequence_number);
+					}
+					if order.is_none() {
+						OrderMap::<T>::insert(
+							old_sequence_number,
+							Order::<T::AuthorityId> {
+								sequence_number: old_sequence_number,
+								orderer: author_pub.unwrap(),
+								price,
+								executed: false,
+							},
+						);
+						CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
 					} else {
-						Err(Error::<T>::WrongSequenceNumber)?;
-						// if old_sequence_number == sequence_number + 1 {
-						// 	// two same relaychain block,write same again or do nothing??
-						// } else {
-						// 	Err(Error::<T>::WrongSequenceNumber)?;
-						// }
+						Err(Error::<T>::OrderExist)?;
 					}
 					T::DbWeight::get().reads_writes(2, 1)
 				},

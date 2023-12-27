@@ -19,6 +19,8 @@ use cumulus_primitives_core::{
 	relay_chain::BlockNumber as RelayBlockNumber, relay_chain::Hash as PHash, ParaId,
 	PersistedValidationData,
 };
+use sp_core::H256;
+use sp_runtime::sp_std::vec::Vec;
 use sp_runtime::traits::MaybeDisplay;
 #[cfg(feature = "std")]
 pub mod inherent_client;
@@ -62,6 +64,7 @@ pub struct OrderRecord<AuthorityId> {
 	pub para_id: ParaId,
 	pub sequence_number: u64,
 	pub author_pub: Option<AuthorityId>,
+	pub txs: Vec<H256>,
 }
 
 sp_api::decl_runtime_apis! {

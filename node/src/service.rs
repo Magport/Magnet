@@ -462,6 +462,7 @@ async fn start_node_impl(
 				para_id,
 				sequence_number: 0,
 				author_pub: None,
+				txs: vec![],
 			}));
 		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
 			client.clone(),
