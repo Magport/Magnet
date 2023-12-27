@@ -35,6 +35,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		OrderPallet: pallet_order::{Pallet, Storage, Event<T>},
 		Pot: pallet_pot::{Pallet, Call, Storage, Event<T>},
+		Utility: pallet_utility::{Pallet, Call, Storage, Event},
 		Liquidation: pallet_liquidation::{Pallet, Storage, Event<T>},
 	}
 );
@@ -110,6 +111,13 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxHolds = ();
 	type MaxFreezes = ();
+}
+
+impl pallet_utility::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -218,5 +226,8 @@ impl ExtBuilder {
 }
 
 pub(crate) fn expected_event(event: &LiquidationEvent<Test>) -> bool {
-	matches!(event, LiquidationEvent::ProfitDistributed | LiquidationEvent::CollatorsCompensated)
+	matches!(
+		event,
+		LiquidationEvent::ProfitDistributed(_, _) | LiquidationEvent::CollatorsCompensated(_, _)
+	)
 }

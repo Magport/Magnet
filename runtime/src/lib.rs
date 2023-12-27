@@ -896,6 +896,13 @@ impl pallet_assurance::Config for Runtime {
 	type DefaultLiquidateThreshold = ConstU128<0>;
 }
 
+impl pallet_utility::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type PalletsOrigin = OriginCaller;
+	type WeightInfo = pallet_utility::weights::SubstrateWeight<Runtime>;
+}
+
 parameter_types! {
 	pub const SystemRatio: Perbill = Perbill::from_percent(20); // 20% for system
 	pub const TreasuryRatio: Perbill = Perbill::from_percent(33); // 33% for treasury
@@ -931,6 +938,7 @@ construct_runtime!(
 		ParachainSystem: cumulus_pallet_parachain_system = 1,
 		Timestamp: pallet_timestamp = 2,
 		ParachainInfo: parachain_info = 3,
+		Utility: pallet_utility = 4,
 
 		// Monetary stuff.
 		Balances: pallet_balances = 10,
