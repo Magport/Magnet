@@ -317,5 +317,6 @@ fn testnet_genesis(
 		dynamic_fee: Default::default(),
 		base_fee: Default::default(),
 		assurance: Default::default(),
+		treasury: Default::default(),
 	}
 }

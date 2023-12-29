@@ -17,8 +17,18 @@
 
 //! Expose the auto generated weight files.
 
+//Modified by Alex Wang 2023/11
+
 pub mod block_weights;
 pub mod extrinsic_weights;
+pub mod pallet_conviction_voting;
+pub mod pallet_preimage;
+pub mod pallet_ranked_collective;
+pub mod pallet_referenda_fellowship_referenda;
+pub mod pallet_referenda_referenda;
+pub mod pallet_scheduler;
+pub mod pallet_treasury;
+pub mod pallet_whitelist;
 pub mod paritydb_weights;
 pub mod rocksdb_weights;
 
