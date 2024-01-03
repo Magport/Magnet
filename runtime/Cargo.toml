@@ -283,7 +283,6 @@ try-runtime = [
 	"pallet-hotfix-sufficients/try-runtime",
 	"pallet-pot/try-runtime",
 	"pallet-assurance/try-runtime",
-	"pallet-motion/try-runtime",
 	"pallet-utility/try-runtime",
 	"pallet-assurance/try-runtime",
 	"pallet-preimage/try-runtime",
