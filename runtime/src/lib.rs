@@ -26,11 +26,12 @@ use sp_runtime::{
 		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
-	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature,
+	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature, Percent,
 };
 
 use scale_info::prelude::string::String;
-use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData, prelude::*};
+use sp_std::collections::btree_map::BTreeMap;
+use sp_std::{cmp::Ordering, marker::PhantomData, prelude::*};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
@@ -47,7 +48,8 @@ use frame_support::{
 	parameter_types,
 	traits::{
 		AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency,
-		EitherOfDiverse, Everything, FindAuthor, Imbalance, OnFinalize, OnUnbalanced,
+		EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance, OnFinalize, OnUnbalanced,
+		PrivilegeCmp,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -79,12 +81,11 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 
 // XCM Imports
 use xcm::latest::prelude::BodyId;
+use xcm::opaque::lts::{InteriorMultiLocation, Junction::PalletInstance};
 use xcm_executor::XcmExecutor;
 
 use cumulus_primitives_core::{ParaId, PersistedValidationData};
 pub use pallet_order::{self, OrderGasCost};
-/// Import the template pallet.
-pub use pallet_parachain_template;
 
 use fp_evm::weight_per_gas;
 use fp_rpc::TransactionStatus;
@@ -100,6 +101,15 @@ mod precompiles;
 use precompiles::FrontierPrecompiles;
 
 use pallet_pot::PotNameBtreemap;
+
+/// Constant values used within the runtime.
+use parachains_common::kusama::currency::*;
+
+use pallet_preimage::storage::LinearStoragePrice;
+
+// Governance and configurations.
+pub mod governance;
+use governance::{pallet_custom_origins, AuctionAdmin, Treasurer, TreasurySpender};
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -482,8 +492,8 @@ impl pallet_balances::Config for Runtime {
 	type ReserveIdentifier = [u8; 8];
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type FreezeIdentifier = ();
-	type MaxHolds = ConstU32<0>;
-	type MaxFreezes = ConstU32<0>;
+	type MaxHolds = ConstU32<2>;
+	type MaxFreezes = ConstU32<1>;
 }
 
 use pallet_liquidation;
@@ -642,10 +652,6 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = ();
 }
 
-/// Configure the pallet template in pallets/template.
-impl pallet_parachain_template::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-}
 pub struct OrderGasCostHandler();
 
 impl<T> OrderGasCost<T> for OrderGasCostHandler
@@ -668,6 +674,7 @@ parameter_types! {
 	pub const OrderMaxAmount:Balance = 200000000;
 	pub const TxPoolThreshold:Balance = 3000000000;
 }
+
 type EnsureRootOrHalf = EitherOfDiverse<
 	EnsureRoot<AccountId>,
 	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
@@ -703,18 +710,6 @@ impl pallet_collective::Config<CouncilCollective> for Runtime {
 	type WeightInfo = pallet_collective::weights::SubstrateWeight<Runtime>;
 	type SetMembersOrigin = EnsureRoot<AccountId>;
 	type MaxProposalWeight = MaxCollectivesProposalWeight;
-}
-
-impl pallet_motion::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;
-	type SimpleMajorityOrigin =
-		pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>;
-	type SuperMajorityOrigin =
-		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 2, 3>;
-	type UnanimousOrigin =
-		pallet_collective::EnsureProportionAtLeast<AccountId, CouncilCollective, 1, 1>;
-	type WeightInfo = pallet_motion::weights::SubstrateWeight<Runtime>;
 }
 
 impl pallet_evm_chain_id::Config for Runtime {}
@@ -929,6 +924,190 @@ impl pallet_liquidation::Config for Runtime {
 	type ProfitDistributionCycle = ProfitDistributionCycle;
 }
 
+mod hold {
+	use super::*;
+
+	use frame_support::pallet_prelude::*;
+	use frame_support::traits::{
+		fungible::MutateHold,
+		tokens::{Fortitude::Force, Precision::BestEffort},
+	};
+	use frame_support::{CloneNoBound, EqNoBound, PartialEqNoBound, RuntimeDebugNoBound};
+	use pallet_preimage::storage::{Consideration, Footprint};
+	use sp_runtime::traits::Convert;
+	/// Consideration method using a `fungible` balance frozen as the cost exacted for the footprint.
+	#[derive(
+		CloneNoBound,
+		EqNoBound,
+		PartialEqNoBound,
+		Encode,
+		Decode,
+		TypeInfo,
+		MaxEncodedLen,
+		RuntimeDebugNoBound,
+	)]
+	#[scale_info(skip_type_params(A, F, R, D))]
+	#[codec(mel_bound())]
+	pub struct HoldConsideration<A, F, R, D>(F::Balance, PhantomData<fn() -> (A, R, D)>)
+	where
+		F: MutateHold<A>;
+	impl<
+			A: 'static,
+			F: 'static + MutateHold<A>,
+			R: 'static + Get<F::Reason>,
+			D: 'static + Convert<Footprint, F::Balance>,
+		> Consideration<A> for HoldConsideration<A, F, R, D>
+	where
+		F::Balance: Send + Sync,
+		//<F as hidden_include::traits::fungible::Inspect<A>>::Balance: Send + Sync,
+	{
+		fn new(who: &A, footprint: Footprint) -> Result<Self, DispatchError> {
+			let new = D::convert(footprint);
+			F::hold(&R::get(), who, new)?;
+			Ok(Self(new, PhantomData))
+		}
+		fn update(self, who: &A, footprint: Footprint) -> Result<Self, DispatchError> {
+			let new = D::convert(footprint);
+			if self.0 > new {
+				F::release(&R::get(), who, self.0 - new, BestEffort)?;
+			} else if new > self.0 {
+				F::hold(&R::get(), who, new - self.0)?;
+			}
+			Ok(Self(new, PhantomData))
+		}
+		fn drop(self, who: &A) -> Result<(), DispatchError> {
+			F::release(&R::get(), who, self.0, BestEffort).map(|_| ())
+		}
+		fn burn(self, who: &A) {
+			let _ = F::burn_held(&R::get(), who, self.0, BestEffort, Force);
+		}
+	}
+}
+
+parameter_types! {
+	pub const PreimageBaseDeposit: Balance = deposit(2, 64);
+	pub const PreimageByteDeposit: Balance = deposit(0, 1);
+	pub const PreimageHoldReason: RuntimeHoldReason = RuntimeHoldReason::Preimage(pallet_preimage::HoldReason::Preimage);
+}
+
+impl pallet_preimage::Config for Runtime {
+	type WeightInfo = weights::pallet_preimage::WeightInfo<Runtime>;
+	type RuntimeEvent = RuntimeEvent;
+	type Currency = Balances;
+	type ManagerOrigin = EnsureRoot<AccountId>;
+	type Consideration = crate::hold::HoldConsideration<
+		AccountId,
+		Balances,
+		PreimageHoldReason,
+		LinearStoragePrice<PreimageBaseDeposit, PreimageByteDeposit, Balance>,
+	>;
+	//type BaseDeposit = PreimageBaseDeposit;
+	//type ByteDeposit = PreimageByteDeposit;
+}
+
+parameter_types! {
+	pub MaximumSchedulerWeight: Weight = Perbill::from_percent(80) *
+		RuntimeBlockWeights::get().max_block;
+	pub const MaxScheduledPerBlock: u32 = 50;
+	pub const NoPreimagePostponement: Option<u32> = Some(10);
+}
+
+/// Used the compare the privilege of an origin inside the scheduler.
+pub struct OriginPrivilegeCmp;
+
+impl PrivilegeCmp<OriginCaller> for OriginPrivilegeCmp {
+	fn cmp_privilege(left: &OriginCaller, right: &OriginCaller) -> Option<Ordering> {
+		if left == right {
+			return Some(Ordering::Equal);
+		}
+
+		match (left, right) {
+			// Root is greater than anything.
+			(OriginCaller::system(frame_system::RawOrigin::Root), _) => Some(Ordering::Greater),
+			// For every other origin we don't care, as they are not used for `ScheduleOrigin`.
+			_ => None,
+		}
+	}
+}
+
+impl pallet_scheduler::Config for Runtime {
+	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeEvent = RuntimeEvent;
+	type PalletsOrigin = OriginCaller;
+	type RuntimeCall = RuntimeCall;
+	type MaximumWeight = MaximumSchedulerWeight;
+	// The goal of having ScheduleOrigin include AuctionAdmin is to allow the auctions track of
+	// OpenGov to schedule periodic auctions.
+	type ScheduleOrigin = EitherOf<EnsureRoot<AccountId>, AuctionAdmin>;
+	type MaxScheduledPerBlock = MaxScheduledPerBlock;
+	type WeightInfo = weights::pallet_scheduler::WeightInfo<Runtime>;
+	type OriginPrivilegeCmp = OriginPrivilegeCmp;
+	type Preimages = Preimage;
+}
+
+parameter_types! {
+	pub const ProposalBond: Permill = Permill::from_percent(5);
+	pub const ProposalBondMinimum: Balance = 2000 * CENTS;
+	pub const ProposalBondMaximum: Balance = 1 * GRAND;
+	pub const SpendPeriod: BlockNumber = 6 * DAYS;
+	pub const Burn: Permill = Permill::from_perthousand(2);
+	pub const TreasuryPalletId: PalletId = PalletId(*b"py/trsry");
+	pub const PayoutSpendPeriod: BlockNumber = 30 * DAYS;
+	// The asset's interior location for the paying account. This is the Treasury
+	// pallet instance (which sits at index 15).
+	pub TreasuryInteriorLocation: InteriorMultiLocation = PalletInstance(15).into();
+
+	pub const TipCountdown: BlockNumber = 1 * DAYS;
+	pub const TipFindersFee: Percent = Percent::from_percent(20);
+	pub const TipReportDepositBase: Balance = 100 * CENTS;
+	pub const DataDepositPerByte: Balance = 1 * CENTS;
+	pub const MaxApprovals: u32 = 100;
+	pub const MaxAuthorities: u32 = 100_000;
+	pub const MaxKeys: u32 = 10_000;
+	pub const MaxPeerInHeartbeats: u32 = 10_000;
+	pub const MaxBalance: Balance = Balance::max_value();
+}
+
+impl pallet_treasury::Config for Runtime {
+	type PalletId = TreasuryPalletId;
+	type Currency = Balances;
+	type ApproveOrigin = EitherOfDiverse<EnsureRoot<AccountId>, Treasurer>;
+	type RejectOrigin = EitherOfDiverse<EnsureRoot<AccountId>, Treasurer>;
+	type RuntimeEvent = RuntimeEvent;
+	type OnSlash = Treasury;
+	type ProposalBond = ProposalBond;
+	type ProposalBondMinimum = ProposalBondMinimum;
+	type ProposalBondMaximum = ProposalBondMaximum;
+	type SpendPeriod = SpendPeriod;
+	type Burn = Burn;
+	//type BurnDestination = Society;
+	type BurnDestination = ();
+	type MaxApprovals = MaxApprovals;
+	type WeightInfo = weights::pallet_treasury::WeightInfo<Runtime>;
+	//type SpendFunds = Bounties;
+	type SpendFunds = ();
+	type SpendOrigin = TreasurySpender;
+	/*
+	type AssetKind = VersionedLocatableAsset;
+	type Beneficiary = VersionedMultiLocation;
+	type BeneficiaryLookup = IdentityLookup<Self::Beneficiary>;
+	type Paymaster = PayOverXcm<
+		TreasuryInteriorLocation,
+		crate::xcm_config::XcmRouter,
+		crate::XcmPallet,
+		ConstU32<{ 6 * HOURS }>,
+		Self::Beneficiary,
+		Self::AssetKind,
+		LocatableAssetConverter,
+		VersionedMultiLocationConverter,
+	>;
+	type BalanceConverter = AssetRate;
+	type PayoutPeriod = PayoutSpendPeriod;
+	*/
+	#[cfg(feature = "runtime-benchmarks")]
+	type BenchmarkHelper = runtime_common::impls::benchmarks::TreasuryArguments;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -947,9 +1126,25 @@ construct_runtime!(
 		AssetsBridge: pallet_assets_bridge = 13,
 
 		// Governance
-		Sudo: pallet_sudo = 15,
-		Council: pallet_collective::<Instance1> = 16,
-		Motion: pallet_motion = 17,
+		Sudo: pallet_sudo = 14,
+		Treasury: pallet_treasury = 15,
+		ConvictionVoting: pallet_conviction_voting = 16,
+		Referenda: pallet_referenda = 17,
+		//	pub type FellowshipCollectiveInstance = pallet_ranked_collective::Instance1;
+		FellowshipCollective: pallet_ranked_collective::<Instance1> = 18,
+		// pub type FellowshipReferendaInstance = pallet_referenda::Instance2;
+		FellowshipReferenda: pallet_referenda::<Instance2> = 19,
+		Origins: pallet_custom_origins::{Origin} = 52,
+		Whitelist: pallet_whitelist = 53,
+
+		// System scheduler.
+		Scheduler: pallet_scheduler = 54,
+
+		// Preimage registrar.
+		Preimage: pallet_preimage::{Pallet, Call, Storage, Event<T>, HoldReason} = 55,
+
+		//Old Governance
+		Council: pallet_collective::<Instance1> = 56,
 
 		// Collator support. The order of these 4 are important and shall not change.
 		Authorship: pallet_authorship = 20,
@@ -971,9 +1166,6 @@ construct_runtime!(
 		BaseFee: pallet_base_fee = 43,
 		DynamicFee: pallet_dynamic_fee = 44,
 		HotfixSufficients: pallet_hotfix_sufficients = 45,
-
-		// Template
-		TemplatePallet: pallet_parachain_template = 50,
 
 		//Magnet
 		OrderPallet: pallet_order = 51,
