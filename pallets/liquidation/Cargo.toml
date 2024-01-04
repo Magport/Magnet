@@ -34,6 +34,7 @@ sp-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch
 frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
+pallet-utility = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 
 [features]
 default = ['std']
@@ -42,6 +43,7 @@ runtime-benchmarks = [
     "frame-support/runtime-benchmarks",
     "frame-system/runtime-benchmarks",
     "sp-runtime/runtime-benchmarks",
+    "pallet-utility/runtime-benchmarks",
 ]
 std = [
     "sp-core/std",
@@ -54,10 +56,12 @@ std = [
     "pallet-order/std",
     "pallet-pot/std",
     "mp-system/std",
+    "pallet-utility/std",
     "frame-benchmarking/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
     "sp-runtime/try-runtime",
+    "pallet-utility/try-runtime",
 ]
