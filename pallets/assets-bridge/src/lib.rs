@@ -58,8 +58,8 @@ pub type ReserveBalanceOf<T> = <<T as pallet_assets::Config>::Currency as Curren
 #[derive(Clone, Encode, Decode, Eq, PartialEq, RuntimeDebug, scale_info::TypeInfo)]
 pub enum ActionType<AssetId> {
 	Direct(H160),
-	FromSubToEth,
-	FromEthToSub,
+	FromSubToEth(H160),
+	FromEthToSub(H160),
 	BackForeign(AssetId),
 }
 
@@ -417,6 +417,7 @@ pub mod pallet {
 		#[transactional]
 		pub fn deposit(
 			origin: OriginFor<T>,
+			eth_address: H160,
 			asset_id: T::AssetId,
 			amount: T::Balance,
 			precision: LocalPrecision,
@@ -425,6 +426,11 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			ensure!(!Self::is_in_emergency(asset_id.clone()), Error::<T>::InEmergency);
 			ensure!(!amount.is_zero(), Error::<T>::ZeroBalance);
+
+			<T as pallet_assets::Config>::Currency::reserve(&who, T::ClaimBond::get())?;
+
+			SubAccounts::<T>::insert(eth_address, &who);
+			EvmAccounts::<T>::insert(&who, eth_address);
 
 			// 1. check evm account
 			let evm_account = Self::evm_accounts(&who).ok_or(Error::<T>::EthAddressHasNotMapped)?;
@@ -448,6 +454,11 @@ pub mod pallet {
 
 			Self::call_evm(erc20, inputs)?;
 
+			<T as pallet_assets::Config>::Currency::unreserve(&who, T::ClaimBond::get());
+
+			SubAccounts::<T>::remove(evm_account);
+			EvmAccounts::<T>::remove(&who);
+
 			Self::deposit_event(Event::DepositExecuted(asset_id, who, evm_account, amount, erc20));
 
 			Ok(Pays::No.into())
@@ -463,12 +474,18 @@ pub mod pallet {
 		#[transactional]
 		pub fn withdraw(
 			origin: OriginFor<T>,
+			eth_address: H160,
 			asset_id: T::AssetId,
 			amount: T::Balance,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			ensure!(!Self::is_in_emergency(asset_id.clone()), Error::<T>::InEmergency);
 			ensure!(!amount.is_zero(), Error::<T>::ZeroBalance);
+
+			<T as pallet_assets::Config>::Currency::reserve(&who, T::ClaimBond::get())?;
+
+			SubAccounts::<T>::insert(eth_address, &who);
+			EvmAccounts::<T>::insert(&who, eth_address);
 
 			// 1. check evm account
 			let evm_account = Self::evm_accounts(&who).ok_or(Error::<T>::EthAddressHasNotMapped)?;
@@ -483,6 +500,11 @@ pub mod pallet {
 
 			// 3. mint asset
 			pallet_assets::Pallet::<T>::mint_into(asset_id.clone(), &who, amount)?;
+
+			<T as pallet_assets::Config>::Currency::unreserve(&who, T::ClaimBond::get());
+
+			SubAccounts::<T>::remove(evm_account);
+			EvmAccounts::<T>::remove(&who);
 
 			Self::deposit_event(Event::WithdrawExecuted(
 				asset_id.clone(),
@@ -520,23 +542,15 @@ pub mod pallet {
 			ensure!(!amount.is_zero(), Error::<T>::ZeroBalance);
 
 			let (from, to, back_foreign) = match action {
-				ActionType::Direct(unchecked) => {
-					(who.clone(), AddressMappingOf::<T>::into_account_id(unchecked), false)
+				ActionType::Direct(eth_address) => {
+					(who.clone(), AddressMappingOf::<T>::into_account_id(eth_address), false)
 				},
-				ActionType::FromSubToEth => (
-					who.clone(),
-					Self::evm_accounts(&who)
-						.map(AddressMappingOf::<T>::into_account_id)
-						.ok_or(Error::<T>::EthAddressHasNotMapped)?,
-					false,
-				),
-				ActionType::FromEthToSub => (
-					Self::evm_accounts(&who)
-						.map(AddressMappingOf::<T>::into_account_id)
-						.ok_or(Error::<T>::EthAddressHasNotMapped)?,
-					who.clone(),
-					false,
-				),
+				ActionType::FromSubToEth(eth_address) => {
+					(who.clone(), AddressMappingOf::<T>::into_account_id(eth_address), false)
+				},
+				ActionType::FromEthToSub(eth_address) => {
+					(AddressMappingOf::<T>::into_account_id(eth_address), who.clone(), false)
+				},
 				ActionType::BackForeign(asset_id) => {
 					// ensure asset_id registered in back_foreign list
 					ensure!(Self::is_in_back_foreign(asset_id.clone()), Error::<T>::BanBackForeign);

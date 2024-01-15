@@ -7535,25 +7535,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-motion"
-version = "4.0.0-dev"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "log",
- "pallet-balances",
- "pallet-collective",
- "pallet-membership",
- "parity-scale-codec",
- "scale-info",
- "sp-core",
- "sp-io",
- "sp-runtime",
- "sp-std",
-]
-
-[[package]]
 name = "pallet-multisig"
 version = "4.0.0-dev"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0#f60318f68687e601c47de5ad5ca88e2c3f8139a7"
@@ -7709,21 +7690,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-parachain-template"
-version = "0.1.0"
-dependencies = [
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "parity-scale-codec",
- "scale-info",
- "serde",
- "sp-core",
- "sp-io",
- "sp-runtime",
-]
-
-[[package]]
 name = "pallet-pot"
 version = "0.1.0"
 dependencies = [
@@ -7779,6 +7745,24 @@ dependencies = [
  "sp-core",
  "sp-io",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-preimage"
+version = "4.0.0-dev"
+dependencies = [
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "impl-trait-for-tuples",
+ "log",
+ "pallet-balances",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]
@@ -8250,7 +8234,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-node"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "array-bytes",
  "clap",
@@ -8346,7 +8330,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-runtime"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "cumulus-pallet-aura-ext",
  "cumulus-pallet-dmp-queue",
@@ -8382,6 +8366,7 @@ dependencies = [
  "pallet-base-fee",
  "pallet-collator-selection",
  "pallet-collective",
+ "pallet-conviction-voting",
  "pallet-dynamic-fee",
  "pallet-ethereum",
  "pallet-evm",
@@ -8392,19 +8377,23 @@ dependencies = [
  "pallet-evm-utils",
  "pallet-hotfix-sufficients",
  "pallet-liquidation",
- "pallet-motion",
  "pallet-order",
- "pallet-parachain-template",
  "pallet-pot",
  "pallet-pot-runtime-api",
  "pallet-precompile-substrate-utils",
+ "pallet-preimage 4.0.0-dev",
+ "pallet-ranked-collective",
+ "pallet-referenda",
+ "pallet-scheduler",
  "pallet-session",
  "pallet-society",
  "pallet-sudo",
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
+ "pallet-treasury",
  "pallet-utility",
+ "pallet-whitelist",
  "pallet-xcm 1.0.0",
  "parachain-info",
  "parachains-common",
@@ -8415,6 +8404,7 @@ dependencies = [
  "scale-info",
  "smallvec",
  "sp-api",
+ "sp-arithmetic",
  "sp-block-builder",
  "sp-consensus-aura",
  "sp-core",
@@ -9647,7 +9637,7 @@ dependencies = [
  "pallet-nomination-pools-runtime-api",
  "pallet-offences",
  "pallet-offences-benchmarking",
- "pallet-preimage",
+ "pallet-preimage 4.0.0-dev (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-proxy",
  "pallet-referenda",
  "pallet-scheduler",
@@ -10799,7 +10789,7 @@ dependencies = [
  "pallet-multisig",
  "pallet-nis",
  "pallet-offences",
- "pallet-preimage",
+ "pallet-preimage 4.0.0-dev (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-proxy",
  "pallet-recovery",
  "pallet-scheduler",
@@ -13831,7 +13821,7 @@ dependencies = [
  "pallet-nomination-pools-runtime-api",
  "pallet-offences",
  "pallet-offences-benchmarking",
- "pallet-preimage",
+ "pallet-preimage 4.0.0-dev (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-proxy",
  "pallet-ranked-collective",
  "pallet-recovery",
@@ -15742,7 +15732,7 @@ dependencies = [
  "pallet-nomination-pools-runtime-api",
  "pallet-offences",
  "pallet-offences-benchmarking",
- "pallet-preimage",
+ "pallet-preimage 4.0.0-dev (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.1.0)",
  "pallet-proxy",
  "pallet-recovery",
  "pallet-scheduler",
