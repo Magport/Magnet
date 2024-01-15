@@ -150,23 +150,13 @@ fn pause_should_work() {
 		));
 		expect_event(AssetsBridgeEvent::Register(1, H160::from_slice(&ERC20_1)));
 
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				1,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
-
 		assert_ok!(AssetsBridge::pause(RuntimeOrigin::signed(ALICE.into()), Some(1)));
 		expect_event(AssetsBridgeEvent::Paused(1));
 
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				1,
 				1,
 				LocalPrecision::Exact,
@@ -216,17 +206,6 @@ fn pause_after_pause_should_work() {
 		));
 		expect_event(AssetsBridgeEvent::Register(2, H160::from_slice(&ERC20_2)));
 
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				1,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
-
 		// 1. pause(1)
 		assert_ok!(AssetsBridge::pause(RuntimeOrigin::signed(ALICE.into()), Some(1)));
 		expect_event(AssetsBridgeEvent::Paused(1));
@@ -235,6 +214,7 @@ fn pause_after_pause_should_work() {
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				1,
 				1,
 				LocalPrecision::Exact,
@@ -280,6 +260,7 @@ fn unpause_should_work() {
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				1,
 				1,
 				LocalPrecision::Exact,
@@ -290,17 +271,6 @@ fn unpause_should_work() {
 
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), Some(1)));
 		expect_event(AssetsBridgeEvent::UnPaused(1));
-
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				1,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
 	})
 }
 
@@ -366,6 +336,7 @@ fn unpause_after_unpause_should_work() {
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				1,
 				1,
 				LocalPrecision::Exact,
@@ -375,26 +346,23 @@ fn unpause_after_unpause_should_work() {
 		);
 
 		assert_noop!(
-			AssetsBridge::withdraw(RuntimeOrigin::signed(BOB.into()), 1, 1),
+			AssetsBridge::withdraw(
+				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
+				1,
+				1
+			),
 			Error::<Test>::InEmergency
 		);
 
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), Some(2)));
 		expect_event(AssetsBridgeEvent::UnPaused(2));
 
-		assert_noop!(
-			AssetsBridge::withdraw(RuntimeOrigin::signed(BOB.into()), 2, 1),
-			Error::<Test>::EthAddressHasNotMapped
-		);
 		assert_eq!(AssetsBridge::emergencies(), vec![1]);
 
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), None));
 		expect_event(AssetsBridgeEvent::UnPausedAll);
 
-		assert_noop!(
-			AssetsBridge::withdraw(RuntimeOrigin::signed(BOB.into()), 1, 1),
-			Error::<Test>::EthAddressHasNotMapped
-		);
 		assert!(AssetsBridge::emergencies().is_empty());
 	})
 }
@@ -418,28 +386,6 @@ fn more_pause_and_unpause_should_work() {
 
 		assert!(AssetsBridge::emergencies().is_empty());
 
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				1,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
-
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				2,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
-
 		assert_ok!(AssetsBridge::pause(RuntimeOrigin::signed(ALICE.into()), None));
 		expect_event(AssetsBridgeEvent::PausedAll);
 
@@ -448,6 +394,7 @@ fn more_pause_and_unpause_should_work() {
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				1,
 				1,
 				LocalPrecision::Exact,
@@ -459,6 +406,7 @@ fn more_pause_and_unpause_should_work() {
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				2,
 				1,
 				LocalPrecision::Exact,
@@ -475,6 +423,7 @@ fn more_pause_and_unpause_should_work() {
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
+				H160::from_slice(&EVM_ADDR),
 				1,
 				1,
 				LocalPrecision::Exact,
@@ -483,32 +432,10 @@ fn more_pause_and_unpause_should_work() {
 			Error::<Test>::InEmergency
 		);
 
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				2,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
-
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), None));
 		expect_event(AssetsBridgeEvent::UnPausedAll);
 
 		assert!(AssetsBridge::emergencies().is_empty());
-
-		assert_noop!(
-			AssetsBridge::deposit(
-				RuntimeOrigin::signed(BOB.into()),
-				1,
-				1,
-				LocalPrecision::Exact,
-				LocalFortitude::Polite
-			),
-			Error::<Test>::EthAddressHasNotMapped
-		);
 	})
 }
 
