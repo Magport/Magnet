@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.4.0"
+version = "0.5.2"
 authors = ["Magnet"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -74,7 +74,9 @@ pallet-conviction-voting = { git = "https://github.com/paritytech/polkadot-sdk",
 pallet-ranked-collective = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-scheduler = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-treasury = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-
+pallet-insecure-randomness-collective-flip = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+pallet-contracts-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+pallet-contracts = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 
 # Polkadot
 polkadot-parachain-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
@@ -191,7 +193,7 @@ std = [
 	"pallet-order/std",
 	"sp-trie/std",
 	"cumulus-primitives-timestamp/std",
-  "pallet-liquidation/std",
+    "pallet-liquidation/std",
 	"pallet-utility/std",
 	"pallet-pot/std",
 	"pallet-assurance/std",
@@ -202,6 +204,9 @@ std = [
 	"pallet-ranked-collective/std",
 	"pallet-scheduler/std",
 	"pallet-treasury/std",
+	"pallet-insecure-randomness-collective-flip/std",
+	"pallet-contracts-primitives/std",
+	"pallet-contracts/std",	
 ]
 
 runtime-benchmarks = [
@@ -230,7 +235,7 @@ runtime-benchmarks = [
 	"pallet-society/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",
 	"pallet-ethereum/runtime-benchmarks",
-  "pallet-liquidation/runtime-benchmarks",
+    "pallet-liquidation/runtime-benchmarks",
 	"pallet-utility/runtime-benchmarks",
 	"pallet-pot/runtime-benchmarks",
 	"pallet-assurance/runtime-benchmarks",
@@ -241,6 +246,7 @@ runtime-benchmarks = [
 	"pallet-ranked-collective/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
+	"pallet-contracts/runtime-benchmarks",	
 ]
 
 try-runtime = [
@@ -270,7 +276,7 @@ try-runtime = [
 	"pallet-evm-utils/try-runtime",
 	"pallet-precompile-substrate-utils/try-runtime",
 	"pallet-order/try-runtime",
-  "pallet-liquidation/try-runtime",
+    "pallet-liquidation/try-runtime",
 	"pallet-assets/try-runtime",
 	"pallet-assets-bridge/try-runtime",
 	"pallet-collective/try-runtime",
@@ -292,6 +298,8 @@ try-runtime = [
 	"pallet-ranked-collective/try-runtime",
 	"pallet-scheduler/try-runtime",
 	"pallet-treasury/try-runtime",
+	"pallet-insecure-randomness-collective-flip/try-runtime",
+	"pallet-contracts/try-runtime",	
 ]
 
 experimental = [ "pallet-aura/experimental" ]
