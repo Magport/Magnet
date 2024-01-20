@@ -4,14 +4,16 @@ authors.workspace = true
 description = "Runtime API definition of magnet-primitives-order"
 edition.workspace = true
 license = "Unlicense"
-version = "0.1.0"
+version = "0.2.0"
 
 [dependencies]
 log = { version = "0.4.14", default-features = false }
 hex-literal = { version = "0.3.4" }
 async-trait = { version = "0.1", optional = true }
 scale-info = { version = "2.1.1", default-features = false }
-parity-scale-codec = { version = "3.0.0", features = ["derive"], default-features = false}
+codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = [
+	"derive","full", "bit-vec"
+] }
 sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0"  , default-features = false}
 sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
@@ -22,13 +24,16 @@ sp-state-machine = { git = "https://github.com/paritytech/polkadot-sdk", branch 
 cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" , default-features = false }
 sp-consensus-aura= { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 sp-io ={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-std={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+sp-weights = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+sp-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
 
 [features]
 default = [ "std" ]
 std = [
 	"async-trait",
-	"parity-scale-codec/std",
+	"codec/std",
 	"sp-api/std",
 	"sp-runtime/std",
 	"scale-info/std",
@@ -41,4 +46,7 @@ std = [
 	"sp-consensus-aura/std",
 	"sp-io/std",
 	"sp-std/std",
+	"sp-weights/std",
+	"sp-session/std",
+	"sp-consensus-grandpa/std",
 ]
