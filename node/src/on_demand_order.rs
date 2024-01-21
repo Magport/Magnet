@@ -95,14 +95,24 @@ async fn try_place_order<Balance>(
 	max_amount: Balance,
 	slot_block: u32,
 	height: RelayBlockNumber,
+	relay_chain: impl RelayChainInterface + Clone,
 ) -> Result<(), SubmitOrderError>
 where
 	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128>,
 	ParaId: From<u32>,
 {
 	let max_amount_128 = max_amount.into();
-	build_rpc_for_submit_order(&url, para_id, max_amount_128, hash, keystore, slot_block, height)
-		.await
+	build_rpc_for_submit_order(
+		&url,
+		para_id,
+		max_amount_128,
+		hash,
+		keystore,
+		slot_block,
+		height,
+		relay_chain,
+	)
+	.await
 }
 
 async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
@@ -385,6 +395,7 @@ where
 								spot_price,
 								slot_block,
 								height,
+								relay_chain.clone(),
 							)
 							.await;
 							log::info!("===========place order completed==============",);
