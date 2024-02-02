@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-node"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Magnet"]
 description = "A scalable evm smart contract platform node, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -24,6 +24,8 @@ tracing = "0.1.37"
 array-bytes = "6.1"
 hex-literal = "0.4.1"
 scale-info = { version = "2.5.0", features = ["derive", "serde"] }
+subxt = {version = "0.33.0", features = ["substrate-compat"]}
+subxt-signer = {version = "0.33.0"}
 
 # Local
 parachain-magnet-runtime = { path = "../runtime" }
@@ -82,7 +84,6 @@ polkadot-primitives = { git = "https://github.com/paritytech/polkadot-sdk", bran
 xcm = { package = "staging-xcm", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 polkadot-runtime-common =  { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
 runtime-parachains = { package = "polkadot-runtime-parachains", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-rococo-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
 
 # Cumulus
 cumulus-client-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }

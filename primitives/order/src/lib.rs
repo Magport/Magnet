@@ -24,14 +24,10 @@ use sp_runtime::sp_std::vec::Vec;
 use sp_runtime::traits::MaybeDisplay;
 #[cfg(feature = "std")]
 pub mod inherent_client;
+pub mod metadata;
 pub mod well_known_keys;
-#[cfg(feature = "std")]
-pub use inherent_client::*;
-use {
-	parity_scale_codec::{Codec, Decode, Encode},
-	scale_info::TypeInfo,
-	sp_inherents::InherentIdentifier,
-};
+use codec::{Codec, Decode, Encode};
+use {scale_info::TypeInfo, sp_inherents::InherentIdentifier};
 
 #[derive(Encode, Decode, sp_core::RuntimeDebug, Clone, PartialEq, TypeInfo)]
 pub struct OrderInherentData<AuthorityId> {

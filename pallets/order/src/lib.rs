@@ -25,12 +25,13 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::*;
 use frame_system::{self, EventRecord};
-use magnet_primitives_order::well_known_keys::SYSTEM_EVENTS;
+use magnet_primitives_order::{
+	metadata::api::{runtime_types, runtime_types::rococo_runtime as polakdot_runtime},
+	well_known_keys::SYSTEM_EVENTS,
+};
 pub use pallet::*;
 use primitives::Balance;
 use primitives::{Id as ParaId, PersistedValidationData};
-use runtime_parachains::assigner_on_demand as parachains_assigner_on_demand;
-use sp_core::crypto::ByteArray;
 use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
@@ -235,10 +236,10 @@ pub mod pallet {
 					let old_sequence_number = SequenceNumber::<T>::get();
 					let order = OrderMap::<T>::get(old_sequence_number);
 					if sequence_number != old_sequence_number {
-						// In the worst-case scenario, if there are multiple orders at the same time,
-						//  it may be due to system issues or it may be due to human intervention.
-						//   Currently, we only support running one order at the same time
-						// Err(Error::<T>::WrongSequenceNumber)?;
+						// In the worst-case scenario, if there are multiple orders at the same
+						// time,  it may be due to system issues or it may be due to human
+						// intervention.   Currently, we only support running one order at the same
+						// time Err(Error::<T>::WrongSequenceNumber)?;
 						// Continuing to produce blocks, recording errors
 						log::info!("========WrongSequenceNumber:{:?}========", sequence_number);
 					}
@@ -267,15 +268,21 @@ pub mod pallet {
 		#[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
 		pub fn set_parameter(
 			origin: OriginFor<T>,
-			slot_width: u32,
-			order_max_amount: BalanceOf<T>,
+			slot_width: Option<u32>,
+			order_max_amount: Option<BalanceOf<T>>,
+			tx_pool_threshold: Option<BalanceOf<T>>,
 		) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 
-			<SlotWidth<T>>::put(slot_width);
-
-			<OrderMaxAmount<T>>::put(order_max_amount);
-
+			if let Some(t_slot_width) = slot_width {
+				<SlotWidth<T>>::put(t_slot_width);
+			}
+			if let Some(t_order_max_amount) = order_max_amount {
+				<OrderMaxAmount<T>>::put(t_order_max_amount);
+			}
+			if let Some(t_tx_pool_threshold) = tx_pool_threshold {
+				<TxPoolThreshold<T>>::put(t_tx_pool_threshold);
+			}
 			Ok(().into())
 		}
 	}
@@ -291,9 +298,8 @@ impl<T: Config> Pallet<T> {
 		let relay_storage_rooted_proof =
 			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
 				.expect("Invalid relay chain state proof");
-		// key = System Events
 		let head_data = relay_storage_rooted_proof
-			.read_entry::<Vec<Box<EventRecord<rococo_runtime::RuntimeEvent, T::Hash>>>>(
+			.read_entry::<Vec<Box<EventRecord<polakdot_runtime::RuntimeEvent, T::Hash>>>>(
 				SYSTEM_EVENTS,
 				None,
 			)
@@ -305,15 +311,14 @@ impl<T: Config> Pallet<T> {
 		let v_price: Vec<u128> = head_data
 			.iter()
 			.filter_map(|item| {
-				if let rococo_runtime::RuntimeEvent::OnDemandAssignmentProvider(
-					parachains_assigner_on_demand::Event::OnDemandOrderPlaced {
-						para_id: pid,
-						spot_price: sprice,
-					},
-				) = item.event
+				if let polakdot_runtime::RuntimeEvent::OnDemandAssignmentProvider(
+					runtime_types::polkadot_runtime_parachains::assigner_on_demand::pallet::Event::OnDemandOrderPlaced{
+							para_id: pid,
+							spot_price: sprice,
+						}) = &item.event
 				{
-					if pid == para_id {
-						Some(sprice)
+					if pid.encode() == para_id.encode() {
+						Some(*sprice)
 					} else {
 						None
 					}
@@ -322,7 +327,6 @@ impl<T: Config> Pallet<T> {
 				}
 			})
 			.collect();
-
 		let orderer: Vec<(T::AuthorityId, u128)> = v_price
 			.iter()
 			.filter_map(|item| {
@@ -330,12 +334,16 @@ impl<T: Config> Pallet<T> {
 				let _: Vec<_> = head_data
 					.iter()
 					.filter_map(|event| {
-						if let rococo_runtime::RuntimeEvent::Balances(
-							pallet_balances::Event::Withdraw { who: ref order, amount: eprice },
+						if let polakdot_runtime::RuntimeEvent::Balances(
+							runtime_types::pallet_balances::pallet::Event::Withdraw {
+								who: ref order,
+								amount: eprice,
+							},
 						) = event.event
 						{
 							if eprice == *item {
-								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
+								orderer = match T::AuthorityId::try_from(order.clone().0.as_slice())
+								{
 									Ok(order) => Some((order, eprice)),
 									Err(_) => None,
 								};

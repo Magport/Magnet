@@ -2,7 +2,7 @@
 name = "pallet-order"
 authors = ["Anonymous"]
 description = "On demand order runtime logic."
-version = "0.1.0"
+version = "0.2.0"
 license = "Apache-2.0"
 homepage = "https://magnet.magport.io/"
 repository.workspace = true
@@ -25,7 +25,6 @@ cumulus-pallet-parachain-system = { git = "https://github.com/paritytech/polkado
 cumulus-primitives-core= { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 
 # Polkadot
-rococo-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" , default-features = false}
 runtime-parachains = { package = "polkadot-runtime-parachains", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" , default-features = false}
 primitives = { package = "polkadot-primitives", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" , default-features = false}
 
@@ -64,7 +63,6 @@ runtime-benchmarks = [
 	"pallet-xcm/runtime-benchmarks",
 	"pallet-society/runtime-benchmarks",
 	"xcm-builder/runtime-benchmarks",
-	"rococo-runtime/runtime-benchmarks",
 ]
 std = [
 	"codec/std",
@@ -79,7 +77,6 @@ std = [
 	"log/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-primitives-core/std",
-	"rococo-runtime/std",
 	"runtime-parachains/std",
 	"primitives/std",
 	"sp-trie/std",

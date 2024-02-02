@@ -14,49 +14,40 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::submit_order::{build_rpc_for_submit_order, SubmitOrderError};
+use crate::{submit_order::build_rpc_for_submit_order, submit_order::SubmitOrderError};
 use codec::{Codec, Decode};
 use cumulus_primitives_core::relay_chain::vstaging::Assignment;
 use cumulus_primitives_core::{
 	relay_chain::BlockNumber as RelayBlockNumber, ParaId, PersistedValidationData,
 };
 use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
-use frame_system::{self, AccountInfo};
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
 use magnet_primitives_order::{
 	self,
 	well_known_keys::paras_para_lifecycles,
-	well_known_keys::{
-		ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_ACCOUNT, SYSTEM_BLOCKHASH,
-		SYSTEM_EVENTS,
-	},
+	well_known_keys::{ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_EVENTS},
 	OrderRecord, OrderRuntimeApi, OrderStatus,
 };
 use mp_system::OnRelayChainApi;
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
-use rococo_runtime::{Runtime, RuntimeCall, SignedExtra, SignedPayload, UncheckedExtrinsic};
-use runtime_parachains::{
-	assigner_on_demand as parachains_assigner_on_demand, configuration::HostConfiguration,
-	paras::ParaLifecycle,
-};
+use runtime_parachains::{configuration::HostConfiguration, paras::ParaLifecycle};
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
 use sc_transaction_pool_api::{InPoolTransaction, MaintainedTransactionPool};
 use sp_api::ProvideRuntimeApi;
-use sp_application_crypto::{AppCrypto, AppPublic};
+use sp_application_crypto::AppPublic;
 use sp_consensus_aura::AuraApi;
+use sp_core::ByteArray;
 use sp_core::{crypto::Pair, H256};
-use sp_io::hashing::blake2_128;
 use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	codec::Encode,
-	generic,
 	traits::{
 		AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, Member,
 		SaturatedConversion,
 	},
-	FixedPointNumber, FixedU128, OpaqueExtrinsic,
+	FixedPointNumber, FixedU128,
 };
 use std::cmp::Ordering;
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
@@ -96,69 +87,32 @@ where
 	}
 }
 
-async fn get_relay_chain_nonce<Balance>(
-	relay_chain: impl RelayChainInterface + Clone,
-	hash: H256,
-	keystore: KeystorePtr,
-) -> Option<u32>
-where
-	Balance: Codec + MaybeDisplay + 'static + Debug,
-{
-	let pubkey = keystore.sr25519_public_keys(sp_application_crypto::key_types::AURA)[0];
-	//System Account
-	let public_key: Vec<u8> = pubkey.using_encoded(|key: &[u8]| {
-		SYSTEM_ACCOUNT
-			.iter()
-			.chain(blake2_128(key).iter())
-			.chain(key.iter())
-			.cloned()
-			.collect()
-	});
-	let system_account_storage =
-		relay_chain.get_storage_by_key(hash, public_key.as_slice()).await.ok()?;
-	let system_account = system_account_storage.map(|raw| AccountInfo::<parachain_magnet_runtime::Nonce,pallet_balances::AccountData<Balance>>::decode(&mut &raw[..])).transpose().ok()?;
-	match system_account {
-		Some(account) => Some(account.nonce),
-		None => Some(0),
-	}
-}
-
 async fn try_place_order<Balance>(
-	relay_chain: impl RelayChainInterface + Clone,
 	hash: H256,
-	number: u32,
 	keystore: KeystorePtr,
 	para_id: ParaId,
 	url: String,
 	max_amount: Balance,
+	slot_block: u32,
+	height: RelayBlockNumber,
+	relay_chain: impl RelayChainInterface + Clone,
 ) -> Result<(), SubmitOrderError>
 where
 	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128>,
+	ParaId: From<u32>,
 {
-	let nonce = get_relay_chain_nonce::<Balance>(relay_chain.clone(), hash, keystore.clone())
-		.await
-		.ok_or_else(|| SubmitOrderError::NonceGetError)?;
-	// key:System BlockHash 0x00000000(Twox64Concat)
-	let genesis_hash_storage = relay_chain
-		.get_storage_by_key(hash, SYSTEM_BLOCKHASH)
-		.await
-		.map_err(|_e| SubmitOrderError::GenesisHashGetError)?;
-	let genesis_hash = genesis_hash_storage
-		.map(|raw| <H256>::decode(&mut &raw[..]))
-		.transpose()
-		.map_err(|_e| SubmitOrderError::GenesisHashGetError)?
-		.unwrap_or_default();
 	let max_amount_128 = max_amount.into();
-	let output = place_order_extrinsic(
-		hash,
-		u64::from(number),
-		genesis_hash,
-		nonce,
-		keystore,
+	build_rpc_for_submit_order(
+		&url,
 		para_id,
 		max_amount_128,
-	);
-	build_rpc_for_submit_order(&url, output).await
+		hash,
+		keystore,
+		slot_block,
+		height,
+		relay_chain,
+	)
+	.await
 }
 
 async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
@@ -434,13 +388,14 @@ where
 								},
 							}
 							let order_result = try_place_order::<Balance>(
-								relay_chain,
 								order_record_local.relay_base,
-								order_record_local.relay_base_height,
 								keystore,
 								para_id,
 								url,
 								spot_price,
+								slot_block,
+								height,
+								relay_chain.clone(),
 							)
 							.await;
 							log::info!("===========place order completed==============",);
@@ -531,6 +486,7 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 		}
 	}
 }
+
 pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
 	para_id: ParaId,
 	parachain: Arc<P>,
@@ -621,79 +577,4 @@ where
 		on_demand_order_task,
 	);
 	Ok(())
-}
-
-pub fn construct_extrinsic(
-	current_block_hash: H256,
-	current_block: u64,
-	genesis_block: H256,
-	function: impl Into<RuntimeCall>,
-	keystore: KeystorePtr,
-	nonce: u32,
-) -> UncheckedExtrinsic {
-	let function = function.into();
-	let period = 4;
-	let tip = 0;
-	let extra: SignedExtra = (
-		frame_system::CheckNonZeroSender::<Runtime>::new(),
-		frame_system::CheckSpecVersion::<Runtime>::new(),
-		frame_system::CheckTxVersion::<Runtime>::new(),
-		frame_system::CheckGenesis::<Runtime>::new(),
-		frame_system::CheckEra::<Runtime>::from(generic::Era::mortal(period, current_block)),
-		frame_system::CheckNonce::<Runtime>::from(nonce),
-		frame_system::CheckWeight::<Runtime>::new(),
-		pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
-	);
-	let raw_payload = SignedPayload::from_raw(
-		function.clone(),
-		extra.clone(),
-		(
-			(),
-			rococo_runtime::VERSION.spec_version,
-			rococo_runtime::VERSION.transaction_version,
-			genesis_block,
-			current_block_hash,
-			(),
-			(),
-			(),
-		),
-	);
-	let pub_key = keystore.sr25519_public_keys(sp_consensus_aura::sr25519::AuthorityPair::ID)[0];
-	let signature = raw_payload
-		.using_encoded(|e| {
-			keystore.sr25519_sign(sp_consensus_aura::sr25519::AuthorityPair::ID, &pub_key, e)
-		})
-		.unwrap()
-		.unwrap();
-	UncheckedExtrinsic::new_signed(
-		function.clone(),
-		rococo_runtime::Address::Id(pub_key.into()),
-		polkadot_primitives::Signature::Sr25519(signature.clone()),
-		extra.clone(),
-	)
-}
-
-pub fn place_order_extrinsic(
-	current_block_hash: H256,
-	current_block: u64,
-	genesis_block: H256,
-	nonce: u32,
-	keystore: KeystorePtr,
-	para_id: ParaId,
-	max_amount: u128,
-) -> String {
-	let function = rococo_runtime::RuntimeCall::OnDemandAssignmentProvider(
-		parachains_assigner_on_demand::Call::place_order_allow_death { max_amount, para_id },
-	);
-	let extrinsic: OpaqueExtrinsic = construct_extrinsic(
-		current_block_hash,
-		current_block,
-		genesis_block,
-		function,
-		keystore,
-		nonce,
-	)
-	.into();
-	let output = array_bytes::bytes2hex("", &extrinsic.encode());
-	output
 }

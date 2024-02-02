@@ -28,10 +28,12 @@ benchmarks! {
 		let s in 0 .. 100;
 		let caller: T::AccountId = whitelisted_caller();
 		let test_balance = BalanceOf::<T>::from(200000000 as u32);
-	}: _(RawOrigin::Root, 4, test_balance)
+		let test_threshold = BalanceOf::<T>::from(3000000000 as u32);
+	}: _(RawOrigin::Root, Some(4), Some(test_balance), Some(test_threshold))
 	verify {
 		assert_eq!(SlotWidth::<T>::get(), 4);
 		assert_eq!(OrderMaxAmount::<T>::get(), test_balance);
+		assert_eq!(TxPoolThreshold::<T>::get(), test_threshold);
 	}
 }
 
