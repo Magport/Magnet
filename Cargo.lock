@@ -7459,6 +7459,7 @@ dependencies = [
 name = "pallet-liquidation"
 version = "0.1.0"
 dependencies = [
+ "cumulus-pallet-xcmp-queue",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
@@ -7470,6 +7471,7 @@ dependencies = [
  "pallet-pot",
  "pallet-transaction-payment",
  "pallet-utility",
+ "pallet-xcm 1.0.0",
  "parity-scale-codec",
  "scale-info",
  "smallvec",
@@ -7478,6 +7480,9 @@ dependencies = [
  "sp-io",
  "sp-runtime",
  "sp-std",
+ "staging-xcm",
+ "staging-xcm-builder",
+ "staging-xcm-executor",
 ]
 
 [[package]]

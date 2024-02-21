@@ -1513,6 +1513,7 @@ impl<T: Config> Pallet<T> {
 		let hash = local_xcm.using_encoded(sp_io::hashing::blake2_256);
 		let outcome =
 			T::XcmExecutor::execute_xcm_in_credit(origin, local_xcm, hash, weight, weight);
+		log::trace!("\n\n---- execute xcm in credit: outcome -> {:?}\n\n", &outcome);
 		Self::deposit_event(Event::Attempted { outcome: outcome.clone() });
 		if let Some(remote_xcm) = remote_xcm {
 			outcome.ensure_complete().map_err(|_| Error::<T>::LocalExecutionIncomplete)?;

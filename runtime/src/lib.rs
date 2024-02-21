@@ -912,6 +912,7 @@ parameter_types! {
 impl pallet_liquidation::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = OrderGasCostHandler;
 	type SystemRatio = SystemRatio;
