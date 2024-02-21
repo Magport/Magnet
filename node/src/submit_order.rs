@@ -13,139 +13,146 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
-
-use futures::{
-	channel::oneshot::Sender as OneshotSender, future::BoxFuture, stream::FuturesUnordered,
-	FutureExt, StreamExt,
+use crate::metadata;
+use cumulus_primitives_core::{
+	relay_chain::BlockId, relay_chain::BlockNumber as RelayBlockNumber, ParaId,
 };
-use jsonrpsee::{
-	core::{
-		client::{Client as JsonRpcClient, ClientT},
-		params::ArrayParams,
-		Error as JsonRpseeError,
-	},
-	rpc_params,
-	ws_client::WsClientBuilder,
+use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
+use sp_application_crypto::AppCrypto;
+use sp_core::ByteArray;
+use sp_core::H256;
+use sp_keystore::KeystorePtr;
+use sp_runtime::{
+	traits::{IdentifyAccount, Verify},
+	MultiSignature as SpMultiSignature,
 };
-use serde_json::Value as JsonValue;
-use std::sync::Arc;
-use url::Url;
-
-const LOG_TARGET: &str = "reconnecting-websocket-client";
+use subxt::client::OfflineClientT;
+use subxt::{
+	config::polkadot::PolkadotExtrinsicParamsBuilder as Params, tx::Signer, utils::MultiSignature,
+	Config, OnlineClient, PolkadotConfig,
+};
 
 #[derive(Debug)]
 pub enum SubmitOrderError {
 	RPCUrlError,
 	RPCConnectError,
 	RPCCallException,
-	DeconstructValueError,
 	NonceGetError,
-	GenesisHashGetError,
+	StorageGetError,
+	GetBlockError,
+	GetHeadError,
 }
-/// Format url and force addition of a port
-fn url_to_string_with_port(url: Url) -> Option<String> {
-	// This is already validated on CLI side, just defensive here
-	if (url.scheme() != "ws" && url.scheme() != "wss") || url.host_str().is_none() {
-		tracing::warn!(target: LOG_TARGET, ?url, "Non-WebSocket URL or missing host.");
-		return None;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Signature(pub [u8; 64]);
+
+impl From<Signature> for MultiSignature {
+	fn from(value: Signature) -> Self {
+		MultiSignature::Sr25519(value.0)
+	}
+}
+pub struct SignerKeystore<T: Config> {
+	account_id: T::AccountId,
+	keystore: KeystorePtr,
+}
+impl<T> SignerKeystore<T>
+where
+	T: Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	pub fn new(keystore: KeystorePtr) -> Self {
+		let pub_key =
+			keystore.sr25519_public_keys(sp_consensus_aura::sr25519::AuthorityPair::ID)[0];
+
+		let binding = <SpMultiSignature as Verify>::Signer::from(pub_key).into_account().clone();
+
+		let account_id = binding.as_slice();
+		let mut r = [0u8; 32];
+		r.copy_from_slice(account_id);
+		let acc = T::AccountId::try_from(r).ok().unwrap();
+		Self { account_id: acc.clone(), keystore }
+	}
+}
+impl<T> Signer<T> for SignerKeystore<T>
+where
+	T: Config,
+	T::AccountId: From<[u8; 32]>,
+	T::Signature: From<Signature>,
+{
+	fn account_id(&self) -> T::AccountId {
+		self.account_id.clone()
 	}
 
-	// Either we have a user-supplied port or use the default for 'ws' or 'wss' here
-	Some(format!(
-		"{}://{}:{}{}{}",
-		url.scheme(),
-		url.host_str()?,
-		url.port_or_known_default()?,
-		url.path(),
-		url.query().map(|query| format!("?{}", query)).unwrap_or_default()
-	))
-}
-#[allow(dead_code)]
-struct ClientManager {
-	urls: Vec<String>,
-	active_client: Arc<JsonRpcClient>,
-	active_index: usize,
-}
-async fn connect_next_available_rpc_server(
-	urls: &Vec<String>,
-	starting_position: usize,
-) -> Result<(usize, Arc<JsonRpcClient>), ()> {
-	tracing::debug!(target: LOG_TARGET, starting_position, "Connecting to RPC server.");
-	for (counter, url) in urls.iter().cycle().skip(starting_position).take(urls.len()).enumerate() {
-		let index = (starting_position + counter) % urls.len();
-		tracing::debug!(
-			target: LOG_TARGET,
-			index,
-			url,
-			"Trying to connect to next external relaychain node.",
-		);
-		match WsClientBuilder::default().build(&url).await {
-			Ok(ws_client) => return Ok((index, Arc::new(ws_client))),
-			Err(err) => tracing::debug!(target: LOG_TARGET, url, ?err, "Unable to connect."),
-		};
-	}
-	Err(())
-}
-
-impl ClientManager {
-	pub async fn new(urls: Vec<String>) -> Result<Self, SubmitOrderError> {
-		if urls.is_empty() {
-			return Err(SubmitOrderError::RPCUrlError);
-		}
-		let active_client = connect_next_available_rpc_server(&urls, 0)
-			.await
-			.map_err(|_e| SubmitOrderError::RPCUrlError)?;
-		Ok(Self { urls, active_client: active_client.1, active_index: active_client.0 })
+	fn address(&self) -> T::Address {
+		self.account_id.clone().into()
 	}
 
-	fn create_request(
-		&self,
-		method: String,
-		params: ArrayParams,
-		response_sender: OneshotSender<Result<JsonValue, JsonRpseeError>>,
-	) -> BoxFuture<'static, Result<(), SubmitOrderError>> {
-		let future_client = self.active_client.clone();
-		async move {
-			let resp = future_client.request(&method, params.clone()).await;
-			if let Err(_err) = resp {
-				return Err(SubmitOrderError::RPCCallException);
-			}
+	fn sign(&self, signer_payload: &[u8]) -> T::Signature {
+		let pub_key =
+			self.keystore.sr25519_public_keys(sp_consensus_aura::sr25519::AuthorityPair::ID)[0];
 
-			if let Err(err) = response_sender.send(resp) {
-				tracing::debug!(
-					target: LOG_TARGET,
-					?err,
-					"Recipient no longer interested in request result"
-				);
-			}
-			Ok(())
-		}
-		.boxed()
+		let signature = self
+			.keystore
+			.sr25519_sign(sp_consensus_aura::sr25519::AuthorityPair::ID, &pub_key, signer_payload)
+			.unwrap()
+			.unwrap();
+
+		Signature(signature.0).into()
 	}
 }
 
-pub async fn submit_extrinsic_rpc_call(
-	url: &str,
-	method: String,
-	params: ArrayParams,
-	response_sender: OneshotSender<Result<JsonValue, JsonRpseeError>>,
-) -> Result<(), SubmitOrderError> {
-	let urls = vec![Url::parse(url).unwrap()];
-	let urls_col = urls.into_iter().filter_map(url_to_string_with_port).collect();
-	let mut pending_requests = FuturesUnordered::new();
-	let Ok(client_manager) = ClientManager::new(urls_col).await else {
-		return Err(SubmitOrderError::RPCConnectError);
-	};
-	pending_requests.push(client_manager.create_request(method, params, response_sender));
-	pending_requests.next().await.expect("request should create success")
-}
 pub async fn build_rpc_for_submit_order(
 	url: &str,
-	extrinsic: String,
+	para_id: ParaId,
+	max_amount: u128,
+	hash: H256,
+	keystore: KeystorePtr,
+	slot_block: u32,
+	height: RelayBlockNumber,
+	relay_chain: impl RelayChainInterface + Clone,
 ) -> Result<(), SubmitOrderError> {
-	let (tx, rx) = futures::channel::oneshot::channel();
-	let params = rpc_params![extrinsic];
-	submit_extrinsic_rpc_call(url, "author_submitExtrinsic".into(), params, tx).await?;
-	let _value = rx.await.map_err(|_err| SubmitOrderError::DeconstructValueError)?;
+	let client = OnlineClient::<PolkadotConfig>::from_url(url)
+		.await
+		.map_err(|_e| SubmitOrderError::RPCConnectError)?;
+
+	let place_order = metadata::api::tx().on_demand_assignment_provider().place_order_allow_death(
+		max_amount,
+		metadata::api::runtime_types::polkadot_parachain_primitives::primitives::Id(para_id.into()),
+	);
+
+	let signer_keystore = SignerKeystore::<PolkadotConfig>::new(keystore.clone());
+
+	// not init
+	let mut relay_hash = hash;
+	let mut for_n_blocks = slot_block;
+	if hash == H256::from([0; 32]) {
+		let chunk = u32::MAX - (slot_block - 1);
+		let r_relay_head = relay_chain
+			.header(BlockId::Number(height))
+			.await
+			.map_err(|_e| SubmitOrderError::GetHeadError)?;
+		if let Some(relay_head) = r_relay_head {
+			relay_hash = relay_head.hash();
+			let nex_relay_height = height + slot_block;
+			let nex_relay_height_align = nex_relay_height & chunk;
+			let height_chunk = nex_relay_height_align - height;
+			for_n_blocks = height_chunk;
+		} else {
+			return Err(SubmitOrderError::GetHeadError);
+		}
+	}
+	let latest_block = client
+		.blocks()
+		.at(relay_hash)
+		.await
+		.map_err(|_e| SubmitOrderError::GetBlockError)?;
+
+	let tx_params = Params::new().mortal(latest_block.header(), for_n_blocks.into()).build();
+
+	let submit_result =
+		client.tx().sign_and_submit(&place_order, &signer_keystore, tx_params).await;
+	log::info!("submit_result:{:?},{:?},{:?}", submit_result, height, relay_hash);
+	submit_result.map_err(|_e| SubmitOrderError::RPCCallException)?;
+
 	Ok(())
 }
