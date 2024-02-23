@@ -73,7 +73,6 @@ pallet-whitelist = { git = "https://github.com/paritytech/polkadot-sdk", branch 
 pallet-conviction-voting = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-ranked-collective = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-scheduler = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-pallet-treasury = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-insecure-randomness-collective-flip = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-contracts-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
 pallet-contracts = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
@@ -203,7 +202,6 @@ std = [
 	"pallet-conviction-voting/std",
 	"pallet-ranked-collective/std",
 	"pallet-scheduler/std",
-	"pallet-treasury/std",
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-contracts-primitives/std",
 	"pallet-contracts/std",	
@@ -245,7 +243,6 @@ runtime-benchmarks = [
 	"pallet-conviction-voting/runtime-benchmarks",
 	"pallet-ranked-collective/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
-	"pallet-treasury/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",	
 ]
 
@@ -297,7 +294,6 @@ try-runtime = [
 	"pallet-conviction-voting/try-runtime",
 	"pallet-ranked-collective/try-runtime",
 	"pallet-scheduler/try-runtime",
-	"pallet-treasury/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
 	"pallet-contracts/try-runtime",	
 ]
