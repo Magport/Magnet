@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-node"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Magnet"]
 description = "A scalable evm smart contract platform node, utilizing DOT as the gas fee."
 license = "Apache License 2.0"

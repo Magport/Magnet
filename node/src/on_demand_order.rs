@@ -87,6 +87,23 @@ where
 	}
 }
 
+async fn start_on_demand(
+	relay_chain: impl RelayChainInterface + Clone,
+	hash: H256,
+) -> Option<bool> {
+	let active_config_storage = relay_chain.get_storage_by_key(hash, ACTIVE_CONFIG).await.ok()?;
+	let p_active_config = active_config_storage
+		.map(|raw| <HostConfiguration<u32>>::decode(&mut &raw[..]))
+		.transpose()
+		.ok()?;
+	if p_active_config.is_some() {
+		let result = p_active_config.unwrap().on_demand_cores > 0;
+		Some(result)
+	} else {
+		None
+	}
+}
+
 async fn try_place_order<Balance>(
 	hash: H256,
 	keystore: KeystorePtr,
@@ -257,13 +274,17 @@ where
 		),
 		None => false,
 	};
-	if !is_parathread {
+	let p_start = start_on_demand(relay_chain.clone(), p_hash).await;
+	let start = if let Some(flag) = p_start { flag } else { false };
+	if !is_parathread || !start {
+		//parachain mode
 		let mut order_record_local = order_record.lock().await;
 		order_record_local.validation_data = None;
 		order_record_local.author_pub = None;
 		order_record_local.relay_parent = None;
 		return Ok(());
 	} else {
+		//parathread
 		let order_record_local = order_record.lock().await;
 		if order_record_local.relay_height == height {
 			return Ok(());

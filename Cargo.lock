@@ -8537,7 +8537,7 @@ dependencies = [
 
 [[package]]
 name = "parachain-magnet-node"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "array-bytes",
  "clap",
@@ -8698,7 +8698,6 @@ dependencies = [
  "pallet-timestamp",
  "pallet-transaction-payment",
  "pallet-transaction-payment-rpc-runtime-api",
- "pallet-treasury",
  "pallet-utility",
  "pallet-whitelist",
  "pallet-xcm 1.0.0",
