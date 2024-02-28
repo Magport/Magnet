@@ -110,7 +110,7 @@ use pallet_preimage::storage::LinearStoragePrice;
 
 // Governance and configurations.
 pub mod governance;
-use governance::{pallet_custom_origins, AuctionAdmin, Treasurer, TreasurySpender};
+use governance::{pallet_custom_origins, AuctionAdmin};
 
 /// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
 pub type Signature = MultiSignature;
@@ -1052,6 +1052,7 @@ impl pallet_scheduler::Config for Runtime {
 	type Preimages = Preimage;
 }
 
+/*
 parameter_types! {
 	pub const ProposalBond: Permill = Permill::from_percent(5);
 	pub const ProposalBondMinimum: Balance = 2000 * CENTS;
@@ -1114,6 +1115,7 @@ impl pallet_treasury::Config for Runtime {
 	#[cfg(feature = "runtime-benchmarks")]
 	type BenchmarkHelper = runtime_common::impls::benchmarks::TreasuryArguments;
 }
+*/
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
 
@@ -1136,7 +1138,6 @@ construct_runtime!(
 
 		// Governance
 		Sudo: pallet_sudo = 14,
-		Treasury: pallet_treasury = 15,
 		ConvictionVoting: pallet_conviction_voting = 16,
 		Referenda: pallet_referenda = 17,
 		//	pub type FellowshipCollectiveInstance = pallet_ranked_collective::Instance1;
