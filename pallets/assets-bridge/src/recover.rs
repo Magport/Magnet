@@ -13,6 +13,30 @@
 
 use super::*;
 
+pub fn to_checksum_address(address: H160) -> String {
+	let addr_hex = format!("{:x}", address);
+	let hash = keccak_256(addr_hex.as_bytes());
+	let hash_hex = hex::encode(hash);
+
+	addr_hex
+		.chars()
+		.enumerate()
+		.map(|(i, c)| {
+			if c.is_digit(10) {
+				c.to_string()
+			} else {
+				// Each byte in the hash controls the case of two characters.
+				let hash_char = hash_hex.chars().nth(i).unwrap();
+				if hash_char.to_digit(16).unwrap() >= 8 {
+					c.to_uppercase().to_string()
+				} else {
+					c.to_lowercase().to_string()
+				}
+			}
+		})
+		.collect::<String>()
+}
+
 /// Converts the given binary data into ASCII-encoded hex. It will be twice
 /// the length.
 pub fn to_ascii_hex(data: &[u8]) -> Vec<u8> {
@@ -59,9 +83,7 @@ pub fn beta_eth_recover(signature: &ecdsa::Signature, what: &[u8]) -> Option<H16
 	v.extend_from_slice(&prefix[..]);
 	v.extend_from_slice(what);
 
-	// frame_support::runtime_print!("\n\n=================msg  : {:?}============================\n\n", &v);
 	let message_hash: [u8; 32] = keccak_256(v.as_ref());
-	// frame_support::runtime_print!("\n\n=================msg hash  : {:?}============================\n\n", &message_hash);
 	let mut sig = [0u8; 65];
 	sig[0..64].copy_from_slice(&signature.0[0..64]);
 	sig[64] = signature.0[64];
@@ -69,5 +91,6 @@ pub fn beta_eth_recover(signature: &ecdsa::Signature, what: &[u8]) -> Option<H16
 	let public_key = sp_io::crypto::secp256k1_ecdsa_recover(&sig, &message_hash).ok()?;
 
 	let address_hash = keccak_256(&public_key);
+
 	Some(H160::from_slice(&address_hash[12..32]))
 }

@@ -349,6 +349,7 @@ fn unpause_after_unpause_should_work() {
 			AssetsBridge::withdraw(
 				RuntimeOrigin::signed(BOB.into()),
 				H160::from_slice(&EVM_ADDR),
+				EcdsaSignature::from_slice(&SIGNATURE).unwrap(),
 				1,
 				1
 			),
