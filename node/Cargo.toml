@@ -11,21 +11,21 @@ build = "build.rs"
 publish = false
 
 [dependencies]
-clap = { version = "4.4.2", features = ["derive"] }
-log = "0.4.20"
-codec = { package = "parity-scale-codec", version = "3.0.0" }
-serde = { version = "1.0.188", features = ["derive"] }
-jsonrpsee = { version = "0.16.2", features = ["server"] }
-futures = "0.3.28"
-serde_json = "1.0.105"
-schnellru = "0.2.1"
-url = "2.4.0"
-tracing = "0.1.37"
-array-bytes = "6.1"
-hex-literal = "0.4.1"
-scale-info = { version = "2.5.0", features = ["derive", "serde"] }
-subxt = {version = "0.33.0", features = ["substrate-compat"]}
-subxt-signer = {version = "0.33.0"}
+clap = { workspace = true, features = ["derive"] }
+log = { workspace = true }
+codec = { package = "parity-scale-codec", workspace = true }
+serde = { workspace = true, features = ["derive"] }
+jsonrpsee = { workspace = true, features = ["server"] }
+futures = { workspace = true }
+serde_json = { workspace = true }
+schnellru = { workspace = true }
+url = { workspace = true }
+tracing = { workspace = true }
+array-bytes = { workspace = true }
+hex-literal = { workspace = true }
+scale-info = { workspace = true, features = ["derive", "serde"] }
+subxt = { workspace = true, features = ["substrate-compat"]}
+subxt-signer = { workspace = true }
 
 # Local
 parachain-magnet-runtime = { path = "../runtime" }
@@ -35,86 +35,86 @@ pallet-pot-rpc = { path = "../pallets/pot/rpc" }
 mp-system = { path = "../primitives/system"}
 
 # Substrate
-frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-frame-benchmarking-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-pallet-transaction-payment-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-basic-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-chain-spec = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-client-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-offchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-consensus = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-consensus-manual-seal = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-executor = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-network = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-network-sync = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0"}
-sc-rpc = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-rpc-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-service = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-sysinfo = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-telemetry = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-tracing = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sc-transaction-pool-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-block-builder = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-blockchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-offchain = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-transaction-pool = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-substrate-frame-rpc-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-substrate-prometheus-endpoint = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-pallet-transaction-payment = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-application-crypto= { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+frame-benchmarking = { workspace = true }
+frame-benchmarking-cli = { workspace = true }
+pallet-transaction-payment-rpc = { workspace = true }
+sc-basic-authorship = { workspace = true }
+sc-chain-spec = { workspace = true }
+sc-cli = { workspace = true }
+sc-client-api = { workspace = true }
+sc-offchain = { workspace = true }
+sc-consensus = { workspace = true }
+sc-consensus-aura = { workspace = true }
+sc-consensus-manual-seal = { workspace = true }
+sc-executor = { workspace = true }
+sc-network = { workspace = true }
+sc-network-sync = { workspace = true }
+sc-rpc = { workspace = true }
+sc-rpc-api = { workspace = true }
+sc-service = { workspace = true }
+sc-sysinfo = { workspace = true }
+sc-telemetry = { workspace = true }
+sc-tracing = { workspace = true }
+sc-transaction-pool = { workspace = true }
+sc-transaction-pool-api = { workspace = true }
+sp-inherents = { workspace = true }
+sp-api = { workspace = true }
+sp-block-builder = { workspace = true }
+sp-blockchain = { workspace = true }
+sp-offchain = { workspace = true }
+sp-consensus-aura = { workspace = true }
+sp-core = { workspace = true }
+sp-keystore = { workspace = true }
+sp-io = { workspace = true }
+sp-runtime = { workspace = true }
+sp-timestamp = { workspace = true }
+sp-transaction-pool = { workspace = true }
+sp-session = { workspace = true }
+substrate-frame-rpc-system = { workspace = true }
+substrate-prometheus-endpoint = { workspace = true }
+pallet-balances = { workspace = true }
+frame-system = { workspace = true }
+pallet-transaction-payment = { workspace = true }
+sp-application-crypto= { workspace = true }
+sp-std = { workspace = true }
 
 # Polkadot
-polkadot-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", features = ["rococo-native"] }
-polkadot-primitives = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-xcm = { package = "staging-xcm", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-polkadot-runtime-common =  { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-runtime-parachains = { package = "polkadot-runtime-parachains", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+polkadot-cli = { workspace = true, features = ["rococo-native"] }
+polkadot-primitives = { workspace = true }
+xcm = { workspace = true, default-features = false}
+polkadot-runtime-common =  { workspace = true }
+runtime-parachains = { workspace = true }
 
 # Cumulus
-cumulus-client-cli = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-client-collator = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-client-consensus-aura = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-client-consensus-common = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-client-consensus-proposer = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-client-service = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0"}
-cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-primitives-parachain-inherent = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-cumulus-relay-chain-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
-frame-system-rpc-runtime-api={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+cumulus-client-cli = { workspace = true }
+cumulus-client-collator = { workspace = true }
+cumulus-client-consensus-aura = { workspace = true }
+cumulus-client-consensus-common = { workspace = true }
+cumulus-client-consensus-proposer = { workspace = true }
+cumulus-client-service = { workspace = true}
+cumulus-primitives-core = { workspace = true }
+cumulus-primitives-parachain-inherent = { workspace = true }
+cumulus-relay-chain-interface = { workspace = true }
+frame-system-rpc-runtime-api={ workspace = true, default-features = false}
+pallet-transaction-payment-rpc-runtime-api = { workspace = true, default-features = false }
 color-print = "0.3.4"
 
 # Frontier Primitive
-fp-evm = { version = "3.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fp-rpc = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fp-dynamic-fee = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fp-evm = { workspace = true }
+fp-rpc = { workspace = true }
+fp-dynamic-fee = { workspace = true }
 
-fc-api = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-cli = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-db = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-mapping-sync = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-rpc = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-rpc-core = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-storage = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fc-consensus = {  git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fc-api = { workspace = true }
+fc-cli = { workspace = true }
+fc-db = { workspace = true }
+fc-mapping-sync = { workspace = true }
+fc-rpc = { workspace = true }
+fc-rpc-core = { workspace = true }
+fc-storage = { workspace = true }
+fc-consensus = {  workspace = true }
 
 [build-dependencies]
-substrate-build-script-utils = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" }
+substrate-build-script-utils = { workspace = true }
 
 [features]
 default = [

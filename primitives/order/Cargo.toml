@@ -7,27 +7,27 @@ license = "Unlicense"
 version = "0.2.0"
 
 [dependencies]
-log = { version = "0.4.14", default-features = false }
-hex-literal = { version = "0.3.4" }
-async-trait = { version = "0.1", optional = true }
-scale-info = { version = "2.1.1", default-features = false }
-codec = { package = "parity-scale-codec", version = "3.0.0", default-features = false, features = [
+log = { workspace = true, default-features = false }
+hex-literal = { workspace = true }
+async-trait = { workspace = true, optional = true }
+scale-info = { workspace = true, default-features = false }
+codec = { package = "parity-scale-codec", workspace = true, default-features = false, features = [
 	"derive","full", "bit-vec"
 ] }
-sp-api = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0"  , default-features = false}
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-trie = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-cumulus-relay-chain-interface = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false , optional = true }
-sp-state-machine = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0" , default-features = false }
-sp-consensus-aura= { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-io ={ git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-weights = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-session = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
-sp-consensus-grandpa = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false }
+sp-api = { workspace = true, default-features = false}
+sp-runtime = { workspace = true, default-features = false }
+sp-inherents = { workspace = true, default-features = false }
+sp-core = { workspace = true, default-features = false }
+sp-trie = { workspace = true, default-features = false }
+cumulus-relay-chain-interface = { workspace = true, default-features = false , optional = true }
+sp-state-machine = { workspace = true, default-features = false }
+cumulus-primitives-core = { workspace = true , default-features = false }
+sp-consensus-aura= { workspace = true, default-features = false }
+sp-io ={ workspace = true, default-features = false }
+sp-std = { workspace = true, default-features = false }
+sp-weights = { workspace = true, default-features = false }
+sp-session = { workspace = true, default-features = false }
+sp-consensus-grandpa = { workspace = true, default-features = false }
 
 [features]
 default = [ "std" ]
