@@ -7,12 +7,13 @@ mod mock;
 mod tests;
 
 use frame_support::{
+	dispatch::DispatchResult,
 	storage::types::StorageMap,
 	traits::{Currency, ExistenceRequirement, Get},
 	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
-use frame_system::pallet_prelude::BlockNumberFor;
+use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
 use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
@@ -21,10 +22,17 @@ use sp_runtime::{
 };
 use sp_std::{prelude::*, vec};
 
+use xcm::{
+	prelude::*,
+	v3::{Junction, MultiAsset, MultiLocation, NetworkId},
+};
+
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub type Balance = u128;
+
+pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_0000_0000;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -53,6 +61,13 @@ pub mod pallet {
 		///handle transfer
 		type Currency: frame_support::traits::Currency<Self::AccountId>
 			+ frame_support::traits::ReservableCurrency<Self::AccountId>;
+
+		/// The XCM sender
+		type XcmSender: SendXcm;
+
+		//Treasury account on the Relay Chain
+		//#[pallet::constant]
+		//type RelayChainTreasuryAccountId: Get<AccountId32>;
 
 		///Handles converting weight to fee value
 		type WeightToFee: WeightToFeePolynomial<Balance = Balance>;
@@ -154,14 +169,18 @@ pub mod pallet {
 
 		///failed to process liquidation
 		ProcessLiquidationError,
+
+		///xcm error
+		XcmError,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
 	where
-		T::AccountId: From<AccountId32>,
+		T::AccountId: From<AccountId32> + Into<AccountId32>,
 		<T as pallet_utility::Config>::RuntimeCall: From<pallet_balances::Call<T>>,
 		<T as pallet_balances::Config>::Balance: From<BalanceOf<T>>,
+		T: pallet_xcm::Config,
 	{
 		fn on_finalize(n: BlockNumberFor<T>) {
 			let base_account = <T::AccountId>::from(BASE_ACCOUNT);
@@ -252,9 +271,11 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T>
 	where
-		T::AccountId: From<AccountId32>,
+		T::AccountId: From<AccountId32> + Into<AccountId32>,
 		<T as pallet_utility::Config>::RuntimeCall: From<pallet_balances::Call<T>>,
 		<T as pallet_balances::Config>::Balance: From<BalanceOf<T>>,
+		T::XcmSender: SendXcm,
+		T: pallet_xcm::Config,
 	{
 		fn execute_batch_transfers(
 			transfers: Vec<(T::AccountId, BalanceOf<T>)>,
@@ -351,17 +372,27 @@ pub mod pallet {
 			let treasury_ratio = T::TreasuryRatio::get();
 			let operation_ratio = T::OperationRatio::get();
 
-			let treasury_amount = treasury_ratio * total_profit;
+			let treasury_amount = treasury_ratio * total_profit / PARACHAIN_TO_RELAYCHAIN_UNIT;
 			let operation_amount = operation_ratio * total_profit;
 			let system_amount = system_ratio * total_profit;
 			let total_collators_profit =
 				total_profit.saturating_sub(treasury_amount + operation_amount + system_amount);
 
-			let mut transfers = Vec::new();
+			let origin: OriginFor<T> =
+				frame_system::RawOrigin::Signed(treasury_account.clone()).into();
 
+			let _send_treasury_profit = Self::send_assets_to_relaychain_treasury(
+				origin,
+				treasury_account.into(),
+				treasury_amount,
+			);
+
+			let mut transfers = Vec::new();
+			/*
 			let treasury_account_profit =
 				treasury_amount.try_into().unwrap_or_else(|_| Zero::zero());
 			transfers.push((treasury_account, treasury_account_profit));
+			 */
 
 			let operation_account_profit =
 				operation_amount.try_into().unwrap_or_else(|_| Zero::zero());
@@ -391,6 +422,47 @@ pub mod pallet {
 				transfers.push((collator.clone(), collator_addr_cost));
 			}
 			Self::execute_batch_transfers(transfers)
+		}
+
+		fn send_assets_to_relaychain_treasury(
+			origin: OriginFor<T>,
+			recipient: AccountId32,
+			amount: u128,
+		) -> DispatchResult {
+			let recipient_account_id = recipient.into();
+
+			let beneficiary = MultiLocation::new(
+				0,
+				X1(Junction::AccountId32 {
+					id: recipient_account_id,
+					network: Some(NetworkId::Rococo), //TODO: Any other networks
+				}),
+			);
+
+			let asset = MultiAsset {
+				id: Concrete(MultiLocation::new(1, Here)),
+				fun: Fungibility::Fungible(amount),
+			};
+
+			let assets = MultiAssets::from(vec![asset]);
+			let versioned_assets = VersionedMultiAssets::from(assets);
+
+			match pallet_xcm::Pallet::<T>::reserve_transfer_assets(
+				origin,
+				Box::new(VersionedMultiLocation::from(MultiLocation::parent())),
+				Box::new(VersionedMultiLocation::from(beneficiary)),
+				Box::new(versioned_assets),
+				0,
+			) {
+				Ok(_) => {
+					frame_support::runtime_print!("reserve_transfer_assets executed successfully.");
+				},
+				Err(e) => {
+					log::error!("Error occurred while executing reserve_transfer_assets: {:?}", e);
+					return Err(Error::<T>::XcmError.into());
+				},
+			}
+			Ok(())
 		}
 	}
 }

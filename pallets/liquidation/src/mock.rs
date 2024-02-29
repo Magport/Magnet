@@ -1,14 +1,17 @@
 pub(crate) use crate as pallet_liquidation;
 pub(crate) use crate::Event as LiquidationEvent;
+use codec::Encode;
+use frame_support::traits::{Everything, Nothing};
 use frame_support::{
 	parameter_types,
 	traits::{ConstU32, ConstU64},
 	weights::{
-		constants::ExtrinsicBaseWeight, WeightToFeeCoefficient, WeightToFeeCoefficients,
+		constants::ExtrinsicBaseWeight, Weight, WeightToFeeCoefficient, WeightToFeeCoefficients,
 		WeightToFeePolynomial,
 	},
 };
 use frame_system as system;
+use frame_system::EnsureRoot;
 use smallvec::smallvec;
 use sp_core::H256;
 use sp_runtime::{
@@ -19,7 +22,15 @@ use sp_runtime::{
 use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_order::OrderGasCost;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_std::collections::btree_map::BTreeMap;
+use sp_std::{cell::RefCell, collections::btree_map::BTreeMap};
+use xcm::latest::{MultiAssets, MultiLocation, SendError, SendResult, SendXcm, Xcm, XcmHash};
+use xcm::prelude::*;
+use xcm_builder::{
+	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
+	AllowTopLevelPaidExecutionFrom, FixedRateOfFungible, FixedWeightBounds, IsConcrete,
+	SignedToAccountId32, TakeWeightCredit,
+};
+use xcm_executor::XcmExecutor;
 
 type Balance = u128;
 type BlockNumber = u32;
@@ -37,6 +48,7 @@ frame_support::construct_runtime!(
 		Pot: pallet_pot::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
 		Liquidation: pallet_liquidation::{Pallet, Storage, Event<T>},
+		XcmPallet: pallet_xcm::{Pallet, Call, Storage, Event<T>, Origin, Config<T>},
 	}
 );
 
@@ -138,6 +150,8 @@ impl pallet_order::Config for Test {
 }
 
 use pallet_pot::PotNameBtreemap;
+use pallet_xcm::TestWeightInfo;
+
 pub type AccountId = AccountId32;
 parameter_types! {
 	pub const PotNames: [&'static str;3] = ["system", "treasury", "maintenance"];
@@ -153,9 +167,116 @@ impl pallet_pot::Config for Test {
 	type Pots = Pots;
 }
 
+thread_local! {
+	pub static SENT_XCM: RefCell<Vec<(MultiLocation, Xcm<()>)>> = RefCell::new(Vec::new());
+}
+
+pub(crate) fn fake_message_hash<T>(message: &Xcm<T>) -> XcmHash {
+	message.using_encoded(sp_io::hashing::blake2_256)
+}
+
+pub struct TestSendXcm;
+impl SendXcm for TestSendXcm {
+	type Ticket = (MultiLocation, Xcm<()>);
+	fn validate(
+		dest: &mut Option<MultiLocation>,
+		msg: &mut Option<Xcm<()>>,
+	) -> SendResult<(MultiLocation, Xcm<()>)> {
+		let pair = (dest.take().unwrap(), msg.take().unwrap());
+		Ok((pair, MultiAssets::new()))
+	}
+	fn deliver(pair: (MultiLocation, Xcm<()>)) -> Result<XcmHash, SendError> {
+		let hash = fake_message_hash(&pair.1);
+		SENT_XCM.with(|q| q.borrow_mut().push(pair));
+		Ok(hash)
+	}
+}
+
+parameter_types! {
+	pub const BaseXcmWeight: Weight = Weight::from_parts(1_000, 1_000);
+	pub const MaxInstructions: u32 = 100;
+	pub const MaxAssetsIntoHolding: u32 = 64;
+	pub XcmFeesTargetAccount: AccountId = AccountId::new([167u8; 32]);
+	pub UniversalLocation: InteriorMultiLocation = Here;
+	pub const AnyNetwork: Option<NetworkId> = None;
+	pub const RelayLocation: MultiLocation = Here.into_location();
+	pub CurrencyPerSecondPerByte: (AssetId, u128, u128) = (Concrete(RelayLocation::get()), 1, 1);
+}
+
+pub struct XcmConfig;
+pub type Barrier = (
+	TakeWeightCredit,
+	AllowTopLevelPaidExecutionFrom<Everything>,
+	AllowKnownQueryResponses<XcmPallet>,
+	AllowSubscriptionsFrom<Everything>,
+);
+
+impl xcm_executor::Config for XcmConfig {
+	type RuntimeCall = RuntimeCall;
+	type XcmSender = XcmRouter;
+	type AssetTransactor = ();
+	type OriginConverter = ();
+	type IsReserve = ();
+	type IsTeleporter = ();
+	type UniversalLocation = UniversalLocation;
+	type Barrier = Barrier;
+	type Weigher = FixedWeightBounds<BaseXcmWeight, RuntimeCall, MaxInstructions>;
+	type Trader = FixedRateOfFungible<CurrencyPerSecondPerByte, ()>;
+	type ResponseHandler = XcmPallet;
+	type AssetTrap = XcmPallet;
+	type AssetLocker = ();
+	type AssetExchanger = ();
+	type AssetClaims = XcmPallet;
+	type SubscriptionService = XcmPallet;
+	type PalletInstancesInfo = AllPalletsWithSystem;
+	type MaxAssetsIntoHolding = MaxAssetsIntoHolding;
+	type FeeManager = ();
+	//type FeeManager = XcmFeeManagerFromComponents<
+	//	EverythingBut<XcmFeesNotWaivedLocations>,
+	//	XcmFeeToAccount<Self::AssetTransactor, AccountId, XcmFeesTargetAccount>,
+	//>;
+	type MessageExporter = ();
+	type UniversalAliases = Nothing;
+	type CallDispatcher = RuntimeCall;
+	type SafeCallFilter = Everything;
+	type Aliasers = Nothing;
+}
+
+pub type LocalOriginToLocation = SignedToAccountId32<RuntimeOrigin, AccountId, AnyNetwork>;
+
+impl pallet_xcm::Config for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type SendXcmOrigin = xcm_builder::EnsureXcmOrigin<RuntimeOrigin, LocalOriginToLocation>;
+	type XcmRouter = XcmRouter;
+	type ExecuteXcmOrigin = xcm_builder::EnsureXcmOrigin<RuntimeOrigin, LocalOriginToLocation>;
+	type XcmExecuteFilter = Everything;
+	type XcmExecutorConfig = XcmConfig;
+	type XcmExecutor = XcmExecutor<XcmConfig>;
+	type XcmTeleportFilter = ();
+	type XcmReserveTransferFilter = Everything;
+	type Weigher = FixedWeightBounds<BaseXcmWeight, RuntimeCall, MaxInstructions>;
+	type UniversalLocation = UniversalLocation;
+	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeCall = RuntimeCall;
+	const VERSION_DISCOVERY_QUEUE_SIZE: u32 = 100;
+	type AdvertisedXcmVersion = pallet_xcm::CurrentXcmVersion;
+	type AdminOrigin = EnsureRoot<AccountId>;
+	type TrustedLockers = ();
+	type SovereignAccountOf = AccountId32Aliases<(), AccountId32>;
+	type Currency = Balances;
+	type CurrencyMatcher = IsConcrete<RelayLocation>;
+	type MaxLockers = frame_support::traits::ConstU32<8>;
+	type MaxRemoteLockConsumers = frame_support::traits::ConstU32<0>;
+	type RemoteLockConsumerIdentifier = ();
+	type WeightInfo = TestWeightInfo;
+}
+
+pub type XcmRouter = TestSendXcm;
+
 impl pallet_liquidation::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type XcmSender = XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = MockOrderGasCostHandler;
 	type SystemRatio = SystemRatio;
