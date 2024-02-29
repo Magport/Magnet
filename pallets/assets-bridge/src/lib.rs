@@ -365,12 +365,22 @@ pub mod pallet {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		#[transactional]
-		pub fn claim_account(origin: OriginFor<T>, eth_address: H160) -> DispatchResult {
+		pub fn claim_account(
+			origin: OriginFor<T>,
+			eth_address: H160,
+			eth_signature: EcdsaSignature,
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			// ensure account_id and eth_address has not been mapped
 			ensure!(!EvmAccounts::<T>::contains_key(&who), Error::<T>::AccountIdHasMapped);
 			ensure!(!SubAccounts::<T>::contains_key(eth_address), Error::<T>::EthAddressHasMapped);
+
+			// recover evm address from signature
+			let address = eth_recover(&eth_signature, &who.using_encoded(to_ascii_hex), &[][..])
+				.ok_or(Error::<T>::BadSignature)?;
+
+			ensure!(eth_address == address, Error::<T>::InvalidSignature);
 
 			<T as pallet_assets::Config>::Currency::reserve(&who, T::ClaimBond::get())?;
 
