@@ -13,27 +13,27 @@ readme = "README.md"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-codec = { package = "parity-scale-codec", version = "3.0.0", features = ["derive"], default-features = false }
-scale-info = { version = "2.2.0", default-features = false, features = ["derive"] }
+codec = { package = "parity-scale-codec", workspace = true, features = ["derive"], default-features = false }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
 
 # Substrate
-sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+sp-io = { workspace = true, default-features = false}
+sp-core = { workspace = true, default-features = false}
+sp-runtime = { workspace = true, default-features = false}
+frame-support = { workspace = true, default-features = false}
 
 #Frontier FRAME
-pallet-evm = { version = "6.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+pallet-evm = { workspace = true, default-features = false }
 
 # Frontier Primitive
-fp-evm = { version = "3.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-fp-account = { version = "1.0.0-dev", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
-precompile-utils = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.1.0", default-features = false }
+fp-evm = { workspace = true, default-features = false }
+fp-account = { workspace = true, default-features = false }
+precompile-utils = { workspace = true, default-features = false }
 
 [dev-dependencies]
-frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-pallet-timestamp = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+frame-system = { workspace = true, default-features = false}
+pallet-balances = { workspace = true, default-features = false}
+pallet-timestamp = { workspace = true, default-features = false}
 
 
 [features]
