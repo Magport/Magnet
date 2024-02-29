@@ -9,21 +9,21 @@ repository.workspace = true
 description = "FRAME pallet for storing preimages of hashes"
 
 [dependencies]
-codec = { package = "parity-scale-codec", version = "3.6.1", default-features = false, features = ["derive"] }
-scale-info = { version = "2.10.0", default-features = false, features = ["derive"] }
-impl-trait-for-tuples = "0.2.2"
-frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false, optional = true}
-frame-support = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-frame-system = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-io = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-log = { version = "0.4.17", default-features = false }
+codec = { package = "parity-scale-codec", workspace = true, default-features = false, features = ["derive"] }
+scale-info = { workspace = true, default-features = false, features = ["derive"] }
+impl-trait-for-tuples = { workspace = true }
+frame-benchmarking = { workspace = true, default-features = false, optional = true}
+frame-support = { workspace = true, default-features = false}
+frame-system = { workspace = true, default-features = false}
+sp-core = { workspace = true, default-features = false}
+sp-io = { workspace = true, default-features = false}
+sp-runtime = { workspace = true, default-features = false}
+sp-std = { workspace = true, default-features = false}
+log = { workspace = true, default-features = false }
 
 [dev-dependencies]
-pallet-balances = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
-sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.1.0", default-features = false}
+pallet-balances = { workspace = true, default-features = false}
+sp-core = { workspace = true, default-features = false}
 
 [features]
 default = [ "std" ]
