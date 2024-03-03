@@ -305,7 +305,7 @@ pub mod pallet {
 				calls.push(utility_call);
 			}
 
-			pallet_utility::Pallet::<T>::batch(
+			pallet_utility::Pallet::<T>::batch_all(
 				frame_system::RawOrigin::Signed(system_account).into(),
 				calls,
 			)
@@ -385,7 +385,7 @@ pub mod pallet {
 				origin,
 				treasury_account.into(),
 				treasury_amount,
-			);
+			)?;
 
 			let mut transfers = Vec::new();
 			/*
@@ -459,6 +459,7 @@ pub mod pallet {
 				},
 				Err(e) => {
 					log::error!("Error occurred while executing reserve_transfer_assets: {:?}", e);
+					Self::deposit_event(Event::Error(Error::<T>::XcmError.into()));
 					return Err(Error::<T>::XcmError.into());
 				},
 			}
