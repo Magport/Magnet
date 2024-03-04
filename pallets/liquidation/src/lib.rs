@@ -91,6 +91,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type ExistentialDeposit: Get<Balance>;
 
+		///minimum liquidation threshold
+		#[pallet::constant]
+		type MinLiquidationThreshold: Get<Balance>;
+
 		/// system accountId
 		#[pallet::constant]
 		type SystemAccountName: Get<&'static str>;
@@ -245,7 +249,15 @@ pub mod pallet {
 				*income = income.saturating_add(current_block_fee_u128)
 			});
 
-			if count % T::ProfitDistributionCycle::get() == Zero::zero() {
+			let min_liquidation_threshold: Balance =
+				<T as pallet::Config>::MinLiquidationThreshold::get()
+					.try_into()
+					.unwrap_or_else(|_| 0);
+			let profit = TotalIncome::<T>::get().saturating_sub(TotalCost::<T>::get());
+
+			if profit >= min_liquidation_threshold
+				&& count % T::ProfitDistributionCycle::get() == Zero::zero()
+			{
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
 				match Self::distribute_profit() {
 					Ok(_) => {

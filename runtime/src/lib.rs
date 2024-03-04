@@ -910,6 +910,7 @@ parameter_types! {
 	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
 	pub const ProfitDistributionCycle: BlockNumber = 10;
 	pub const ExistDeposit: Balance = EXISTENTIAL_DEPOSIT;
+	pub const MinLiquidationThreshold: Balance = MILLIUNIT * 20;
 	pub const SystemAccountName: &'static str = "system";
 	pub const TreasuryAccountName: &'static str = "treasury";
 	pub const OperationAccountName: &'static str = "maintenance";
@@ -925,6 +926,7 @@ impl pallet_liquidation::Config for Runtime {
 	type TreasuryRatio = TreasuryRatio;
 	type OperationRatio = OperationRatio;
 	type ExistentialDeposit = ExistDeposit;
+	type MinLiquidationThreshold = MinLiquidationThreshold;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
 	type OperationAccountName = OperationAccountName;
