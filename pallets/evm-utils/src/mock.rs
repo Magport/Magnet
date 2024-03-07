@@ -17,6 +17,7 @@
 use super::*;
 
 use frame_support::{
+	derive_impl,
 	dispatch::DispatchClass,
 	parameter_types,
 	traits::{ConstU32, ConstU64, FindAuthor, Get},
@@ -72,6 +73,7 @@ impl Get<frame_system::limits::BlockWeights> for BlockWeights {
 
 pub type AccountId = AccountId32;
 
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = BlockWeights;
@@ -111,7 +113,7 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = ();
-	type MaxHolds = ();
+	type RuntimeFreezeReason = ();
 }
 
 parameter_types! {
@@ -172,7 +174,7 @@ parameter_types! {
 	pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE);
 	pub WeightPerGas: Weight = Weight::from_parts(20_000, 0);
 	pub MockPrecompiles: MockPrecompileSet = MockPrecompileSet;
-	//pub SuicideQuickClearLimit: u32 = 0;
+	pub SuicideQuickClearLimit: u32 = 0;
 }
 
 impl pallet_evm::Config for Test {
@@ -194,7 +196,7 @@ impl pallet_evm::Config for Test {
 	type OnCreate = ();
 	type FindAuthor = FindAuthorTruncated;
 	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
-	//type SuicideQuickClearLimit = SuicideQuickClearLimit;
+	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 	type Timestamp = Timestamp;
 	type WeightInfo = ();
 }

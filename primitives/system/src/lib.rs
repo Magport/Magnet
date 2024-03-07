@@ -15,7 +15,6 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unused_crate_dependencies)]
 
 use frame_support::weights::Weight;
 use sp_core::crypto::AccountId32;

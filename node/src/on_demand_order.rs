@@ -16,7 +16,10 @@
 
 use crate::{submit_order::build_rpc_for_submit_order, submit_order::SubmitOrderError};
 use codec::{Codec, Decode};
-use cumulus_primitives_core::relay_chain::vstaging::Assignment;
+
+//use cumulus_primitives_core::relay_chain::vstaging::Assignment;
+use runtime_parachains::scheduler::common::Assignment;
+
 use cumulus_primitives_core::{
 	relay_chain::BlockNumber as RelayBlockNumber, ParaId, PersistedValidationData,
 };
@@ -97,7 +100,7 @@ async fn start_on_demand(
 		.transpose()
 		.ok()?;
 	if p_active_config.is_some() {
-		let result = p_active_config.unwrap().on_demand_cores > 0;
+		let result = p_active_config.unwrap().coretime_cores > 0; //on_demand_cores
 		Some(result)
 	} else {
 		None
@@ -363,7 +366,7 @@ where
 							.transpose()?;
 						if let Some(vvs) = on_demand_queue.clone() {
 							for vv in vvs.into_iter() {
-								if vv.para_id == para_id {
+								if vv.para_id() == para_id {
 									exist_order = true;
 									break;
 								}

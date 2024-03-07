@@ -275,7 +275,7 @@ pub mod pallet {
 					continue;
 				}
 
-				let transfer_call = pallet_balances::Call::<T>::transfer {
+				let transfer_call = pallet_balances::Call::<T>::transfer_allow_death {
 					dest: T::Lookup::unlookup(recipient),
 					value: amount.into(),
 				};
