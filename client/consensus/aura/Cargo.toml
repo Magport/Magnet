@@ -42,6 +42,7 @@ substrate-prometheus-endpoint = {  workspace = true }
 
 # Cumulus
 cumulus-client-consensus-common = {  workspace = true }
+cumulus-client-parachain-inherent = {  workspace = true }
 cumulus-relay-chain-interface = {  workspace = true }
 cumulus-client-consensus-proposer = {  workspace = true }
 cumulus-primitives-aura = {  workspace = true }

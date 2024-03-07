@@ -15,6 +15,7 @@ pub use crate as assets_bridge;
 pub use assets_bridge::{Config, Error, Event as AssetsBridgeEvent};
 
 use frame_support::{
+	derive_impl,
 	pallet_prelude::Weight,
 	parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstU32},
@@ -55,6 +56,7 @@ parameter_types! {
 	pub const SS58Prefix: u8 = 44;
 }
 
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
@@ -108,7 +110,7 @@ impl pallet_balances::Config for Test {
 	type ReserveIdentifier = [u8; 8];
 	type RuntimeHoldReason = ();
 	type FreezeIdentifier = ();
-	type MaxHolds = ();
+	type RuntimeFreezeReason = ();
 	type MaxFreezes = ();
 }
 
@@ -152,6 +154,10 @@ impl pallet_assets::Config for Test {
 	type CreateOrigin = AsEnsureOriginWithArg<EnsureSigned<AccountId32>>;
 }
 
+parameter_types! {
+	pub SuicideQuickClearLimit: u32 = 0;
+}
+
 impl pallet_evm::Config for Test {
 	type FeeCalculator = ();
 	type GasWeightMapping = pallet_evm::FixedGasWeightMapping<Self>;
@@ -173,6 +179,7 @@ impl pallet_evm::Config for Test {
 	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
 	type Timestamp = Timestamp;
 	type WeightInfo = ();
+	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 }
 
 impl assets_bridge::Config for Test {

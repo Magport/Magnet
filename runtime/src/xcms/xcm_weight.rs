@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Polkadot.  If not, see <http://www.gnu.org/licenses/>.
 
-// Modified by Alex Wang  2023/12
+// Modified by Alex Wang  2024/03
+// from polkadot-sdk/polkadot/xcm/xcm-builder/src/weight.rs V1.7.0
 
 use codec::Decode;
 use frame_support::{
@@ -27,10 +28,10 @@ use frame_support::{
 };
 use sp_runtime::traits::{SaturatedConversion, Saturating, Zero};
 use sp_std::{marker::PhantomData, result::Result};
-use xcm::latest::{prelude::*, Weight};
+use xcm::latest::{prelude::*, GetWeight, Weight};
 use xcm_executor::{
 	traits::{WeightBounds, WeightTrader},
-	Assets,
+	AssetsInHolding,
 };
 
 pub struct FixedWeightBounds<T, C, M>(PhantomData<(T, C, M)>);
@@ -116,16 +117,16 @@ where
 }
 
 /// Function trait for handling some revenue. Similar to a negative imbalance (credit) handler, but
-/// for a `MultiAsset`. Sensible implementations will deposit the asset in some known treasury or
+/// for a `Asset`. Sensible implementations will deposit the asset in some known treasury or
 /// block-author account.
 pub trait TakeRevenue {
-	/// Do something with the given `revenue`, which is a single non-wildcard `MultiAsset`.
-	fn take_revenue(revenue: MultiAsset);
+	/// Do something with the given `revenue`, which is a single non-wildcard `Asset`.
+	fn take_revenue(revenue: Asset);
 }
 
 /// Null implementation just burns the revenue.
 impl TakeRevenue for () {
-	fn take_revenue(_revenue: MultiAsset) {}
+	fn take_revenue(_revenue: Asset) {}
 }
 
 /// Simple fee calculator that requires payment in a single fungible at a fixed rate.
@@ -145,9 +146,9 @@ impl<T: Get<(AssetId, u128, u128)>, R: TakeRevenue> WeightTrader for FixedRateOf
 	fn buy_weight(
 		&mut self,
 		weight: Weight,
-		payment: Assets,
+		payment: AssetsInHolding,
 		context: &XcmContext,
-	) -> Result<Assets, XcmError> {
+	) -> Result<AssetsInHolding, XcmError> {
 		log::trace!(
 			target: "xcm::weight",
 			"FixedRateOfFungible::buy_weight weight: {:?}, payment: {:?}, context: {:?}",
@@ -167,7 +168,7 @@ impl<T: Get<(AssetId, u128, u128)>, R: TakeRevenue> WeightTrader for FixedRateOf
 		Ok(unused)
 	}
 
-	fn refund_weight(&mut self, weight: Weight, context: &XcmContext) -> Option<MultiAsset> {
+	fn refund_weight(&mut self, weight: Weight, context: &XcmContext) -> Option<Asset> {
 		log::trace!(target: "xcm::weight", "FixedRateOfFungible::refund_weight weight: {:?}, context: {:?}", weight, context);
 		let (id, units_per_second, units_per_mb) = T::get();
 		let weight = weight.min(self.0);
@@ -196,22 +197,22 @@ impl<T: Get<(AssetId, u128, u128)>, R: TakeRevenue> Drop for FixedRateOfFungible
 /// places any weight bought into the right account.
 pub struct UsingComponents<
 	WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
-	AssetId: Get<MultiLocation>,
+	AssetIdValue: Get<Location>,
 	AccountId,
 	Currency: CurrencyT<AccountId>,
 	OnUnbalanced: OnUnbalancedT<Currency::NegativeImbalance>,
 >(
 	Weight,
 	Currency::Balance,
-	PhantomData<(WeightToFee, AssetId, AccountId, Currency, OnUnbalanced)>,
+	PhantomData<(WeightToFee, AssetIdValue, AccountId, Currency, OnUnbalanced)>,
 );
 impl<
 		WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
-		AssetId: Get<MultiLocation>,
+		AssetIdValue: Get<Location>,
 		AccountId,
 		Currency: CurrencyT<AccountId>,
 		OnUnbalanced: OnUnbalancedT<Currency::NegativeImbalance>,
-	> WeightTrader for UsingComponents<WeightToFee, AssetId, AccountId, Currency, OnUnbalanced>
+	> WeightTrader for UsingComponents<WeightToFee, AssetIdValue, AccountId, Currency, OnUnbalanced>
 {
 	fn new() -> Self {
 		Self(Weight::zero(), Zero::zero(), PhantomData)
@@ -220,28 +221,29 @@ impl<
 	fn buy_weight(
 		&mut self,
 		weight: Weight,
-		payment: Assets,
+		payment: AssetsInHolding,
 		context: &XcmContext,
-	) -> Result<Assets, XcmError> {
+	) -> Result<AssetsInHolding, XcmError> {
 		log::trace!(target: "xcm::weight", "UsingComponents::buy_weight weight: {:?}, payment: {:?}, context: {:?}", weight, payment, context);
 		let amount = WeightToFee::weight_to_fee(&weight);
 		let u128_amount: u128 = amount.try_into().map_err(|_| XcmError::Overflow)?;
-		let required = (Concrete(AssetId::get()), u128_amount).into();
+		let required = (AssetId(AssetIdValue::get()), u128_amount).into();
 		let unused = payment.checked_sub(required).map_err(|_| XcmError::TooExpensive)?;
 		self.0 = self.0.saturating_add(weight);
 		self.1 = self.1.saturating_add(amount);
 		Ok(unused)
 	}
 
-	fn refund_weight(&mut self, weight: Weight, context: &XcmContext) -> Option<MultiAsset> {
-		log::trace!(target: "xcm::weight", "UsingComponents::refund_weight weight: {:?}, context: {:?}", weight, context);
+	fn refund_weight(&mut self, weight: Weight, context: &XcmContext) -> Option<Asset> {
+		log::trace!(target: "xcm::weight", "UsingComponents::refund_weight weight: {:?}, context: {:?}, available weight: {:?}, available amount: {:?}", weight, context, self.0, self.1);
 		let weight = weight.min(self.0);
 		let amount = WeightToFee::weight_to_fee(&weight);
 		self.0 -= weight;
 		self.1 = self.1.saturating_sub(amount);
 		let amount: u128 = amount.saturated_into();
+		log::trace!(target: "xcm::weight", "UsingComponents::refund_weight amount to refund: {:?}", amount);
 		if amount > 0 {
-			Some((AssetId::get(), amount).into())
+			Some((AssetIdValue::get(), amount).into())
 		} else {
 			None
 		}
@@ -249,7 +251,7 @@ impl<
 }
 impl<
 		WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
-		AssetId: Get<MultiLocation>,
+		AssetId: Get<Location>,
 		AccountId,
 		Currency: CurrencyT<AccountId>,
 		OnUnbalanced: OnUnbalancedT<Currency::NegativeImbalance>,
@@ -260,30 +262,30 @@ impl<
 	}
 }
 
-// Weight trader which uses the configured `WeightToFee` to set the right price for weight and then
-// places any weight bought into the right account.
+/// Weight trader which uses the configured `WeightToFee` to set the right price for weight and then
+/// places any weight bought into the right account.
 // use PrecisionMultiplier for different precision between relaychain and Magnet
 use frame_support::traits::Imbalance;
 const PRECISION_MULTIPLIER: u128 = 1_000_000;
 
 pub struct UsingComponentsEx<
 	WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
-	AssetId: Get<MultiLocation>,
+	AssetIdValue: Get<Location>,
 	AccountId,
 	Currency: CurrencyT<AccountId>,
 	OnUnbalanced: OnUnbalancedT<Currency::NegativeImbalance>,
 >(
 	Weight,
 	Currency::Balance,
-	PhantomData<(WeightToFee, AssetId, AccountId, Currency, OnUnbalanced)>,
+	PhantomData<(WeightToFee, AssetIdValue, AccountId, Currency, OnUnbalanced)>,
 );
 impl<
 		WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
-		AssetId: Get<MultiLocation>,
+		AssetIdValue: Get<Location>,
 		AccountId,
 		Currency: CurrencyT<AccountId>,
 		OnUnbalanced: OnUnbalancedT<Currency::NegativeImbalance>,
-	> WeightTrader for UsingComponentsEx<WeightToFee, AssetId, AccountId, Currency, OnUnbalanced>
+	> WeightTrader for UsingComponentsEx<WeightToFee, AssetIdValue, AccountId, Currency, OnUnbalanced>
 {
 	fn new() -> Self {
 		Self(Weight::zero(), Zero::zero(), PhantomData)
@@ -292,33 +294,28 @@ impl<
 	fn buy_weight(
 		&mut self,
 		weight: Weight,
-		payment: Assets,
+		payment: AssetsInHolding,
 		context: &XcmContext,
-	) -> Result<Assets, XcmError> {
-		log::trace!(target: "runtime::xcm_weight", "UsingComponentsEx::buy_weight weight: {:?}, payment: {:?}, context: {:?}", weight, payment, context);
+	) -> Result<AssetsInHolding, XcmError> {
+		log::trace!(target: "xcm::weight", "UsingComponents::buy_weight weight: {:?}, payment: {:?}, context: {:?}", weight, payment, context);
 		let amount = WeightToFee::weight_to_fee(&weight);
-
-		let mut u128_amount: u128 = amount.saturated_into();
+		let mut u128_amount: u128 = amount.try_into().map_err(|_| XcmError::Overflow)?;
 		let is_radix: bool = u128_amount % PRECISION_MULTIPLIER > 0;
 		u128_amount = u128_amount / PRECISION_MULTIPLIER;
 		if is_radix {
 			u128_amount = u128_amount + 1;
 		}
-		let required = (Concrete(AssetId::get()), u128_amount).into();
+		let required = (AssetId(AssetIdValue::get()), u128_amount).into();
 		let unused = payment.checked_sub(required).map_err(|_| XcmError::TooExpensive)?;
-
-		let amount: Currency::Balance = u128_amount.saturated_into();
 		self.0 = self.0.saturating_add(weight);
 		self.1 = self.1.saturating_add(amount);
-
 		Ok(unused)
 	}
 
-	fn refund_weight(&mut self, weight: Weight, context: &XcmContext) -> Option<MultiAsset> {
-		log::trace!(target: "runtime::xcm_weight", "UsingComponentsEx::refund_weight weight: {:?}, context: {:?}", weight, context);
+	fn refund_weight(&mut self, weight: Weight, context: &XcmContext) -> Option<Asset> {
+		log::trace!(target: "xcm::weight", "UsingComponents::refund_weight weight: {:?}, context: {:?}, available weight: {:?}, available amount: {:?}", weight, context, self.0, self.1);
 		let weight = weight.min(self.0);
 		let amount = WeightToFee::weight_to_fee(&weight);
-
 		let mut u128_amount: u128 = amount.saturated_into();
 		u128_amount = u128_amount / PRECISION_MULTIPLIER;
 
@@ -326,8 +323,9 @@ impl<
 		self.0 -= weight;
 		self.1 = self.1.saturating_sub(amount);
 
+		log::trace!(target: "xcm::weight", "UsingComponentsEx::refund_weight amount to refund: {:?}", amount);
 		if u128_amount > 0 {
-			Some((AssetId::get(), u128_amount).into())
+			Some((AssetIdValue::get(), u128_amount).into())
 		} else {
 			None
 		}
@@ -335,7 +333,7 @@ impl<
 }
 impl<
 		WeightToFee: WeightToFeeT<Balance = Currency::Balance>,
-		AssetId: Get<MultiLocation>,
+		AssetId: Get<Location>,
 		AccountId,
 		Currency: CurrencyT<AccountId>,
 		OnUnbalanced: OnUnbalancedT<Currency::NegativeImbalance>,

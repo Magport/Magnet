@@ -15,7 +15,6 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unused_crate_dependencies)]
 
 use scale_info::prelude::string::String;
 

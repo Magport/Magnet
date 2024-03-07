@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-node"
-version = "0.5.1"
+version = "0.5.6"
 authors = ["Magnet"]
 description = "A scalable evm smart contract platform node, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -155,7 +155,4 @@ try-runtime = [
 	"polkadot-cli/try-runtime",
 	"sp-runtime/try-runtime",
 ]
-network-protocol-staging = [
-	"cumulus-client-service/network-protocol-staging",
-	"polkadot-cli/network-protocol-staging",
-]
+

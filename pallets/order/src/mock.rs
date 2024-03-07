@@ -17,7 +17,7 @@
 use crate::{self as order_pallet, OrderGasCost};
 use codec::Encode;
 pub use frame_support::{
-	construct_runtime, parameter_types,
+	construct_runtime, derive_impl, parameter_types,
 	traits::{Everything, Hooks},
 };
 use frame_system as system;
@@ -49,6 +49,7 @@ parameter_types! {
 	pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
 	type BaseCallFilter = Everything;
 	type BlockWeights = ();
@@ -90,7 +91,7 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = ();
-	type MaxHolds = ();
+	type RuntimeFreezeReason = ();
 }
 parameter_types! {
 	pub const SlotWidth: u32 = 2;
