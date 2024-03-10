@@ -54,6 +54,7 @@ pallet-transaction-payment = { workspace = true, default-features = false}
 pallet-transaction-payment-rpc-runtime-api = { workspace = true, default-features = false}
 sp-api = { workspace = true, default-features = false}
 sp-block-builder = { workspace = true, default-features = false}
+sp-genesis-builder = { workspace = true, default-features = false}
 sp-consensus-aura = { workspace = true, default-features = false}
 sp-core = { workspace = true, default-features = false}
 sp-inherents = { workspace = true, default-features = false}
@@ -155,6 +156,7 @@ std = [
 	"sp-block-builder/std",
 	"sp-consensus-aura/std",
 	"sp-core/std",
+	"sp-genesis-builder/std",
 	"sp-inherents/std",
 	"sp-offchain/std",
 	"sp-runtime/std",

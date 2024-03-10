@@ -231,8 +231,8 @@ fn testnet_genesis(
 			],
 			// Genesis metadata: Vec<(id, name, symbol, decimals)>
 			"metadata": vec![
-				(1, "asset-1", "ALT1", 18),
-				(2, "asset-2", "ALT2", 18),
+				(1, b"asset-1".to_vec(), b"ALT1".to_vec(), 18),
+				(2, b"asset-2".to_vec(), b"ALT2".to_vec(), 18),
 			],
 			// Genesis accounts: Vec<(id, account_id, balance)>
 			"accounts": vec![
@@ -240,8 +240,8 @@ fn testnet_genesis(
 				(2, bob, 500_000_000_0000_0000_0000u128),
 			],
 		},
-		"assets_bridge": {
-			"admin_key": Some(root.clone()),
+		"assetsBridge": {
+			"adminKey": Some(root.clone()),
 		},
 		"council": {
 			"members": endowed_accounts
@@ -250,12 +250,12 @@ fn testnet_genesis(
 				.filter_map(|(idx, acc)| if idx % 2 == 0 { Some(acc.clone()) } else { None })
 				.collect::<Vec<_>>(),
 		},
-		"parachain_info": {
-			"parachain_id": id,
+		"parachainInfo": {
+			"parachainId": id,
 		},
-		"collator_selection": {
+		"collatorSelection": {
 			"invulnerables": invulnerables.iter().cloned().map(|(acc, _)| acc).collect::<Vec<_>>(),
-			"candidacy_bond": EXISTENTIAL_DEPOSIT * 16,
+			"candidacyBond": EXISTENTIAL_DEPOSIT * 16,
 		},
 		"session": {
 			"keys": invulnerables
@@ -271,14 +271,14 @@ fn testnet_genesis(
 		},
 		// no need to pass anything to aura, in fact it will panic if we do. Session will take care
 		// of this.
-		"polkadot_xcm": {
-			"safe_xcm_version": Some(SAFE_XCM_VERSION),
+		"polkadotXcm": {
+			"safeXcmVersion": Some(SAFE_XCM_VERSION),
 		},
 		"sudo": { "key": Some(root.clone()) },
 
 		// EVM compatibility
-		"evm_chain_id": {
-			"chain_id": u64::from(u32::from(id)),
+		"evmChainId": {
+			"chainId": u64::from(u32::from(id)),
 		},
 
 		"evm": { "accounts": evm_accounts },
