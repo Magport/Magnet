@@ -17,9 +17,6 @@
 use crate::{submit_order::build_rpc_for_submit_order, submit_order::SubmitOrderError};
 use codec::{Codec, Decode};
 
-//use cumulus_primitives_core::relay_chain::vstaging::Assignment;
-use runtime_parachains::scheduler::common::Assignment;
-
 use cumulus_primitives_core::{
 	relay_chain::BlockNumber as RelayBlockNumber, ParaId, PersistedValidationData,
 };
@@ -54,6 +51,11 @@ use sp_runtime::{
 };
 use std::cmp::Ordering;
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
+
+#[derive(Encode, Decode, Debug, PartialEq, Clone)]
+struct EnqueuedOrder {
+	pub para_id: ParaId,
+}
 
 #[derive(Clone, PartialEq)]
 pub enum OrderType {
@@ -100,7 +102,7 @@ async fn start_on_demand(
 		.transpose()
 		.ok()?;
 	if p_active_config.is_some() {
-		let result = p_active_config.unwrap().coretime_cores > 0; //on_demand_cores
+		let result = p_active_config.unwrap().coretime_cores > 0;
 		Some(result)
 	} else {
 		None
@@ -277,9 +279,7 @@ where
 		),
 		None => false,
 	};
-	let p_start = start_on_demand(relay_chain.clone(), p_hash).await;
-	let start = if let Some(flag) = p_start { flag } else { false };
-	if !is_parathread || !start {
+	if !is_parathread {
 		//parachain mode
 		let mut order_record_local = order_record.lock().await;
 		order_record_local.validation_data = None;
@@ -362,11 +362,11 @@ where
 						let on_demand_queue_storage =
 							relay_chain.get_storage_by_key(p_hash, ON_DEMAND_QUEUE).await?;
 						let on_demand_queue = on_demand_queue_storage
-							.map(|raw| <Vec<Assignment>>::decode(&mut &raw[..]))
+							.map(|raw| <Vec<EnqueuedOrder>>::decode(&mut &raw[..]))
 							.transpose()?;
 						if let Some(vvs) = on_demand_queue.clone() {
 							for vv in vvs.into_iter() {
-								if vv.para_id() == para_id {
+								if vv.para_id == para_id {
 									exist_order = true;
 									break;
 								}
