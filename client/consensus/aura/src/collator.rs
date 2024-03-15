@@ -194,8 +194,10 @@ where
 		inherent_data: (ParachainInherentData, InherentData),
 		proposal_duration: Duration,
 		max_pov_size: usize,
-	) -> Result<(Collation, ParachainBlockData<Block>, Block::Hash), Box<dyn Error + Send + 'static>>
-	{
+	)  -> Result<
+	Option<(Collation, ParachainBlockData<Block>, Block::Hash)>,
+	Box<dyn Error + Send + 'static>,
+>{
 		let mut digest = additional_pre_digest.into().unwrap_or_default();
 		digest.push(slot_claim.pre_digest.clone());
 
@@ -212,14 +214,10 @@ where
 			.await
 			.map_err(|e| Box::new(e) as Box<dyn Error + Send>)?;
 
-		let proposal = match maybe_proposal {
-			None => {
-				return Err(
-					Box::<dyn Error + Send + Sync>::from("None proposal") as Box<dyn Error + Send>
-				)
-			}, //Ok(None),
-			Some(p) => p,
-		};
+			let proposal = match maybe_proposal {
+				None => return Ok(None),
+				Some(p) => p,
+			};
 
 		let sealed_importable = seal::<_, P>(
 			proposal.block,
@@ -265,7 +263,7 @@ where
 				);
 			}
 
-			Ok((collation, block_data, post_hash))
+			Ok(Some((collation, block_data, post_hash)))
 		} else {
 			Err(Box::<dyn Error + Send + Sync>::from("Unable to produce collation")
 				as Box<dyn Error + Send>)
