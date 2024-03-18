@@ -2,9 +2,11 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: 
+      - '**'
   pull_request:
-    branches: [ "main" ]
+    branches: 
+      - '**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -44,6 +46,10 @@ jobs:
       with:
         cache-on-failure: true
         cache-all-crates: true
+
+    - name: Add rust-src
+      run: |
+        rustup component add rust-src
             
     - name: Build
       run: cargo check --release
