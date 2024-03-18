@@ -28,6 +28,7 @@ pub mod pallet_referenda_fellowship_referenda;
 pub mod pallet_referenda_referenda;
 pub mod pallet_scheduler;
 pub mod pallet_whitelist;
+pub mod pallet_xcm;
 pub mod paritydb_weights;
 pub mod rocksdb_weights;
 
