@@ -32,9 +32,7 @@ jobs:
         sudo apt-get install -y protobuf-compiler
         protoc --version
         
-    - name: Add rust-src
-      run: |
-        rustup component add rust-src
+
     
     - uses: actions/checkout@v3
     
@@ -50,6 +48,10 @@ jobs:
       with:
         cache-on-failure: true
         cache-all-crates: true
+
+    - name: Add rust-src
+      run: |
+        rustup component add rust-src
             
     - name: Build
       run: cargo check --release
