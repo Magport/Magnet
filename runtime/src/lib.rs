@@ -44,13 +44,14 @@ use frame_support::weights::constants::ParityDbWeight as RuntimeDbWeight;
 use frame_support::weights::constants::RocksDbWeight as RuntimeDbWeight;
 
 use frame_support::{
-	construct_runtime,
+	construct_runtime, derive_impl,
 	dispatch::DispatchClass,
+	genesis_builder_helper::{build_config, create_default_config},
 	parameter_types,
 	traits::{
-		AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, Currency,
-		EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance, OnFinalize, OnUnbalanced,
-		PrivilegeCmp,
+		fungible::HoldConsideration, AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32,
+		ConstU64, ConstU8, Currency, EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance,
+		LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp, TransformOrigin,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -58,6 +59,7 @@ use frame_support::{
 	},
 	PalletId,
 };
+
 use frame_system::{
 	limits::{BlockLength, BlockWeights},
 	pallet_prelude::BlockNumberFor,
@@ -74,19 +76,22 @@ pub use sp_runtime::BuildStorage;
 
 // Cumulus imports
 pub use parachains_common::impls::{AccountIdOf, DealWithFees};
+pub use parachains_common::message_queue::{NarrowOriginToSibling, ParaIdToSibling};
 
 // Polkadot imports
+use polkadot_runtime_common::xcm_sender::NoPriceForMessageDelivery;
 use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
 
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 
 // XCM Imports
-use xcm::latest::prelude::BodyId;
-use xcm::opaque::lts::{InteriorMultiLocation, Junction::PalletInstance};
-use xcm_executor::XcmExecutor;
-
-use cumulus_primitives_core::{ParaId, PersistedValidationData};
+use cumulus_primitives_core::{AggregateMessageOrigin, ParaId, PersistedValidationData};
 pub use pallet_order::{self, OrderGasCost};
+use xcm::latest::prelude::{
+	Asset as MultiAsset, BodyId, InteriorLocation as InteriorMultiLocation,
+	Junction::PalletInstance, Location as MultiLocation,
+};
+use xcm_executor::XcmExecutor;
 
 use fp_evm::weight_per_gas;
 use fp_rpc::TransactionStatus;
@@ -102,11 +107,6 @@ mod precompiles;
 use precompiles::FrontierPrecompiles;
 
 use pallet_pot::PotNameBtreemap;
-
-/// Constant values used within the runtime.
-use parachains_common::kusama::currency::*;
-
-use pallet_preimage::storage::LinearStoragePrice;
 
 // Governance and configurations.
 pub mod governance;
@@ -349,6 +349,10 @@ pub const DAYS: BlockNumber = HOURS * 24;
 pub const UNIT: Balance = 1_000_000_000_000_000_000;
 pub const MILLIUNIT: Balance = 1_000_000_000_000_000;
 pub const MICROUNIT: Balance = 1_000_000_000_000;
+pub const QUID: Balance = UNIT / 30;
+pub const CENTS: Balance = QUID / 100;
+pub const GRAND: Balance = QUID * 1_000;
+pub const MILLICENTS: Balance = CENTS / 1_000;
 
 /// The existential deposit. Set to 1/10 of the Connected Relay Chain.
 pub const EXISTENTIAL_DEPOSIT: Balance = MILLIUNIT;
@@ -419,6 +423,10 @@ parameter_types! {
 
 // Configure FRAME pallets to include in runtime.
 
+/// The default types are being injected by [`derive_impl`](`frame_support::derive_impl`) from
+/// [`ParaChainDefaultConfig`](`struct@frame_system::config_preludes::ParaChainDefaultConfig`),
+/// but overridden as needed.
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Runtime {
 	/// The identifier used to distinguish between accounts.
 	type AccountId = AccountId;
@@ -497,8 +505,8 @@ impl pallet_balances::Config for Runtime {
 	type MaxReserves = ConstU32<50>;
 	type ReserveIdentifier = [u8; 8];
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
 	type FreezeIdentifier = ();
-	type MaxHolds = ConstU32<2>;
 	type MaxFreezes = ConstU32<1>;
 }
 
@@ -559,14 +567,16 @@ impl pallet_sudo::Config for Runtime {
 parameter_types! {
 	pub const ReservedXcmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
 	pub const ReservedDmpWeight: Weight = MAXIMUM_BLOCK_WEIGHT.saturating_div(4);
+	pub const RelayOrigin: AggregateMessageOrigin = AggregateMessageOrigin::Parent;
 }
 
 impl cumulus_pallet_parachain_system::Config for Runtime {
+	type WeightInfo = ();
 	type RuntimeEvent = RuntimeEvent;
 	type OnSystemEvent = ();
 	type SelfParaId = parachain_info::Pallet<Runtime>;
 	type OutboundXcmpMessageSource = XcmpQueue;
-	type DmpMessageHandler = DmpQueue;
+	type DmpQueue = frame_support::traits::EnqueueWithOrigin<MessageQueue, RelayOrigin>;
 	type ReservedDmpWeight = ReservedDmpWeight;
 	type XcmpMessageHandler = XcmpQueue;
 	type ReservedXcmpWeight = ReservedXcmpWeight;
@@ -581,24 +591,45 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
 
 impl parachain_info::Config for Runtime {}
 
+parameter_types! {
+	pub MessageQueueServiceWeight: Weight = Perbill::from_percent(35) * RuntimeBlockWeights::get().max_block;
+}
+
+impl pallet_message_queue::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type MessageProcessor = pallet_message_queue::mock_helpers::NoopMessageProcessor<
+		cumulus_primitives_core::AggregateMessageOrigin,
+	>;
+	#[cfg(not(feature = "runtime-benchmarks"))]
+	type MessageProcessor = xcm_builder::ProcessXcmMessage<
+		AggregateMessageOrigin,
+		xcm_executor::XcmExecutor<xcm_config::XcmConfig>,
+		RuntimeCall,
+	>;
+	type Size = u32;
+	// The XCMP queue pallet is only ever able to handle the `Sibling(ParaId)` origin:
+	type QueueChangeHandler = NarrowOriginToSibling<XcmpQueue>;
+	type QueuePausedQuery = NarrowOriginToSibling<XcmpQueue>;
+	type HeapSize = sp_core::ConstU32<{ 64 * 1024 }>;
+	type MaxStale = sp_core::ConstU32<8>;
+	type ServiceWeight = MessageQueueServiceWeight;
+}
+
 impl cumulus_pallet_aura_ext::Config for Runtime {}
 
 impl cumulus_pallet_xcmp_queue::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type XcmExecutor = XcmExecutor<XcmConfig>;
+	// Enqueue XCMP messages from siblings for later processing.
+	type XcmpQueue = TransformOrigin<MessageQueue, AggregateMessageOrigin, ParaId, ParaIdToSibling>;
+	type MaxInboundSuspended = sp_core::ConstU32<1_000>;
 	type ChannelInfo = ParachainSystem;
 	type VersionWrapper = ();
-	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
 	type ControllerOrigin = EnsureRoot<AccountId>;
 	type ControllerOriginConverter = XcmOriginToTransactDispatchOrigin;
 	type WeightInfo = ();
-	type PriceForSiblingDelivery = ();
-}
-
-impl cumulus_pallet_dmp_queue::Config for Runtime {
-	type RuntimeEvent = RuntimeEvent;
-	type XcmExecutor = XcmExecutor<XcmConfig>;
-	type ExecuteOverweightOrigin = EnsureRoot<AccountId>;
+	type PriceForSiblingDelivery = NoPriceForMessageDelivery<ParaId>;
 }
 
 parameter_types! {
@@ -743,6 +774,7 @@ parameter_types! {
 	pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE);
 	pub PrecompilesValue: FrontierPrecompiles<Runtime> = FrontierPrecompiles::<_>::new();
 	pub WeightPerGas: Weight = Weight::from_parts(weight_per_gas(BLOCK_GAS_LIMIT, NORMAL_DISPATCH_RATIO, WEIGHT_MILLISECS_PER_BLOCK), 0);
+	pub SuicideQuickClearLimit: u32 = 0;
 }
 
 impl pallet_evm::Config for Runtime {
@@ -764,6 +796,7 @@ impl pallet_evm::Config for Runtime {
 	type OnCreate = ();
 	type FindAuthor = FindAuthorTruncated<Aura>;
 	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
+	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 	type Timestamp = Timestamp;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 }
@@ -910,7 +943,6 @@ parameter_types! {
 	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
 	pub const ProfitDistributionCycle: BlockNumber = 10;
 	pub const ExistDeposit: Balance = EXISTENTIAL_DEPOSIT;
-	pub const MinLiquidationThreshold: Balance = MILLIUNIT * 20;
 	pub const SystemAccountName: &'static str = "system";
 	pub const TreasuryAccountName: &'static str = "treasury";
 	pub const OperationAccountName: &'static str = "maintenance";
@@ -919,78 +951,16 @@ parameter_types! {
 impl pallet_liquidation::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
-	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = OrderGasCostHandler;
 	type SystemRatio = SystemRatio;
 	type TreasuryRatio = TreasuryRatio;
 	type OperationRatio = OperationRatio;
 	type ExistentialDeposit = ExistDeposit;
-	type MinLiquidationThreshold = MinLiquidationThreshold;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
 	type OperationAccountName = OperationAccountName;
 	type ProfitDistributionCycle = ProfitDistributionCycle;
-}
-
-mod hold {
-	use super::*;
-
-	use frame_support::pallet_prelude::*;
-	use frame_support::traits::{
-		fungible::MutateHold,
-		tokens::{Fortitude::Force, Precision::BestEffort},
-	};
-	use frame_support::{CloneNoBound, EqNoBound, PartialEqNoBound, RuntimeDebugNoBound};
-	use pallet_preimage::storage::{Consideration, Footprint};
-	use sp_runtime::traits::Convert;
-	/// Consideration method using a `fungible` balance frozen as the cost exacted for the footprint.
-	#[derive(
-		CloneNoBound,
-		EqNoBound,
-		PartialEqNoBound,
-		Encode,
-		Decode,
-		TypeInfo,
-		MaxEncodedLen,
-		RuntimeDebugNoBound,
-	)]
-	#[scale_info(skip_type_params(A, F, R, D))]
-	#[codec(mel_bound())]
-	pub struct HoldConsideration<A, F, R, D>(F::Balance, PhantomData<fn() -> (A, R, D)>)
-	where
-		F: MutateHold<A>;
-	impl<
-			A: 'static,
-			F: 'static + MutateHold<A>,
-			R: 'static + Get<F::Reason>,
-			D: 'static + Convert<Footprint, F::Balance>,
-		> Consideration<A> for HoldConsideration<A, F, R, D>
-	where
-		F::Balance: Send + Sync,
-		//<F as hidden_include::traits::fungible::Inspect<A>>::Balance: Send + Sync,
-	{
-		fn new(who: &A, footprint: Footprint) -> Result<Self, DispatchError> {
-			let new = D::convert(footprint);
-			F::hold(&R::get(), who, new)?;
-			Ok(Self(new, PhantomData))
-		}
-		fn update(self, who: &A, footprint: Footprint) -> Result<Self, DispatchError> {
-			let new = D::convert(footprint);
-			if self.0 > new {
-				F::release(&R::get(), who, self.0 - new, BestEffort)?;
-			} else if new > self.0 {
-				F::hold(&R::get(), who, new - self.0)?;
-			}
-			Ok(Self(new, PhantomData))
-		}
-		fn drop(self, who: &A) -> Result<(), DispatchError> {
-			F::release(&R::get(), who, self.0, BestEffort).map(|_| ())
-		}
-		fn burn(self, who: &A) {
-			let _ = F::burn_held(&R::get(), who, self.0, BestEffort, Force);
-		}
-	}
 }
 
 parameter_types! {
@@ -1004,14 +974,12 @@ impl pallet_preimage::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type ManagerOrigin = EnsureRoot<AccountId>;
-	type Consideration = crate::hold::HoldConsideration<
+	type Consideration = HoldConsideration<
 		AccountId,
 		Balances,
 		PreimageHoldReason,
 		LinearStoragePrice<PreimageBaseDeposit, PreimageByteDeposit, Balance>,
 	>;
-	//type BaseDeposit = PreimageBaseDeposit;
-	//type ByteDeposit = PreimageByteDeposit;
 }
 
 parameter_types! {
@@ -1169,7 +1137,7 @@ construct_runtime!(
 		XcmpQueue: cumulus_pallet_xcmp_queue = 30,
 		PolkadotXcm: pallet_xcm = 31,
 		CumulusXcm: cumulus_pallet_xcm = 32,
-		DmpQueue: cumulus_pallet_dmp_queue = 33,
+		MessageQueue: pallet_message_queue = 33,
 
 		//Frontier
 		EVMChainId: pallet_evm_chain_id = 40,
@@ -1609,7 +1577,7 @@ impl_runtime_apis! {
 			gas_limit: Option<Weight>,
 			storage_deposit_limit: Option<Balance>,
 			input_data: Vec<u8>,
-		) -> pallet_contracts_primitives::ContractExecResult<Balance, EventRecord> {
+		) -> pallet_contracts::ContractExecResult<Balance, EventRecord> {
 			let gas_limit = gas_limit.unwrap_or(RuntimeBlockWeights::get().max_block);
 			Contracts::bare_call(
 				origin,
@@ -1629,10 +1597,10 @@ impl_runtime_apis! {
 			value: Balance,
 			gas_limit: Option<Weight>,
 			storage_deposit_limit: Option<Balance>,
-			code: pallet_contracts_primitives::Code<Hash>,
+			code: pallet_contracts::Code<Hash>,
 			data: Vec<u8>,
 			salt: Vec<u8>,
-		) -> pallet_contracts_primitives::ContractInstantiateResult<AccountId, Balance, EventRecord>
+		) -> pallet_contracts::ContractInstantiateResult<AccountId, Balance, EventRecord>
 		{
 			let gas_limit = gas_limit.unwrap_or(RuntimeBlockWeights::get().max_block);
 			Contracts::bare_instantiate(
@@ -1653,7 +1621,7 @@ impl_runtime_apis! {
 			code: Vec<u8>,
 			storage_deposit_limit: Option<Balance>,
 			determinism: pallet_contracts::Determinism,
-		) -> pallet_contracts_primitives::CodeUploadResult<Hash, Balance>
+		) -> pallet_contracts::CodeUploadResult<Hash, Balance>
 		{
 			Contracts::bare_upload_code(origin, code, storage_deposit_limit, determinism)
 		}
@@ -1661,7 +1629,7 @@ impl_runtime_apis! {
 		fn get_storage(
 			address: AccountId,
 			key: Vec<u8>,
-		) -> pallet_contracts_primitives::GetStorageResult {
+		) -> pallet_contracts::GetStorageResult {
 			Contracts::get_storage(address, key)
 		}
 	}
@@ -1732,6 +1700,15 @@ impl_runtime_apis! {
 
 			if batches.is_empty() { return Err("Benchmark not found for this pallet.".into()) }
 			Ok(batches)
+		}
+	}
+		impl sp_genesis_builder::GenesisBuilder<Block> for Runtime {
+		fn create_default_config() -> Vec<u8> {
+			create_default_config::<RuntimeGenesisConfig>()
+		}
+
+		fn build_config(config: Vec<u8>) -> sp_genesis_builder::Result {
+			build_config::<RuntimeGenesisConfig>(config)
 		}
 	}
 }

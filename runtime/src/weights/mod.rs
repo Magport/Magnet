@@ -30,6 +30,7 @@ pub mod pallet_scheduler;
 pub mod pallet_whitelist;
 pub mod paritydb_weights;
 pub mod rocksdb_weights;
+pub mod pallet_xcm;
 
 pub use block_weights::constants::BlockExecutionWeight;
 pub use extrinsic_weights::constants::ExtrinsicBaseWeight;

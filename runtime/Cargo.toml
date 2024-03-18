@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.5.3"
+version = "0.5.6"
 authors = ["Magnet"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"
@@ -31,9 +31,7 @@ magnet-primitives-order = { path = "../primitives/order", default-features = fal
 pallet-pot = { path = "../pallets/pot", default-features = false }
 pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
-pallet-xcm = {  path = "../pallets/pallet-xcm", default-features = false}
 pallet-liquidation = {path = "../pallets/liquidation", default-features = false}
-pallet-preimage = { path = "../pallets/preimage", default-features = false}
 
 # Substrate
 frame-benchmarking = { workspace = true, default-features = false, optional = true}
@@ -47,6 +45,7 @@ pallet-aura = { workspace = true, default-features = false}
 pallet-authorship = { workspace = true, default-features = false}
 pallet-balances = { workspace = true, default-features = false}
 pallet-assets = { workspace = true, default-features = false}
+pallet-preimage = { workspace = true, default-features = false}
 pallet-session = { workspace = true, default-features = false}
 pallet-sudo = { workspace = true, default-features = false}
 pallet-collective = { workspace = true, default-features = false}
@@ -55,6 +54,7 @@ pallet-transaction-payment = { workspace = true, default-features = false}
 pallet-transaction-payment-rpc-runtime-api = { workspace = true, default-features = false}
 sp-api = { workspace = true, default-features = false}
 sp-block-builder = { workspace = true, default-features = false}
+sp-genesis-builder = { workspace = true, default-features = false}
 sp-consensus-aura = { workspace = true, default-features = false}
 sp-core = { workspace = true, default-features = false}
 sp-inherents = { workspace = true, default-features = false}
@@ -74,10 +74,11 @@ pallet-conviction-voting = { workspace = true, default-features = false}
 pallet-ranked-collective = { workspace = true, default-features = false}
 pallet-scheduler = { workspace = true, default-features = false}
 pallet-insecure-randomness-collective-flip = { workspace = true, default-features = false}
-pallet-contracts-primitives = { workspace = true, default-features = false}
 pallet-contracts = { workspace = true, default-features = false}
+pallet-message-queue = { workspace = true, default-features = false }
 
 # Polkadot
+pallet-xcm = { workspace = true, default-features = false}
 polkadot-parachain-primitives = { workspace = true, default-features = false}
 polkadot-primitives = { workspace = true, default-features = false}
 polkadot-runtime-common = { workspace = true, default-features = false}
@@ -87,7 +88,6 @@ xcm-executor = { workspace = true, default-features = false}
 
 # Cumulus
 cumulus-pallet-aura-ext = { workspace = true, default-features = false }
-cumulus-pallet-dmp-queue = { workspace = true, default-features = false }
 cumulus-pallet-parachain-system = { workspace = true, default-features = false, features = ["parameterized-consensus-hook",] }
 cumulus-pallet-session-benchmarking = { workspace = true, default-features = false}
 cumulus-pallet-xcm = { workspace = true, default-features = false }
@@ -123,7 +123,6 @@ with-paritydb-weights = []
 std = [
 	"codec/std",
 	"cumulus-pallet-aura-ext/std",
-	"cumulus-pallet-dmp-queue/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-pallet-session-benchmarking/std",
 	"cumulus-pallet-xcm/std",
@@ -142,6 +141,7 @@ std = [
 	"pallet-authorship/std",
 	"pallet-balances/std",
 	"pallet-collator-selection/std",
+	"pallet-message-queue/std",	
 	"pallet-session/std",
 	"pallet-sudo/std",
 	"pallet-timestamp/std",
@@ -156,6 +156,7 @@ std = [
 	"sp-block-builder/std",
 	"sp-consensus-aura/std",
 	"sp-core/std",
+	"sp-genesis-builder/std",
 	"sp-inherents/std",
 	"sp-offchain/std",
 	"sp-runtime/std",
@@ -203,7 +204,6 @@ std = [
 	"pallet-ranked-collective/std",
 	"pallet-scheduler/std",
 	"pallet-insecure-randomness-collective-flip/std",
-	"pallet-contracts-primitives/std",
 	"pallet-contracts/std",	
 ]
 
@@ -218,6 +218,7 @@ runtime-benchmarks = [
 	"hex-literal",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-collator-selection/runtime-benchmarks",
+	"pallet-message-queue/runtime-benchmarks",	
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-xcm/runtime-benchmarks",
@@ -249,7 +250,6 @@ runtime-benchmarks = [
 try-runtime = [
 	"cumulus-pallet-parachain-system/try-runtime",
 	"cumulus-pallet-aura-ext/try-runtime",
-	"cumulus-pallet-dmp-queue/try-runtime",
 	"cumulus-pallet-parachain-system/try-runtime",
 	"cumulus-pallet-xcm/try-runtime",
 	"cumulus-pallet-xcmp-queue/try-runtime",
@@ -262,6 +262,7 @@ try-runtime = [
 	"pallet-authorship/try-runtime",
 	"pallet-balances/try-runtime",
 	"pallet-collator-selection/try-runtime",
+	"pallet-message-queue/try-runtime",	
 	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-timestamp/try-runtime",
