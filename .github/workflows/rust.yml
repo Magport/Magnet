@@ -46,10 +46,6 @@ jobs:
       with:
         cache-on-failure: true
         cache-all-crates: true
-
-    - name: Add rust-src
-      run: |
-        rustup component add rust-src
             
     - name: Build
       run: cargo check --release
