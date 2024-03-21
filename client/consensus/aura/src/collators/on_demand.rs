@@ -15,7 +15,9 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 use codec::{Codec, Decode};
-use cumulus_client_collator::{relay_chain_driven::CollationRequest, service::ServiceInterface as CollatorServiceInterface};
+use cumulus_client_collator::{
+	relay_chain_driven::CollationRequest, service::ServiceInterface as CollatorServiceInterface,
+};
 use cumulus_client_consensus_common::ParachainBlockImportMarker;
 use cumulus_client_consensus_proposer::ProposerInterface;
 use cumulus_primitives_core::{
@@ -30,6 +32,7 @@ use polkadot_primitives::{CollatorPair, Id as ParaId};
 use cumulus_primitives_core::PersistedValidationData;
 use futures::lock::Mutex;
 use futures::prelude::*;
+use futures::{channel::mpsc::Receiver, prelude::*};
 use magnet_primitives_order::OrderRecord;
 use sc_client_api::{backend::AuxStore, BlockBackend, BlockOf};
 use sc_consensus::BlockImport;
@@ -43,7 +46,6 @@ use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, Member};
 use std::{convert::TryFrom, sync::Arc, time::Duration};
-use futures::{channel::mpsc::Receiver, prelude::*};
 /// Parameters for [`run`].
 pub struct Params<BI, CIDP, Client, RClient, SO, Proposer, CS> {
 	/// Inherent data providers. Only non-consensus inherent data should be provided, i.e.
@@ -116,13 +118,14 @@ where
 	async move {
 		let mut collation_requests = match params.collation_request_receiver {
 			Some(receiver) => receiver,
-			None =>
+			None => {
 				cumulus_client_collator::relay_chain_driven::init(
 					params.collator_key,
 					params.para_id,
 					params.overseer_handle,
 				)
-				.await,
+				.await
+			},
 		};
 
 		let mut collator = {

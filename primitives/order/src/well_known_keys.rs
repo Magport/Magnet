@@ -16,7 +16,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use {cumulus_primitives_core::ParaId, sp_core::Encode, sp_io::hashing::twox_64, sp_std::vec::Vec};
+use cumulus_primitives_core::relay_chain::CoreIndex;
+use {
+	cumulus_primitives_core::ParaId,
+	sp_core::Encode,
+	sp_io::hashing::{twox_256, twox_64},
+	sp_std::vec::Vec,
+};
 
 pub const PARAS_PARA_LIFECYCLES: &[u8] =
 	&hex_literal::hex!["cd710b30bd2eab0352ddcc26417aa194281e0bfde17b36573208a06cb5cfba6b"];
@@ -53,3 +59,12 @@ pub const SPOT_TRAFFIC: &[u8] =
 //Configuration ActiveConfig
 pub const ACTIVE_CONFIG: &[u8] =
 	&hex_literal::hex!["06de3d8a54d27e44a9d5ce189618f22db4b49d95320d9021994c850f25b8e385"];
+
+pub const CORE_DESCRIPTORS: &[u8] =
+	&hex_literal::hex!["638595eebaa445ce03a13547bece90e704e6ac775a3245623103ffec2cb2c92f"];
+
+pub fn paras_core_descriptors(core_index: CoreIndex) -> Vec<u8> {
+	core_index.using_encoded(|core_index: &[u8]| {
+		CORE_DESCRIPTORS.iter().chain(twox_256(core_index).iter()).cloned().collect()
+	})
+}
