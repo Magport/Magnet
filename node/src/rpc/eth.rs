@@ -9,7 +9,6 @@ use sc_client_api::{
 };
 use sc_network::NetworkService;
 use sc_network_sync::SyncingService;
-//use sc_rpc::DenyUnsafe::No;
 use sc_rpc::SubscriptionTaskExecutor;
 use sc_transaction_pool::{ChainApi, Pool};
 use sc_transaction_pool_api::TransactionPool;

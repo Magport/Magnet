@@ -1,4 +1,4 @@
-//! Substrate Parachain Node Template CLI
+//! Magnet Parachain Node CLI
 
 #![warn(missing_docs)]
 
