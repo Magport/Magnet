@@ -15,7 +15,9 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 use codec::{Codec, Decode};
-use cumulus_client_collator::service::ServiceInterface as CollatorServiceInterface;
+use cumulus_client_collator::{
+	relay_chain_driven::CollationRequest, service::ServiceInterface as CollatorServiceInterface,
+};
 use cumulus_client_consensus_common::ParachainBlockImportMarker;
 use cumulus_client_consensus_proposer::ProposerInterface;
 use cumulus_primitives_core::{
@@ -30,6 +32,7 @@ use polkadot_primitives::{CollatorPair, Id as ParaId};
 use cumulus_primitives_core::PersistedValidationData;
 use futures::lock::Mutex;
 use futures::prelude::*;
+use futures::{channel::mpsc::Receiver, prelude::*};
 use magnet_primitives_order::OrderRecord;
 use sc_client_api::{backend::AuxStore, BlockBackend, BlockOf};
 use sc_consensus::BlockImport;
@@ -43,7 +46,6 @@ use sp_inherents::CreateInherentDataProviders;
 use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Header as HeaderT, Member};
 use std::{convert::TryFrom, sync::Arc, time::Duration};
-
 /// Parameters for [`run`].
 pub struct Params<BI, CIDP, Client, RClient, SO, Proposer, CS> {
 	/// Inherent data providers. Only non-consensus inherent data should be provided, i.e.
@@ -76,6 +78,10 @@ pub struct Params<BI, CIDP, Client, RClient, SO, Proposer, CS> {
 	pub collator_service: CS,
 	/// The amount of time to spend authoring each block.
 	pub authoring_duration: Duration,
+	/// Receiver for collation requests. If `None`, Aura consensus will establish a new receiver.
+	/// Should be used when a chain migrates from a different consensus algorithm and was already
+	/// processing collation requests before initializing Aura.
+	pub collation_request_receiver: Option<Receiver<CollationRequest>>,
 }
 
 /// Run bare Aura consensus as a relay-chain-driven collator.
@@ -110,12 +116,17 @@ where
 	P::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
 	async move {
-		let mut collation_requests = cumulus_client_collator::relay_chain_driven::init(
-			params.collator_key,
-			params.para_id,
-			params.overseer_handle,
-		)
-		.await;
+		let mut collation_requests = match params.collation_request_receiver {
+			Some(receiver) => receiver,
+			None => {
+				cumulus_client_collator::relay_chain_driven::init(
+					params.collator_key,
+					params.para_id,
+					params.overseer_handle,
+				)
+				.await
+			},
+		};
 
 		let mut collator = {
 			let params = crate::collator::Params {
@@ -191,7 +202,7 @@ where
 					)
 					.await
 			);
-			let (collation, _, post_hash) = try_request!(
+			let maybe_collation = try_request!(
 				collator
 					.collate(
 						&parent_header,
@@ -208,8 +219,14 @@ where
 					.await
 			);
 
-			let result_sender = Some(collator.collator_service().announce_with_barrier(post_hash));
-			request.complete(Some(CollationResult { collation, result_sender }));
+			if let Some((collation, _, post_hash)) = maybe_collation {
+				let result_sender =
+					Some(collator.collator_service().announce_with_barrier(post_hash));
+				request.complete(Some(CollationResult { collation, result_sender }));
+			} else {
+				request.complete(None);
+				tracing::debug!(target: crate::LOG_TARGET, "No block proposal");
+			}
 		}
 	}
 }
