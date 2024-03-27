@@ -35,8 +35,8 @@ use primitives::{Id as ParaId, PersistedValidationData};
 use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
+use sp_core::crypto::ByteArray;
 use weights::WeightInfo;
-
 #[cfg(test)]
 mod mock;
 
@@ -303,11 +303,7 @@ impl<T: Config> Pallet<T> {
 				SYSTEM_EVENTS,
 				None,
 			)
-			.map_err(|e| match e {
-				Relay_Error::ReadEntry(_) => panic!("Invalid proof provided for system events key"),
-				_ => Error::<T>::FailedReading,
-			})
-			.unwrap();
+			.ok()?;
 		let v_price: Vec<u128> = head_data
 			.iter()
 			.filter_map(|item| {
@@ -342,8 +338,7 @@ impl<T: Config> Pallet<T> {
 						) = event.event
 						{
 							if eprice == *item {
-								orderer = match T::AuthorityId::try_from(order.clone().0.as_slice())
-								{
+								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
 									Ok(order) => Some((order, eprice)),
 									Err(_) => None,
 								};
