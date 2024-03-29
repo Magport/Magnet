@@ -696,13 +696,22 @@ where
 	T: pallet_order::Config,
 	T::AccountId: From<[u8; 32]>,
 {
-	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
-		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number)?;
-		let order = <pallet_order::Pallet<T>>::order_map(sequece_number)?;
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
+		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number);
+		if sequece_number.is_none() {
+			return Ok(None);
+		}
+		let order = <pallet_order::Pallet<T>>::order_map(
+			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
+		)
+		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
 		let mut r = [0u8; 32];
 		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r).ok()?;
-		Some((account, order.price))
+		let account = T::AccountId::try_from(r)
+			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
+		Ok(Some((account, order.price)))
 	}
 }
 
