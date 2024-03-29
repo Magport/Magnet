@@ -190,9 +190,11 @@ where
 	T: pallet_order::Config,
 	T::AccountId: From<[u8; 32]>,
 {
-	fn gas_cost(_block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
+	fn gas_cost(
+		_block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
 		let account = T::AccountId::try_from(COLLATOR_BYTES).unwrap();
-		Some((account, 10000000 as u128))
+		Ok(Some((account, 10000000 as u128)))
 	}
 }
 
