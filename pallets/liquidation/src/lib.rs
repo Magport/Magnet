@@ -7,24 +7,34 @@ mod mock;
 mod tests;
 
 use frame_support::{
+	dispatch::DispatchResult,
 	storage::types::StorageMap,
 	traits::{Currency, ExistenceRequirement, Get},
 	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
-use frame_system::pallet_prelude::BlockNumberFor;
+use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
 use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
 	traits::{StaticLookup, Zero},
 	AccountId32, Perbill, Saturating,
 };
-use sp_std::{prelude::*, vec};
+use sp_std::{prelude::*, sync::Arc, vec};
+
+use xcm::{
+	opaque::v4::Junctions::X1,
+	prelude::*,
+	v4::{Asset, AssetId, Junction, Location, NetworkId},
+	VersionedAssets, VersionedLocation,
+};
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 pub type Balance = u128;
+
+pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_0000_0000;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -54,6 +64,13 @@ pub mod pallet {
 		type Currency: frame_support::traits::Currency<Self::AccountId>
 			+ frame_support::traits::ReservableCurrency<Self::AccountId>;
 
+		/// The XCM sender
+		type XcmSender: SendXcm;
+
+		//Treasury account on the Relay Chain
+		//#[pallet::constant]
+		//type RelayChainTreasuryAccountId: Get<AccountId32>;
+
 		///Handles converting weight to fee value
 		type WeightToFee: WeightToFeePolynomial<Balance = Balance>;
 
@@ -75,6 +92,10 @@ pub mod pallet {
 		/// ED necessitate the account to exist
 		#[pallet::constant]
 		type ExistentialDeposit: Get<Balance>;
+
+		///minimum liquidation threshold
+		#[pallet::constant]
+		type MinLiquidationThreshold: Get<Balance>;
 
 		/// system accountId
 		#[pallet::constant]
@@ -154,14 +175,18 @@ pub mod pallet {
 
 		///failed to process liquidation
 		ProcessLiquidationError,
+
+		///xcm error
+		XcmError,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
 	where
-		T::AccountId: From<AccountId32>,
+		T::AccountId: From<AccountId32> + Into<AccountId32>,
 		<T as pallet_utility::Config>::RuntimeCall: From<pallet_balances::Call<T>>,
 		<T as pallet_balances::Config>::Balance: From<BalanceOf<T>>,
+		T: pallet_xcm::Config,
 	{
 		fn on_finalize(n: BlockNumberFor<T>) {
 			let base_account = <T::AccountId>::from(BASE_ACCOUNT);
@@ -226,7 +251,15 @@ pub mod pallet {
 				*income = income.saturating_add(current_block_fee_u128)
 			});
 
-			if count % T::ProfitDistributionCycle::get() == Zero::zero() {
+			let min_liquidation_threshold: Balance =
+				<T as pallet::Config>::MinLiquidationThreshold::get()
+					.try_into()
+					.unwrap_or_else(|_| 0);
+			let profit = TotalIncome::<T>::get().saturating_sub(TotalCost::<T>::get());
+
+			if profit >= min_liquidation_threshold
+				&& count % T::ProfitDistributionCycle::get() == Zero::zero()
+			{
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
 				match Self::distribute_profit() {
 					Ok(_) => {
@@ -252,9 +285,11 @@ pub mod pallet {
 
 	impl<T: Config> Pallet<T>
 	where
-		T::AccountId: From<AccountId32>,
+		T::AccountId: From<AccountId32> + Into<AccountId32>,
 		<T as pallet_utility::Config>::RuntimeCall: From<pallet_balances::Call<T>>,
 		<T as pallet_balances::Config>::Balance: From<BalanceOf<T>>,
+		T::XcmSender: SendXcm,
+		T: pallet_xcm::Config,
 	{
 		fn execute_batch_transfers(
 			transfers: Vec<(T::AccountId, BalanceOf<T>)>,
@@ -284,7 +319,7 @@ pub mod pallet {
 				calls.push(utility_call);
 			}
 
-			pallet_utility::Pallet::<T>::batch(
+			pallet_utility::Pallet::<T>::batch_all(
 				frame_system::RawOrigin::Signed(system_account).into(),
 				calls,
 			)
@@ -351,17 +386,27 @@ pub mod pallet {
 			let treasury_ratio = T::TreasuryRatio::get();
 			let operation_ratio = T::OperationRatio::get();
 
-			let treasury_amount = treasury_ratio * total_profit;
+			let treasury_amount = treasury_ratio * total_profit / PARACHAIN_TO_RELAYCHAIN_UNIT;
 			let operation_amount = operation_ratio * total_profit;
 			let system_amount = system_ratio * total_profit;
 			let total_collators_profit =
 				total_profit.saturating_sub(treasury_amount + operation_amount + system_amount);
 
-			let mut transfers = Vec::new();
+			let origin: OriginFor<T> =
+				frame_system::RawOrigin::Signed(treasury_account.clone()).into();
 
+			let _send_treasury_profit = Self::send_assets_to_relaychain_treasury(
+				origin,
+				treasury_account.into(),
+				treasury_amount,
+			)?;
+
+			let mut transfers = Vec::new();
+			/*
 			let treasury_account_profit =
 				treasury_amount.try_into().unwrap_or_else(|_| Zero::zero());
 			transfers.push((treasury_account, treasury_account_profit));
+			*/
 
 			let operation_account_profit =
 				operation_amount.try_into().unwrap_or_else(|_| Zero::zero());
@@ -391,6 +436,46 @@ pub mod pallet {
 				transfers.push((collator.clone(), collator_addr_cost));
 			}
 			Self::execute_batch_transfers(transfers)
+		}
+
+		fn send_assets_to_relaychain_treasury(
+			origin: OriginFor<T>,
+			recipient: AccountId32,
+			amount: u128,
+		) -> DispatchResult {
+			let recipient_account_id = recipient.into();
+
+			let junction = Junction::AccountId32 {
+				id: recipient_account_id,
+				network: Some(NetworkId::Rococo),
+			};
+			let arc_junctions = Arc::new([junction]);
+
+			let beneficiary = Location::new(0, X1(arc_junctions));
+
+			let asset =
+				Asset { id: AssetId(Location::new(1, Here)), fun: Fungibility::Fungible(amount) };
+
+			let assets = Assets::from(vec![asset]);
+			let versioned_assets = VersionedAssets::from(assets);
+
+			match pallet_xcm::Pallet::<T>::reserve_transfer_assets(
+				origin,
+				Box::new(VersionedLocation::from(Location::parent())),
+				Box::new(VersionedLocation::from(beneficiary)),
+				Box::new(versioned_assets),
+				0,
+			) {
+				Ok(_) => {
+					frame_support::runtime_print!("reserve_transfer_assets executed successfully.");
+				},
+				Err(e) => {
+					log::error!("Error occurred while executing reserve_transfer_assets: {:?}", e);
+					Self::deposit_event(Event::Error(Error::<T>::XcmError.into()));
+					return Err(Error::<T>::XcmError.into());
+				},
+			}
+			Ok(())
 		}
 	}
 }
