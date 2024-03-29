@@ -193,8 +193,11 @@ pub mod pallet {
 			let base_account_balance = <T as pallet::Config>::Currency::free_balance(&base_account);
 
 			let (collator, real_gas_cost) = match T::OrderGasCost::gas_cost(n) {
-				Some((collator, real_gas_cost)) => (collator, real_gas_cost),
-				None => {
+				Ok(cost) => match cost {
+					Some((collator, real_gas_cost)) => (collator, real_gas_cost),
+					None => return,
+				},
+				Err(_) => {
 					Self::deposit_event(Event::Error(Error::<T>::FailedToFetchRealGasCost.into()));
 					return;
 				},
