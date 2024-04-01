@@ -7616,6 +7616,7 @@ dependencies = [
 name = "pallet-liquidation"
 version = "0.1.0"
 dependencies = [
+ "cumulus-pallet-xcmp-queue",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
@@ -7627,6 +7628,7 @@ dependencies = [
  "pallet-pot",
  "pallet-transaction-payment",
  "pallet-utility",
+ "pallet-xcm",
  "parity-scale-codec",
  "scale-info",
  "smallvec",
@@ -7635,6 +7637,9 @@ dependencies = [
  "sp-io 30.0.0",
  "sp-runtime 31.0.1",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "staging-xcm",
+ "staging-xcm-builder",
+ "staging-xcm-executor",
 ]
 
 [[package]]

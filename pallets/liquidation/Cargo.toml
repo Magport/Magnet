@@ -35,6 +35,11 @@ frame-support = { workspace = true, default-features = false }
 frame-system = { workspace = true, default-features = false }
 frame-benchmarking = { workspace = true, default-features = false, optional = true}
 pallet-utility = { workspace = true, default-features = false}
+xcm = { workspace = true, default-features = false}
+xcm-builder = { workspace = true, default-features = false}
+cumulus-pallet-xcmp-queue = { workspace = true, default-features = false}
+xcm-executor = { workspace = true, default-features = false}
+pallet-xcm = {workspace = true, default-features = false}
 
 [features]
 default = ['std']
@@ -58,6 +63,11 @@ std = [
     "mp-system/std",
     "pallet-utility/std",
     "frame-benchmarking/std",
+    "pallet-xcm/std",
+    "xcm/std",
+    "xcm-builder/std",
+    "cumulus-pallet-xcmp-queue/std",
+    "xcm-executor/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",
