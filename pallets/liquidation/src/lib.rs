@@ -34,7 +34,7 @@ type BalanceOf<T> =
 
 pub type Balance = u128;
 
-pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_0000_0000;
+pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_000_000;
 
 #[frame_support::pallet]
 pub mod pallet {
