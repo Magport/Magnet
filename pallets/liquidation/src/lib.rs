@@ -20,11 +20,13 @@ use sp_runtime::{
 	traits::{StaticLookup, Zero},
 	AccountId32, Perbill, Saturating,
 };
-use sp_std::{prelude::*, vec};
+use sp_std::{prelude::*, sync::Arc, vec};
 
 use xcm::{
+	opaque::v4::Junctions::X1,
 	prelude::*,
-	v3::{Junction, MultiAsset, MultiLocation, NetworkId},
+	v4::{Asset, AssetId, Junction, Location, NetworkId},
+	VersionedAssets, VersionedLocation,
 };
 
 type BalanceOf<T> =
@@ -32,7 +34,7 @@ type BalanceOf<T> =
 
 pub type Balance = u128;
 
-pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_0000_0000;
+pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_000_000;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -191,8 +193,11 @@ pub mod pallet {
 			let base_account_balance = <T as pallet::Config>::Currency::free_balance(&base_account);
 
 			let (collator, real_gas_cost) = match T::OrderGasCost::gas_cost(n) {
-				Some((collator, real_gas_cost)) => (collator, real_gas_cost),
-				None => {
+				Ok(cost) => match cost {
+					Some((collator, real_gas_cost)) => (collator, real_gas_cost),
+					None => return,
+				},
+				Err(_) => {
 					Self::deposit_event(Event::Error(Error::<T>::FailedToFetchRealGasCost.into()));
 					return;
 				},
@@ -308,7 +313,7 @@ pub mod pallet {
 					continue;
 				}
 
-				let transfer_call = pallet_balances::Call::<T>::transfer {
+				let transfer_call = pallet_balances::Call::<T>::transfer_allow_death {
 					dest: T::Lookup::unlookup(recipient),
 					value: amount.into(),
 				};
@@ -404,7 +409,7 @@ pub mod pallet {
 			let treasury_account_profit =
 				treasury_amount.try_into().unwrap_or_else(|_| Zero::zero());
 			transfers.push((treasury_account, treasury_account_profit));
-			 */
+			*/
 
 			let operation_account_profit =
 				operation_amount.try_into().unwrap_or_else(|_| Zero::zero());
@@ -443,26 +448,24 @@ pub mod pallet {
 		) -> DispatchResult {
 			let recipient_account_id = recipient.into();
 
-			let beneficiary = MultiLocation::new(
-				0,
-				X1(Junction::AccountId32 {
-					id: recipient_account_id,
-					network: Some(NetworkId::Rococo), //TODO: Any other networks
-				}),
-			);
-
-			let asset = MultiAsset {
-				id: Concrete(MultiLocation::new(1, Here)),
-				fun: Fungibility::Fungible(amount),
+			let junction = Junction::AccountId32 {
+				id: recipient_account_id,
+				network: Some(NetworkId::Rococo),
 			};
+			let arc_junctions = Arc::new([junction]);
 
-			let assets = MultiAssets::from(vec![asset]);
-			let versioned_assets = VersionedMultiAssets::from(assets);
+			let beneficiary = Location::new(0, X1(arc_junctions));
+
+			let asset =
+				Asset { id: AssetId(Location::new(1, Here)), fun: Fungibility::Fungible(amount) };
+
+			let assets = Assets::from(vec![asset]);
+			let versioned_assets = VersionedAssets::from(assets);
 
 			match pallet_xcm::Pallet::<T>::reserve_transfer_assets(
 				origin,
-				Box::new(VersionedMultiLocation::from(MultiLocation::parent())),
-				Box::new(VersionedMultiLocation::from(beneficiary)),
+				Box::new(VersionedLocation::from(Location::parent())),
+				Box::new(VersionedLocation::from(beneficiary)),
 				Box::new(versioned_assets),
 				0,
 			) {

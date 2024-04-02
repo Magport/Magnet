@@ -17,6 +17,7 @@
 use super::*;
 
 use frame_support::{
+	derive_impl,
 	dispatch::DispatchClass,
 	parameter_types,
 	traits::{ConstU32, ConstU64, Get},
@@ -64,6 +65,7 @@ impl Get<frame_system::limits::BlockWeights> for BlockWeights {
 
 pub type AccountId = AccountId32;
 
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = BlockWeights;
@@ -103,7 +105,7 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = ();
-	type MaxHolds = ();
+	type RuntimeFreezeReason = ();
 }
 
 parameter_types! {

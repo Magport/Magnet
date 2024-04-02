@@ -110,6 +110,7 @@ pub async fn build_rpc_for_submit_order(
 	slot_block: u32,
 	height: RelayBlockNumber,
 	relay_chain: impl RelayChainInterface + Clone,
+	number: u32,
 ) -> Result<(), SubmitOrderError> {
 	let client = OnlineClient::<PolkadotConfig>::from_url(url)
 		.await
@@ -122,36 +123,10 @@ pub async fn build_rpc_for_submit_order(
 
 	let signer_keystore = SignerKeystore::<PolkadotConfig>::new(keystore.clone());
 
-	// not init
-	let mut relay_hash = hash;
-	let mut for_n_blocks = slot_block;
-	if hash == H256::from([0; 32]) {
-		let chunk = u32::MAX - (slot_block - 1);
-		let r_relay_head = relay_chain
-			.header(BlockId::Number(height))
-			.await
-			.map_err(|_e| SubmitOrderError::GetHeadError)?;
-		if let Some(relay_head) = r_relay_head {
-			relay_hash = relay_head.hash();
-			let nex_relay_height = height + slot_block;
-			let nex_relay_height_align = nex_relay_height & chunk;
-			let height_chunk = nex_relay_height_align - height;
-			for_n_blocks = height_chunk;
-		} else {
-			return Err(SubmitOrderError::GetHeadError);
-		}
-	}
-	let latest_block = client
-		.blocks()
-		.at(relay_hash)
-		.await
-		.map_err(|_e| SubmitOrderError::GetBlockError)?;
+	// let tx_params = Params::new().mortal_unchecked(number.into(), hash , slot_block.into()).build();
 
-	let tx_params = Params::new().mortal(latest_block.header(), for_n_blocks.into()).build();
-
-	let submit_result =
-		client.tx().sign_and_submit(&place_order, &signer_keystore, tx_params).await;
-	log::info!("submit_result:{:?},{:?},{:?}", submit_result, height, relay_hash);
+	let submit_result = client.tx().sign_and_submit_default(&place_order, &signer_keystore).await;
+	log::info!("submit_result:{:?},{:?},{:?}", submit_result, height, hash);
 	submit_result.map_err(|_e| SubmitOrderError::RPCCallException)?;
 
 	Ok(())

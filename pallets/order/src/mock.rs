@@ -17,7 +17,7 @@
 use crate::{self as order_pallet, OrderGasCost};
 use codec::Encode;
 pub use frame_support::{
-	construct_runtime, parameter_types,
+	construct_runtime, derive_impl, parameter_types,
 	traits::{Everything, Hooks},
 };
 use frame_system as system;
@@ -49,6 +49,7 @@ parameter_types! {
 	pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
 	type BaseCallFilter = Everything;
 	type BlockWeights = ();
@@ -90,7 +91,7 @@ impl pallet_balances::Config for Test {
 	type FreezeIdentifier = ();
 	type MaxFreezes = ();
 	type RuntimeHoldReason = ();
-	type MaxHolds = ();
+	type RuntimeFreezeReason = ();
 }
 parameter_types! {
 	pub const SlotWidth: u32 = 2;
@@ -114,13 +115,22 @@ where
 	T: crate::Config,
 	T::AccountId: From<[u8; 32]>,
 {
-	fn gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
-		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number)?;
-		let order = <crate::Pallet<T>>::order_map(sequece_number)?;
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
+		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number);
+		if sequece_number.is_none() {
+			return Ok(None);
+		}
+		let order = <crate::Pallet<T>>::order_map(
+			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
+		)
+		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
 		let mut r = [0u8; 32];
 		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r).ok()?;
-		Some((account, order.price))
+		let account = T::AccountId::try_from(r)
+			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
+		Ok(Some((account, order.price)))
 	}
 }
 
@@ -141,7 +151,7 @@ pub mod mock_pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub fn get_gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
-			T::OrderGasCost::gas_cost(block_number)
+			T::OrderGasCost::gas_cost(block_number).unwrap()
 		}
 	}
 }

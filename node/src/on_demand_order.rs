@@ -14,9 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{submit_order::build_rpc_for_submit_order, submit_order::SubmitOrderError};
+use crate::{
+	metadata::api::runtime_types::pallet_broker::coretime_interface::CoreAssignment,
+	submit_order::{build_rpc_for_submit_order, SubmitOrderError},
+};
 use codec::{Codec, Decode};
-use cumulus_primitives_core::relay_chain::vstaging::Assignment;
+
+use crate::metadata::api::runtime_types::polkadot_runtime_parachains::assigner_coretime::CoreDescriptor;
 use cumulus_primitives_core::{
 	relay_chain::BlockNumber as RelayBlockNumber, ParaId, PersistedValidationData,
 };
@@ -24,7 +28,7 @@ use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
 use magnet_primitives_order::{
 	self,
-	well_known_keys::paras_para_lifecycles,
+	well_known_keys::{paras_core_descriptors, paras_para_lifecycles},
 	well_known_keys::{ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_EVENTS},
 	OrderRecord, OrderRuntimeApi, OrderStatus,
 };
@@ -51,6 +55,11 @@ use sp_runtime::{
 };
 use std::cmp::Ordering;
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
+
+#[derive(Encode, Decode, Debug, PartialEq, Clone)]
+struct EnqueuedOrder {
+	pub para_id: ParaId,
+}
 
 #[derive(Clone, PartialEq)]
 pub enum OrderType {
@@ -90,6 +99,7 @@ where
 async fn start_on_demand(
 	relay_chain: impl RelayChainInterface + Clone,
 	hash: H256,
+	para_id: ParaId,
 ) -> Option<bool> {
 	let active_config_storage = relay_chain.get_storage_by_key(hash, ACTIVE_CONFIG).await.ok()?;
 	let p_active_config = active_config_storage
@@ -97,7 +107,30 @@ async fn start_on_demand(
 		.transpose()
 		.ok()?;
 	if p_active_config.is_some() {
-		let result = p_active_config.unwrap().on_demand_cores > 0;
+		let mut result = false;
+		let cores = p_active_config.unwrap().coretime_cores;
+		for core in 0..cores {
+			let key = paras_core_descriptors(polkadot_primitives::CoreIndex(core));
+			let core_descriptors_storage =
+				relay_chain.get_storage_by_key(hash, key.as_slice()).await.ok()?;
+			let p_core_descriptors = core_descriptors_storage
+				.map(|raw| <CoreDescriptor<u32>>::decode(&mut &raw[..]))
+				.transpose()
+				.ok()?;
+			if p_core_descriptors.is_some() {
+				let p_current_work = p_core_descriptors?.current_work;
+				if p_current_work.is_some() {
+					let current_work = p_current_work?;
+					for (assign, _) in current_work.assignments {
+						if assign == CoreAssignment::Task(para_id.into()) {
+							return Some(false);
+						} else if assign == CoreAssignment::Pool {
+							result = true
+						}
+					}
+				}
+			}
+		}
 		Some(result)
 	} else {
 		None
@@ -113,6 +146,7 @@ async fn try_place_order<Balance>(
 	slot_block: u32,
 	height: RelayBlockNumber,
 	relay_chain: impl RelayChainInterface + Clone,
+	number: u32,
 ) -> Result<(), SubmitOrderError>
 where
 	Balance: Codec + MaybeDisplay + 'static + Debug + Into<u128>,
@@ -128,6 +162,7 @@ where
 		slot_block,
 		height,
 		relay_chain,
+		number,
 	)
 	.await
 }
@@ -274,9 +309,7 @@ where
 		),
 		None => false,
 	};
-	let p_start = start_on_demand(relay_chain.clone(), p_hash).await;
-	let start = if let Some(flag) = p_start { flag } else { false };
-	if !is_parathread || !start {
+	if !is_parathread {
 		//parachain mode
 		let mut order_record_local = order_record.lock().await;
 		order_record_local.validation_data = None;
@@ -285,6 +318,13 @@ where
 		return Ok(());
 	} else {
 		//parathread
+		let p_on_demand = start_on_demand(relay_chain.clone(), p_hash, para_id).await;
+		if p_on_demand.is_some() {
+			let on_demand = p_on_demand.unwrap();
+			if !on_demand {
+				return Ok(());
+			}
+		}
 		let order_record_local = order_record.lock().await;
 		if order_record_local.relay_height == height {
 			return Ok(());
@@ -359,7 +399,7 @@ where
 						let on_demand_queue_storage =
 							relay_chain.get_storage_by_key(p_hash, ON_DEMAND_QUEUE).await?;
 						let on_demand_queue = on_demand_queue_storage
-							.map(|raw| <Vec<Assignment>>::decode(&mut &raw[..]))
+							.map(|raw| <Vec<EnqueuedOrder>>::decode(&mut &raw[..]))
 							.transpose()?;
 						if let Some(vvs) = on_demand_queue.clone() {
 							for vv in vvs.into_iter() {
@@ -417,6 +457,7 @@ where
 								slot_block,
 								height,
 								relay_chain.clone(),
+								order_record_local.relay_base_height,
 							)
 							.await;
 							log::info!("===========place order completed==============",);
