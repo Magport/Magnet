@@ -1,6 +1,6 @@
 [package]
 name = "parachain-magnet-runtime"
-version = "0.5.6"
+version = "0.6.0"
 authors = ["Magnet"]
 description = "A scalable evm smart contract platform runtime, utilizing DOT as the gas fee."
 license = "Apache License 2.0"

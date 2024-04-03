@@ -307,6 +307,8 @@ impl<
 		}
 		let required = (AssetId(AssetIdValue::get()), u128_amount).into();
 		let unused = payment.checked_sub(required).map_err(|_| XcmError::TooExpensive)?;
+
+		let amount: Currency::Balance = u128_amount.saturated_into();
 		self.0 = self.0.saturating_add(weight);
 		self.1 = self.1.saturating_add(amount);
 		Ok(unused)
