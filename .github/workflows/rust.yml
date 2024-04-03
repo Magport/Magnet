@@ -2,9 +2,11 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
+    branches: 
+      - '**'
   pull_request:
-    branches: [ "main" ]
+    branches: 
+      - '**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,6 +17,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Free up space on runner
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
     - name: Rust Setup
       uses: actions-rs/toolchain@v1
@@ -44,6 +53,10 @@ jobs:
       with:
         cache-on-failure: true
         cache-all-crates: true
+
+    - name: Add rust-src
+      run: |
+        rustup component add rust-src
             
     - name: Build
       run: cargo check --release

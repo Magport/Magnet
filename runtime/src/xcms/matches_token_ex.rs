@@ -17,94 +17,24 @@
 //! Various implementations for the `MatchesFungible` trait.
 
 // Modified by Alex Wang for extending xcm transmit currency and token
-// with different precision.
+// with different precision, 2024/03
 
 use frame_support::traits::Get;
 use sp_std::{collections::btree_map::BTreeMap, marker::PhantomData};
 use xcm::latest::{
-	AssetId::{Abstract, Concrete},
-	AssetInstance,
+	Asset, AssetId, AssetInstance,
 	Fungibility::{Fungible, NonFungible},
-	MultiAsset, MultiLocation,
+	Location,
 };
 use xcm_executor::traits::{MatchesFungible, MatchesNonFungible};
 
-/// Converts a `MultiAsset` into balance `B` if it is a concrete fungible with an id equal to that
-/// given by `T`'s `Get`.
-///
-/// # Example
-///
-/// ```
-/// use xcm::latest::{MultiLocation, Parent};
-/// use xcm_builder::IsConcrete;
-/// use xcm_executor::traits::MatchesFungible;
-///
-/// frame_support::parameter_types! {
-/// 	pub TargetLocation: MultiLocation = Parent.into();
-/// }
-///
-/// # fn main() {
-/// let asset = (Parent, 999).into();
-/// // match `asset` if it is a concrete asset in `TargetLocation`.
-/// assert_eq!(<IsConcrete<TargetLocation> as MatchesFungible<u128>>::matches_fungible(&asset), Some(999));
-/// # }
-/// ```
 pub struct IsConcreteEx<T, M>(PhantomData<T>, PhantomData<M>);
-impl<T: Get<MultiLocation>, M: Get<BTreeMap<MultiLocation, u64>>, B: TryFrom<u128>>
-	MatchesFungible<B> for IsConcreteEx<T, M>
-{
-	fn matches_fungible(a: &MultiAsset) -> Option<B> {
-		match (&a.id, &a.fun) {
-			(Concrete(ref id), Fungible(ref amount)) if id == &T::get() => {
-				let precision_multiplier = if let Some(v) = M::get().get(id) { *v } else { 1u64 };
-				(*amount * u128::from(precision_multiplier)).try_into().ok()
-			},
-			_ => None,
-		}
-	}
-}
-impl<T: Get<MultiLocation>, I: TryFrom<AssetInstance>, M> MatchesNonFungible<I>
+impl<T: Get<Location>, M: Get<BTreeMap<Location, u64>>, B: TryFrom<u128>> MatchesFungible<B>
 	for IsConcreteEx<T, M>
 {
-	fn matches_nonfungible(a: &MultiAsset) -> Option<I> {
+	fn matches_fungible(a: &Asset) -> Option<B> {
 		match (&a.id, &a.fun) {
-			(Concrete(id), NonFungible(instance)) if id == &T::get() => (*instance).try_into().ok(),
-			_ => None,
-		}
-	}
-}
-
-/// Same as [`IsConcrete`] but for a fungible with abstract location.
-///
-/// # Example
-///
-/// ```
-/// use xcm::latest::prelude::*;
-/// use xcm_builder::IsAbstract;
-/// use xcm_executor::traits::{MatchesFungible, MatchesNonFungible};
-///
-/// frame_support::parameter_types! {
-/// 	pub TargetLocation: [u8; 32] = [7u8; 32];
-/// }
-///
-/// # fn main() {
-/// let asset = ([7u8; 32], 999u128).into();
-/// // match `asset` if it is an abstract asset in `TargetLocation`.
-/// assert_eq!(<IsAbstract<TargetLocation> as MatchesFungible<u128>>::matches_fungible(&asset), Some(999));
-/// let nft = ([7u8; 32], [42u8; 4]).into();
-/// assert_eq!(
-///     <IsAbstract<TargetLocation> as MatchesNonFungible<[u8; 4]>>::matches_nonfungible(&nft),
-///     Some([42u8; 4])
-/// );
-/// # }
-/// ```
-pub struct IsAbstractEx<T, M>(PhantomData<T>, PhantomData<M>);
-impl<T: Get<[u8; 32]>, M: Get<BTreeMap<[u8; 32], u64>>, B: TryFrom<u128>> MatchesFungible<B>
-	for IsAbstractEx<T, M>
-{
-	fn matches_fungible(a: &MultiAsset) -> Option<B> {
-		match (&a.id, &a.fun) {
-			(Abstract(ref id), Fungible(ref amount)) if id == &T::get() => {
+			(AssetId(ref id), Fungible(ref amount)) if id == &T::get() => {
 				let precision_multiplier = if let Some(v) = M::get().get(id) { *v } else { 1u64 };
 				(*amount * u128::from(precision_multiplier)).try_into().ok()
 			},
@@ -112,10 +42,10 @@ impl<T: Get<[u8; 32]>, M: Get<BTreeMap<[u8; 32], u64>>, B: TryFrom<u128>> Matche
 		}
 	}
 }
-impl<T: Get<[u8; 32]>, B: TryFrom<AssetInstance>, M> MatchesNonFungible<B> for IsAbstractEx<T, M> {
-	fn matches_nonfungible(a: &MultiAsset) -> Option<B> {
+impl<T: Get<Location>, I: TryFrom<AssetInstance>, M> MatchesNonFungible<I> for IsConcreteEx<T, M> {
+	fn matches_nonfungible(a: &Asset) -> Option<I> {
 		match (&a.id, &a.fun) {
-			(Abstract(id), NonFungible(instance)) if id == &T::get() => (*instance).try_into().ok(),
+			(AssetId(id), NonFungible(instance)) if id == &T::get() => (*instance).try_into().ok(),
 			_ => None,
 		}
 	}

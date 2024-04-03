@@ -23,7 +23,7 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use pallet_order::OrderGasCost;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_std::{cell::RefCell, collections::btree_map::BTreeMap};
-use xcm::latest::{MultiAssets, MultiLocation, SendError, SendResult, SendXcm, Xcm, XcmHash};
+use xcm::latest::{Assets, Location, SendError, SendResult, SendXcm, Xcm, XcmHash};
 use xcm::prelude::*;
 use xcm_builder::{
 	AccountId32Aliases, AllowKnownQueryResponses, AllowSubscriptionsFrom,
@@ -104,6 +104,7 @@ impl system::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;
 	type RuntimeOrigin = RuntimeOrigin;
+	type RuntimeTask = ();
 }
 
 parameter_types! {
@@ -122,8 +123,8 @@ impl pallet_balances::Config for Test {
 	type ReserveIdentifier = [u8; 8];
 	type RuntimeHoldReason = ();
 	type FreezeIdentifier = ();
-	type MaxHolds = ();
 	type MaxFreezes = ();
+	type RuntimeFreezeReason = ();
 }
 
 impl pallet_utility::Config for Test {
@@ -169,7 +170,7 @@ impl pallet_pot::Config for Test {
 }
 
 thread_local! {
-	pub static SENT_XCM: RefCell<Vec<(MultiLocation, Xcm<()>)>> = RefCell::new(Vec::new());
+	pub static SENT_XCM: RefCell<Vec<(Location, Xcm<()>)>> = RefCell::new(Vec::new());
 }
 
 pub(crate) fn fake_message_hash<T>(message: &Xcm<T>) -> XcmHash {
@@ -178,15 +179,15 @@ pub(crate) fn fake_message_hash<T>(message: &Xcm<T>) -> XcmHash {
 
 pub struct TestSendXcm;
 impl SendXcm for TestSendXcm {
-	type Ticket = (MultiLocation, Xcm<()>);
+	type Ticket = (Location, Xcm<()>);
 	fn validate(
-		dest: &mut Option<MultiLocation>,
+		dest: &mut Option<Location>,
 		msg: &mut Option<Xcm<()>>,
-	) -> SendResult<(MultiLocation, Xcm<()>)> {
+	) -> SendResult<(Location, Xcm<()>)> {
 		let pair = (dest.take().unwrap(), msg.take().unwrap());
-		Ok((pair, MultiAssets::new()))
+		Ok((pair, Assets::new()))
 	}
-	fn deliver(pair: (MultiLocation, Xcm<()>)) -> Result<XcmHash, SendError> {
+	fn deliver(pair: (Location, Xcm<()>)) -> Result<XcmHash, SendError> {
 		let hash = fake_message_hash(&pair.1);
 		SENT_XCM.with(|q| q.borrow_mut().push(pair));
 		Ok(hash)
@@ -198,10 +199,10 @@ parameter_types! {
 	pub const MaxInstructions: u32 = 100;
 	pub const MaxAssetsIntoHolding: u32 = 64;
 	pub XcmFeesTargetAccount: AccountId = AccountId::new([167u8; 32]);
-	pub UniversalLocation: InteriorMultiLocation = Here;
+	pub UniversalLocation: InteriorLocation = Here;
 	pub const AnyNetwork: Option<NetworkId> = None;
-	pub const RelayLocation: MultiLocation = Here.into_location();
-	pub CurrencyPerSecondPerByte: (AssetId, u128, u128) = (Concrete(RelayLocation::get()), 1, 1);
+	pub const RelayLocation: Location = Here.into_location();
+	pub CurrencyPerSecondPerByte: (AssetId, u128, u128) = (AssetId(RelayLocation::get()), 1, 1);
 }
 
 pub struct XcmConfig;
@@ -241,6 +242,7 @@ impl xcm_executor::Config for XcmConfig {
 	type CallDispatcher = RuntimeCall;
 	type SafeCallFilter = Everything;
 	type Aliasers = Nothing;
+	type TransactionalProcessor = ();
 }
 
 pub type LocalOriginToLocation = SignedToAccountId32<RuntimeOrigin, AccountId, AnyNetwork>;
@@ -251,7 +253,6 @@ impl pallet_xcm::Config for Test {
 	type XcmRouter = XcmRouter;
 	type ExecuteXcmOrigin = xcm_builder::EnsureXcmOrigin<RuntimeOrigin, LocalOriginToLocation>;
 	type XcmExecuteFilter = Everything;
-	type XcmExecutorConfig = XcmConfig;
 	type XcmExecutor = XcmExecutor<XcmConfig>;
 	type XcmTeleportFilter = ();
 	type XcmReserveTransferFilter = Everything;
@@ -312,9 +313,11 @@ where
 	T: pallet_order::Config,
 	T::AccountId: From<[u8; 32]>,
 {
-	fn gas_cost(_block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
+	fn gas_cost(
+		_block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
 		let account = T::AccountId::try_from(COLLATOR_BYTES).unwrap();
-		Some((account, 10000000 as u128))
+		Ok(Some((account, 10000000 as u128)))
 	}
 }
 

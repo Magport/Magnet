@@ -19,7 +19,7 @@
 use jsonrpsee::{
 	core::RpcResult,
 	proc_macros::rpc,
-	types::error::{CallError, ErrorObject},
+	types::{error::ErrorObject, ErrorObjectOwned},
 };
 use std::sync::Arc;
 
@@ -101,6 +101,7 @@ where
 	}
 }
 
-fn map_err(error: impl ToString, desc: &'static str) -> CallError {
-	CallError::Custom(ErrorObject::owned(Error::RuntimeError.into(), desc, Some(error.to_string())))
+fn map_err(error: impl ToString, desc: &'static str) -> ErrorObjectOwned {
+	//CallError::Custom(ErrorObject::owned(Error::RuntimeError.into(), desc, Some(error.to_string())))
+	ErrorObject::owned(Error::RuntimeError.into(), desc, Some(error.to_string()))
 }
