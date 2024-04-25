@@ -21,11 +21,13 @@ members = [
 	"primitives/system",
     "pallets/evm-utils",
 	"pallets/evm/precompile/substrate-utils",
+	"pallets/evm/precompile/transfer-to-magnet",
 	"pallets/pot/runtime-api",
 	"pallets/pot/rpc",
 	"pallets/pot",
 	"pallets/assurance",
     "pallets/liquidation",
+	"pallets/assets-bridge",
 ]
 resolver = "2"
 

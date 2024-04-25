@@ -31,12 +31,12 @@ use sp_runtime::{
 };
 
 use scale_info::prelude::string::String;
-use sp_std::collections::btree_map::BTreeMap;
+use sp_std::collections::{btree_map::BTreeMap, btree_set::BTreeSet};
 use sp_std::{cmp::Ordering, marker::PhantomData, prelude::*};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
-
+q
 // Substrate FRAME
 #[cfg(feature = "with-paritydb-weights")]
 use frame_support::weights::constants::ParityDbWeight as RuntimeDbWeight;
@@ -901,11 +901,18 @@ parameter_types! {
 	// 0x1111111111111111111111111111111111111111
 	pub EvmCaller: H160 = H160::from_slice(&[17u8;20][..]);
 	pub ClaimBond: Balance = 10 * EXISTENTIAL_DEPOSIT;
+	//pub EvmAdmin: H160 = H160([0x05, 0xF9, 0xb8, 0xC7, 0x6E, 0x89, 0x87, 0xB8, 0x15, 0xC9, 0x3C, 0x27, 0xD1, 0x45, 0x20, 0xb6, 0xeD, 0x57, 0x39, 0x02]);
+	pub EvmAdmins: BTreeSet<H160> = {
+		let mut set = BTreeSet::new();
+		set.insert(H160([0x05, 0xF9, 0xb8, 0xC7, 0x6E, 0x89, 0x87, 0xB8, 0x15, 0xC9, 0x3C, 0x27, 0xD1, 0x45, 0x20, 0xb6, 0xeD, 0x57, 0x39, 0x02]));
+		set
+	};
 }
 impl pallet_assets_bridge::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type EvmCaller = EvmCaller;
 	type ClaimBond = ClaimBond;
+	type EvmAdmins = EvmAdmins;
 }
 
 impl pallet_evm_utils::Config for Runtime {
