@@ -26,6 +26,7 @@ mp-system = { path = "../primitives/system", default-features = false }
 pallet-assets-bridge = { path = "../pallets/assets-bridge", default-features = false }
 pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
 pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
+pallet-precompile-transfer-to-magnet = { path = "../pallets/evm/precompile/transfer-to-magnet", default-features = false }
 pallet-order = { path = "../pallets/order", default-features = false }
 magnet-primitives-order = { path = "../primitives/order", default-features = false }
 pallet-pot = { path = "../pallets/pot", default-features = false }
@@ -189,6 +190,7 @@ std = [
 	"pallet-assets-bridge/std",
 	"pallet-evm-utils/std",
 	"pallet-precompile-substrate-utils/std",
+	"pallet-precompile-transfer-to-magnet/std",
 	"magnet-primitives-order/std",
 	"pallet-order/std",
 	"sp-trie/std",
@@ -229,6 +231,7 @@ runtime-benchmarks = [
 	"xcm-executor/runtime-benchmarks",
 	"pallet-evm-utils/runtime-benchmarks",
 	"pallet-precompile-substrate-utils/runtime-benchmarks",
+	"pallet-precompile-transfer-to-magnet/runtime-benchmarks",
 	"pallet-order/runtime-benchmarks",
 	"pallet-collective/runtime-benchmarks",
 	"pallet-society/runtime-benchmarks",
@@ -273,6 +276,7 @@ try-runtime = [
 	"sp-runtime/try-runtime",
 	"pallet-evm-utils/try-runtime",
 	"pallet-precompile-substrate-utils/try-runtime",
+	"pallet-precompile-transfer-to-magnet/try-runtime",
 	"pallet-order/try-runtime",
     "pallet-liquidation/try-runtime",
 	"pallet-assets/try-runtime",

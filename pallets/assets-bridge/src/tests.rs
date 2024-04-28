@@ -17,6 +17,7 @@ use sp_core::{H160, U256};
 
 use ethabi::{Function, Param, ParamType, Token};
 use hex_literal::hex;
+use sp_runtime::TokenError;
 use std::str::FromStr;
 
 use crate::LocalFortitude;
@@ -154,11 +155,12 @@ fn pause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 
 		assert_ok!(AssetsBridge::pause(RuntimeOrigin::signed(ALICE.into()), Some(1)));
@@ -168,6 +170,7 @@ fn pause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -220,11 +223,12 @@ fn pause_after_pause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 
 		// 1. pause(1)
@@ -236,6 +240,7 @@ fn pause_after_pause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -281,6 +286,7 @@ fn unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -295,11 +301,12 @@ fn unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 	})
 }
@@ -367,6 +374,7 @@ fn unpause_after_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -374,27 +382,14 @@ fn unpause_after_unpause_should_work() {
 			Error::<Test>::InEmergency
 		);
 
-		assert_noop!(
-			AssetsBridge::withdraw(RuntimeOrigin::signed(BOB.into()), 1, 1),
-			Error::<Test>::InEmergency
-		);
-
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), Some(2)));
 		expect_event(AssetsBridgeEvent::UnPaused(2));
 
-		assert_noop!(
-			AssetsBridge::withdraw(RuntimeOrigin::signed(BOB.into()), 2, 1),
-			Error::<Test>::EthAddressHasNotMapped
-		);
 		assert_eq!(AssetsBridge::emergencies(), vec![1]);
 
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), None));
 		expect_event(AssetsBridgeEvent::UnPausedAll);
 
-		assert_noop!(
-			AssetsBridge::withdraw(RuntimeOrigin::signed(BOB.into()), 1, 1),
-			Error::<Test>::EthAddressHasNotMapped
-		);
 		assert!(AssetsBridge::emergencies().is_empty());
 	})
 }
@@ -422,22 +417,24 @@ fn more_pause_and_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 
 		assert_noop!(
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				2,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 
 		assert_ok!(AssetsBridge::pause(RuntimeOrigin::signed(ALICE.into()), None));
@@ -449,6 +446,7 @@ fn more_pause_and_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -460,6 +458,7 @@ fn more_pause_and_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				2,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -476,6 +475,7 @@ fn more_pause_and_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
@@ -487,11 +487,12 @@ fn more_pause_and_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				2,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 
 		assert_ok!(AssetsBridge::unpause(RuntimeOrigin::signed(ALICE.into()), None));
@@ -503,11 +504,12 @@ fn more_pause_and_unpause_should_work() {
 			AssetsBridge::deposit(
 				RuntimeOrigin::signed(BOB.into()),
 				1,
+				H160::from_slice(&EVM_ADDR),
 				1,
 				LocalPrecision::Exact,
 				LocalFortitude::Polite
 			),
-			Error::<Test>::EthAddressHasNotMapped
+			TokenError::FundsUnavailable
 		);
 	})
 }

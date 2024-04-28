@@ -9,6 +9,7 @@ use pallet_evm_precompile_modexp::Modexp;
 use pallet_evm_precompile_sha3fips::Sha3FIPS256;
 use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
 use pallet_precompile_substrate_utils::SubstrateUtils;
+use pallet_precompile_transfer_to_magnet::TransferToMagnet;
 
 pub struct FrontierPrecompiles<R>(PhantomData<R>);
 
@@ -19,14 +20,28 @@ where
 	pub fn new() -> Self {
 		Self(Default::default())
 	}
-	pub fn used_addresses() -> [H160; 8] {
-		[hash(1), hash(2), hash(3), hash(4), hash(5), hash(1024), hash(1025), hash(2048)]
+	pub fn used_addresses() -> [H160; 9] {
+		[
+			hash(1),
+			hash(2),
+			hash(3),
+			hash(4),
+			hash(5),
+			hash(1024),
+			hash(1025),
+			hash(2048),
+			hash(2049),
+		]
 	}
 }
 impl<R> PrecompileSet for FrontierPrecompiles<R>
 where
-	R: pallet_evm::Config,
+	R: pallet_evm::Config
+		+ pallet_assets_bridge::Config
+		+ pallet_assets::Config<AssetIdParameter = codec::Compact<u32>>,
 	R::AccountId: From<AccountId32>,
+	R::AssetId: From<u32> + Into<u32>,
+	<R as pallet_assets::Config>::Balance: From<u128>,
 	U256: UniqueSaturatedInto<pallet_evm::BalanceOf<R>>,
 {
 	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
@@ -41,6 +56,7 @@ where
 			a if a == hash(1024) => Some(Sha3FIPS256::execute(handle)),
 			a if a == hash(1025) => Some(ECRecoverPublicKey::execute(handle)),
 			a if a == hash(2048) => Some(SubstrateUtils::<R>::execute(handle)),
+			a if a == hash(2049) => Some(TransferToMagnet::<R>::execute(handle)),
 			_ => None,
 		}
 	}
