@@ -25,7 +25,6 @@
 //! Provides many query methods for node or other pallets to use, such as querying the gas consumed by placing an order in a certain block,
 //! whether the order has been executed, whether the order threshold has been reached, etc.
 
-
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
 use cumulus_pallet_parachain_system::{
@@ -242,7 +241,6 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-
 		/// Create an order, which is called by the pallet.
 		/// Users cannot actively call this function.
 		/// Obtain order information by parsing inherited data.
@@ -310,7 +308,7 @@ pub mod pallet {
 		/// Parameters:
 		/// - `slot_width`: The order interval is 2^slotwidth..
 		/// - `order_max_amount`: The maximum price the user is willing to pay when placing an order.
-        /// - `tx_pool_threshold`: Gas threshold that triggers order placement.
+		/// - `tx_pool_threshold`: Gas threshold that triggers order placement.
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
 		pub fn set_parameter(
@@ -341,7 +339,7 @@ impl<T: Config> Pallet<T> {
 	/// Parameters:
 	/// - `relay_storage_proof`: The proof of relay chain storage.
 	///- `validation_data`: The validation data.
-    /// - `para_id`: ID of parachain.
+	/// - `para_id`: ID of parachain.
 	fn get_author_from_proof(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
@@ -420,7 +418,7 @@ impl<T: Config> Pallet<T> {
 	/// - `relay_storage_proof`: The proof of relay chain storage.
 	/// - `validation_data`: The validation data.
 	/// - `author_pub`: Account.
-    /// - `para_id`: ID of parachain.
+	/// - `para_id`: ID of parachain.
 	fn check_order_proof(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
@@ -445,7 +443,7 @@ impl<T: Config> Pallet<T> {
 	/// Parameters:
 	/// - `relay_storage_proof`: The proof of relay chain storage.
 	/// - `validation_data`: The validation data.
-    /// - `para_id`: ID of parachain.
+	/// - `para_id`: ID of parachain.
 	pub fn order_placed(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
