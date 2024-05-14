@@ -14,6 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
+//! # Order Pallet
+//!
+//! This pallet implements the recording and query functions of purchasing ondemand core.
+//!
+//! By obtaining the inherent nature of the block, parsing it out of the validation_data of the relaychain,
+//! and querying whether there is an OnDemandOrderPlaced event, obtaining the order account and price from the event,
+//! and then writing this record to the blockchain.
+//!
+//! Provides many query methods for node or other pallets to use, such as querying the gas consumed by placing an order in a certain block,
+//! whether the order has been executed, whether the order threshold has been reached, etc.
+
+
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
 use cumulus_pallet_parachain_system::{
@@ -50,13 +62,18 @@ mod proof_data;
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
+/// ondemand order information.
 #[derive(Encode, Decode, Default, Clone, Copy, TypeInfo, MaxEncodedLen, Debug)]
 pub struct Order<AuthorityId> {
+	/// The number used to record the order, incremented each time.
 	pub sequence_number: u64,
 	// relaychain_block_hash:Hash,
 	// relaychain_block_height:u32,
+	/// Account for placing order.
 	pub orderer: AuthorityId,
+	/// Order price.
 	pub price: Balance,
+	/// Whether the order was executed.
 	pub executed: bool,
 }
 #[frame_support::pallet]
@@ -89,6 +106,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type OrderMaxAmount: Get<BalanceOf<Self>>;
 
+		/// The gas threshold required to place an order.
 		#[pallet::constant]
 		type TxPoolThreshold: Get<BalanceOf<Self>>;
 	}
@@ -96,10 +114,12 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(PhantomData<T>);
 
+	/// Sequence number,number of each order.
 	#[pallet::storage]
 	#[pallet::getter(fn sequence_number)]
 	pub type SequenceNumber<T> = StorageValue<_, u64, ValueQuery>;
 
+	/// Record the relaychain block height of the latest order
 	#[pallet::storage]
 	#[pallet::getter(fn current_relay_height)]
 	pub type CurrentRelayHeight<T> = StorageValue<_, u32, ValueQuery>;
@@ -117,25 +137,30 @@ pub mod pallet {
 		T::TxPoolThreshold::get()
 	}
 
+	/// The order interval is 2^slotwidth.
 	#[pallet::storage]
 	#[pallet::getter(fn slot_width)]
 	pub(super) type SlotWidth<T: Config> = StorageValue<_, u32, ValueQuery, SlotWidthOnEmpty<T>>;
 
+	/// The maximum price the user is willing to pay when placing an order.
 	#[pallet::storage]
 	#[pallet::getter(fn order_max_amount)]
 	pub(super) type OrderMaxAmount<T: Config> =
 		StorageValue<_, BalanceOf<T>, ValueQuery, OrderMaxAmountOnEmpty<T>>;
 
+	/// Gas threshold that triggers order placement.
 	#[pallet::storage]
 	#[pallet::getter(fn txpool_threshold)]
 	pub(super) type TxPoolThreshold<T: Config> =
 		StorageValue<_, BalanceOf<T>, ValueQuery, TxPoolThresholdOnEmpty<T>>;
 
+	/// Order Information Map.
 	#[pallet::storage]
 	#[pallet::getter(fn order_map)]
 	pub type OrderMap<T: Config> =
 		StorageMap<_, Twox64Concat, u64, Order<T::AuthorityId>, OptionQuery>;
 
+	/// Convert block height to sequence number.
 	#[pallet::storage]
 	#[pallet::getter(fn block_2_sequence)]
 	pub type Block2Sequence<T: Config> =
@@ -144,20 +169,28 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		/// Create order event.
 		OrderCreate { sequence_number: u64, orderer: T::AuthorityId },
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
+		/// Error reading data.
 		FailedReading,
+		/// Order already exists.
 		OrderExist,
+		/// Failed to create order.
 		CreateOrderFail,
+		/// Invalid Validation data.
 		InvalidValidation,
+		/// Incorrect sequence number
 		WrongSequenceNumber,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		/// Called at the end of each block to check whether an order has been placed.
+		/// If so, modify the execution status and increase the sequencer number.
 		fn on_finalize(block_number: BlockNumberFor<T>) {
 			let old_sequence_number = SequenceNumber::<T>::get();
 			let order = OrderMap::<T>::get(old_sequence_number);
@@ -209,6 +242,13 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+
+		/// Create an order, which is called by the pallet.
+		/// Users cannot actively call this function.
+		/// Obtain order information by parsing inherited data.
+		///
+		/// Parameters:
+		/// - `data`: The inherent data.
 		#[pallet::call_index(0)]
 		#[pallet::weight((0, DispatchClass::Mandatory))]
 		pub fn create_order(
@@ -264,6 +304,13 @@ pub mod pallet {
 			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
 		}
 
+		/// Order pallet parameter settings.
+		/// It can only be called by accounts with sudo privileges or authorized organization members.
+		///
+		/// Parameters:
+		/// - `slot_width`: The order interval is 2^slotwidth..
+		/// - `order_max_amount`: The maximum price the user is willing to pay when placing an order.
+        /// - `tx_pool_threshold`: Gas threshold that triggers order placement.
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
 		pub fn set_parameter(
@@ -289,6 +336,12 @@ pub mod pallet {
 }
 
 impl<T: Config> Pallet<T> {
+	/// Obtain the order account and price from the relaychain's validation.
+	///
+	/// Parameters:
+	/// - `relay_storage_proof`: The proof of relay chain storage.
+	///- `validation_data`: The validation data.
+    /// - `para_id`: ID of parachain.
 	fn get_author_from_proof(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
@@ -361,6 +414,13 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
+	/// Check whether the account is in the validation of relaychain.
+	///
+	/// Parameters:
+	/// - `relay_storage_proof`: The proof of relay chain storage.
+	/// - `validation_data`: The validation data.
+	/// - `author_pub`: Account.
+    /// - `para_id`: ID of parachain.
 	fn check_order_proof(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
@@ -380,6 +440,12 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
+	/// Check whether there is an order event in the validation of relaychain.
+	///
+	/// Parameters:
+	/// - `relay_storage_proof`: The proof of relay chain storage.
+	/// - `validation_data`: The validation data.
+    /// - `para_id`: ID of parachain.
 	pub fn order_placed(
 		relay_storage_proof: sp_trie::StorageProof,
 		validation_data: PersistedValidationData,
@@ -392,11 +458,19 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
+	/// Whether the gas threshold for placing an order has been reached.
+	///
+	/// Parameters:
+	/// - `gas_balance`: The total gas.
 	pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>) -> bool {
 		let txpool_threshold = TxPoolThreshold::<T>::get();
 		gas_balance > txpool_threshold
 	}
 
+	/// Whether the order with the specified sequence number is executed.
+	///
+	/// Parameters:
+	/// - `sequence_number`: The sequence number.
 	pub fn order_executed(sequence_number: u64) -> bool {
 		let order_map = OrderMap::<T>::get(sequence_number);
 		match order_map {
@@ -407,6 +481,10 @@ impl<T: Config> Pallet<T> {
 }
 
 pub trait OrderGasCost<T: frame_system::Config> {
+	/// Gas consumed by placing an order in a certain block.
+	///
+	/// Parameters:
+	/// - `block_number`: The block number of para chain.
 	fn gas_cost(
 		block_number: BlockNumberFor<T>,
 	) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
