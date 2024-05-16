@@ -1,5 +1,6 @@
 use pallet_evm::{
-	IsPrecompileResult, Precompile, PrecompileHandle, PrecompileResult, PrecompileSet,
+	ExitRevert, IsPrecompileResult, Precompile, PrecompileFailure, PrecompileHandle,
+	PrecompileResult, PrecompileSet,
 };
 use sp_core::{crypto::AccountId32, H160, U256};
 use sp_runtime::traits::UniqueSaturatedInto;
@@ -45,6 +46,21 @@ where
 	U256: UniqueSaturatedInto<pallet_evm::BalanceOf<R>>,
 {
 	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
+		let remaining_gas = handle.remaining_gas();
+
+		let is_precompile_result = self.is_precompile(handle.code_address(), remaining_gas);
+		if let IsPrecompileResult::Answer { is_precompile, .. } = is_precompile_result {
+			if is_precompile
+				&& handle.code_address() > hash(5)
+				&& handle.code_address() != handle.context().address
+			{
+				return Some(Err(PrecompileFailure::Revert {
+					exit_status: ExitRevert::Reverted,
+					output: "cannot be called with DELEGATECALL or CALLCODE".into(),
+				}));
+			}
+		}
+
 		match handle.code_address() {
 			// Ethereum precompiles :
 			a if a == hash(1) => Some(ECRecover::execute(handle)),

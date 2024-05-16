@@ -93,10 +93,11 @@ where
 			&target_gas
 		);
 		let caller = context.caller.clone();
-		if T::EvmAdmins::get().contains(&caller) == false {
-			log::error!("Caller is not the admin: {:?}", caller);
+		if pallet_assets_bridge::EvmContracts::<T>::get().contains(&caller) == false {
+			log::error!("Caller {:?} is not in the admin allow set.", caller);
+			//log::error!("EvmContracts:{:?}", pallet_assets_bridge::EvmContracts::<T>::get());
 			return Err(PrecompileFailure::Error {
-				exit_status: ExitError::Other("Caller is not the admin".into()),
+				exit_status: ExitError::Other("Caller is not in the admin allow set".into()),
 			});
 		}
 

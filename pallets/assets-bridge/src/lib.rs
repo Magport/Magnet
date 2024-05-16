@@ -263,6 +263,10 @@ pub mod pallet {
 	#[pallet::getter(fn emergencies)]
 	pub(super) type Emergencies<T: Config> = StorageValue<_, Vec<T::AssetId>, ValueQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn evm_contracts)]
+	pub type EvmContracts<T: Config> = StorageValue<_, BTreeSet<H160>, ValueQuery>;
+
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
@@ -315,6 +319,11 @@ pub mod pallet {
 		UnPausedAll,
 		// (asset_id, remove)
 		BackForeign(T::AssetId, bool),
+
+		///(new_evm_contract)
+		AddNewContract(H160),
+		///(evm contract)
+		RemoveContract(H160),
 	}
 
 	/// Error for evm accounts module.
@@ -627,6 +636,50 @@ pub mod pallet {
 			}
 
 			Self::deposit_event(Event::ForceUnRegister(asset_id.clone(), erc20));
+
+			Ok(Pays::No.into())
+		}
+
+		/// Add evm token contracts which can call precompile
+		/// Note: for admin
+		///
+		/// - `new_contract`:
+		#[pallet::call_index(8)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn add_evm_contract(
+			origin: OriginFor<T>,
+			new_contract: H160,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			ensure!(Some(who) == Self::admin_key(), Error::<T>::RequireAdmin);
+
+			EvmContracts::<T>::mutate(|contracts| {
+				contracts.insert(new_contract);
+			});
+
+			Self::deposit_event(Event::AddNewContract(new_contract.clone()));
+
+			Ok(Pays::No.into())
+		}
+
+		/// Remove evm token contracts which can call precompile
+		/// Note: for admin
+		///
+		/// - `new_contract`:
+		#[pallet::call_index(9)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn remove_evm_contract(
+			origin: OriginFor<T>,
+			contract: H160,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			ensure!(Some(who) == Self::admin_key(), Error::<T>::RequireAdmin);
+
+			EvmContracts::<T>::mutate(|contracts| {
+				contracts.remove(&contract);
+			});
+
+			Self::deposit_event(Event::RemoveContract(contract));
 
 			Ok(Pays::No.into())
 		}

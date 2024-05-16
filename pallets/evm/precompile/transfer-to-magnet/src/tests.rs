@@ -21,6 +21,7 @@ use super::*;
 use crate::mock::*;
 use frame_support::assert_ok;
 use frame_support::traits::Currency;
+use frame_system::RawOrigin;
 use pallet_evm::{AddressMapping, CallInfo, Error, ExitError, ExitReason, Runner};
 
 use codec::Encode;
@@ -280,6 +281,19 @@ fn transfer_to_substrate_works() {
 		let asset_id = create_and_register_asset(token_addr);
 		log::info!("asset id:{:?}", asset_id);
 
+		let admin_key = AccountId32::from([1u8; 32]);
+		let root_origin: frame_system::Origin<Test> = frame_system::RawOrigin::Root;
+		let _ =
+			pallet_assets_bridge::Pallet::<Test>::set_admin(root_origin.into(), admin_key.clone());
+		let r = pallet_assets_bridge::Pallet::<Test>::add_evm_contract(
+			RawOrigin::Signed(admin_key.clone()).into(),
+			bob_evm,
+		);
+		log::info!("add evm contract result:{:?}", r);
+
+		let callers = pallet_assets_bridge::EvmContracts::<Test>::get();
+		log::info!("callers:{:?}", callers);
+
 		let alice_token_amount_before = Assets::balance(asset_id, &ALICE);
 		log::info!("alice token amount before mint:{:?}", alice_token_amount_before);
 
@@ -390,6 +404,19 @@ fn gas_not_enough_error_works() {
 		let token_addr = deploy_contract(bob_evm);
 		log::info!("token addr:{:?}", token_addr);
 
+		let admin_key = AccountId32::from([1u8; 32]);
+		let root_origin: frame_system::Origin<Test> = frame_system::RawOrigin::Root;
+		let _ =
+			pallet_assets_bridge::Pallet::<Test>::set_admin(root_origin.into(), admin_key.clone());
+		let r = pallet_assets_bridge::Pallet::<Test>::add_evm_contract(
+			RawOrigin::Signed(admin_key.clone()).into(),
+			bob_evm,
+		);
+		log::info!("add evm contract result:{:?}", r);
+
+		let callers = pallet_assets_bridge::EvmContracts::<Test>::get();
+		log::info!("callers:{:?}", callers);
+
 		let asset_id = create_and_register_asset(token_addr);
 		log::info!("asset id:{:?}", asset_id);
 
@@ -490,6 +517,19 @@ fn gas_price_too_low_error_works() {
 
 		let token_addr = deploy_contract(bob_evm);
 		log::info!("token addr:{:?}", token_addr);
+
+		let admin_key = AccountId32::from([1u8; 32]);
+		let root_origin: frame_system::Origin<Test> = frame_system::RawOrigin::Root;
+		let _ =
+			pallet_assets_bridge::Pallet::<Test>::set_admin(root_origin.into(), admin_key.clone());
+		let r = pallet_assets_bridge::Pallet::<Test>::add_evm_contract(
+			RawOrigin::Signed(admin_key.clone()).into(),
+			bob_evm,
+		);
+		log::info!("add evm contract result:{:?}", r);
+
+		let callers = pallet_assets_bridge::EvmContracts::<Test>::get();
+		log::info!("callers:{:?}", callers);
 
 		let asset_id = create_and_register_asset(token_addr);
 		log::info!("asset id:{:?}", asset_id);
@@ -745,6 +785,19 @@ fn ss58address_error_works() {
 		let token_addr = deploy_contract(bob_evm);
 		log::info!("token addr:{:?}", token_addr);
 
+		let admin_key = AccountId32::from([1u8; 32]);
+		let root_origin: frame_system::Origin<Test> = frame_system::RawOrigin::Root;
+		let _ =
+			pallet_assets_bridge::Pallet::<Test>::set_admin(root_origin.into(), admin_key.clone());
+		let r = pallet_assets_bridge::Pallet::<Test>::add_evm_contract(
+			RawOrigin::Signed(admin_key.clone()).into(),
+			bob_evm,
+		);
+		log::info!("add evm contract result:{:?}", r);
+
+		let callers = pallet_assets_bridge::EvmContracts::<Test>::get();
+		log::info!("callers:{:?}", callers);
+
 		let asset_id = create_and_register_asset(token_addr);
 		log::info!("asset id:{:?}", asset_id);
 
@@ -929,7 +982,7 @@ fn not_evm_admin_works() {
 				assert_eq!(
 					reason,
 					ExitReason::Error(ExitError::Other(std::borrow::Cow::Borrowed(
-						"Caller is not the admin"
+						"Caller is not in the admin allow set"
 					)))
 				);
 			},
@@ -966,6 +1019,19 @@ fn token_and_assets_not_bound_works() {
 
 		let token_addr = deploy_contract(bob_evm);
 		log::info!("token addr:{:?}", token_addr);
+
+		let admin_key = AccountId32::from([1u8; 32]);
+		let root_origin: frame_system::Origin<Test> = frame_system::RawOrigin::Root;
+		let _ =
+			pallet_assets_bridge::Pallet::<Test>::set_admin(root_origin.into(), admin_key.clone());
+		let r = pallet_assets_bridge::Pallet::<Test>::add_evm_contract(
+			RawOrigin::Signed(admin_key.clone()).into(),
+			bob_evm,
+		);
+		log::info!("add evm contract result:{:?}", r);
+
+		let callers = pallet_assets_bridge::EvmContracts::<Test>::get();
+		log::info!("callers:{:?}", callers);
 
 		let asset_id = create_without_register_asset();
 		log::info!("asset id:{:?}", asset_id);
