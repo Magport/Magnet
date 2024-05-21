@@ -86,7 +86,7 @@ where
 		let target_gas = handle.gas_limit();
 		let context = handle.context();
 
-		log::info!(
+		log::debug!(
 			"codeAddress:{:?}, input:{:?}, targetGas:{:?}",
 			&code_address,
 			&input,
@@ -103,9 +103,7 @@ where
 
 		let token_addr = solidity::decode_arguments::<Address>(&input[4..36])?;
 		let amount = solidity::decode_arguments::<u128>(&input[36..68])?;
-		log::info!("Caller:{:?}, tokenAddr:{:?}, amount:{:?}", &caller, &token_addr, &amount);
-
-		log::info!("who bstr data len:{:?}", &input[100..].len());
+		log::debug!("Caller:{:?}, tokenAddr:{:?}, amount:{:?}", &caller, &token_addr, &amount);
 
 		if handle.is_static() {
 			log::error!("Can't be static call error");
@@ -123,12 +121,12 @@ where
 				});
 			},
 		};
-		log::info!("to who ss58:{:?}", &to_who_ss58);
+		log::debug!("to who ss58:{:?}", &to_who_ss58);
 		let to_who_id32 =
 			AccountId32::from_ss58check(&to_who_ss58).map_err(|_| PrecompileFailure::Error {
 				exit_status: ExitError::Other("AccountId32 from ss58check(string) failed".into()),
 			})?;
-		log::info!("to_who_ss58:{:?}, to_who_id32:{:?}", &to_who_ss58, &to_who_id32);
+		log::debug!("to_who_ss58:{:?}, to_who_id32:{:?}", &to_who_ss58, &to_who_id32);
 
 		let to_who: <T>::AccountId = to_who_id32.clone().into();
 
@@ -153,7 +151,7 @@ where
 
 		let amount_saturated: T::Balance = amount.into();
 
-		log::info!(
+		log::debug!(
 			"Preparing to mint: AssetId: {:?}, Beneficiary: {:?}, Amount: {:?}",
 			&asset_id,
 			&to_who_ss58,
@@ -238,9 +236,9 @@ where
 		}
 
 		let length_bytes = &input[offset..offset + 32];
-		log::info!("length_bytes:{:?}", &length_bytes);
+		log::debug!("length_bytes:{:?}", &length_bytes);
 		let length = u32::from_be_bytes(length_bytes[28..32].try_into().unwrap()) as usize;
-		log::info!("ss58 string len:{:?}", length);
+		log::debug!("ss58 string len:{:?}", length);
 
 		if input.len() < offset + 32 + length {
 			return Err("Input too short to contain string data");
@@ -249,7 +247,7 @@ where
 		let string_data_start = offset + 32;
 		let string_data_end = string_data_start + length;
 		let string_data = &input[string_data_start..string_data_end];
-		log::info!("ss58 string data:{:?}", &string_data);
+		log::debug!("ss58 string data:{:?}", &string_data);
 
 		let mut result_string = from_utf8(string_data)
 			.map_err(|_| "String data is not valid UTF-8")?

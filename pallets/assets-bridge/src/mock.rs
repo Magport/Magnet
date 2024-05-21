@@ -12,9 +12,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub use crate as assets_bridge;
-pub use assets_bridge::{Config, Error, Event as AssetsBridgeEvent};
-
-use sp_std::collections::btree_set::BTreeSet;
+pub use assets_bridge::{Error, Event as AssetsBridgeEvent};
 
 use frame_support::{
 	derive_impl,
@@ -27,7 +25,6 @@ use frame_system::EnsureSigned;
 
 use sp_core::{H160, H256};
 pub use sp_runtime::{
-	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 	AccountId32, BuildStorage,
 };
