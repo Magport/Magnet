@@ -212,10 +212,6 @@ pub mod pallet {
 		/// How much should be locked up in order to claim account.
 		#[pallet::constant]
 		type ClaimBond: Get<ReserveBalanceOf<Self>>;
-
-		/// The assets-bridge's evm contract deployer.
-		#[pallet::constant]
-		type EvmAdmins: Get<BTreeSet<H160>>;
 	}
 
 	/// The Substrate Account for Evm Addresses
