@@ -282,5 +282,10 @@ fn testnet_genesis(
 		},
 
 		"evm": { "accounts": evm_accounts },
+		//Move VM
+		"moveModule": {
+			"changeDefaultMoveStdlibBundleTo": Option::<Vec<u8>>::None,
+			"changeDefaultSubstrateStdlibBundleTo": Option::<Vec<u8>>::None,
+		}
 	})
 }
