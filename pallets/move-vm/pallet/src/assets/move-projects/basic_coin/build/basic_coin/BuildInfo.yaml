@@ -1,0 +1,22 @@
+---
+compiled_package_info:
+  package_name: basic_coin
+  address_alias_instantiation:
+    CafeAccount: 8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+  source_digest: BCA9241AC02DC05F283745BC446D70A3100CDB56E1B1421FB7B8F616BA2E8D85
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    generate_abis: false
+    install_dir: ~
+    force_recompilation: false
+    lock_file: ~
+    additional_named_addresses: {}
+    architecture: ~
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+    bytecode_version: ~
+dependencies:
+  - MoveStdlib
