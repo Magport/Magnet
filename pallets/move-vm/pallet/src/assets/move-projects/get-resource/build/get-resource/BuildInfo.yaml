@@ -1,0 +1,22 @@
+---
+compiled_package_info:
+  package_name: get-resource
+  address_alias_instantiation:
+    DeveloperBob: 8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+  source_digest: 0EEAD01162BFDA4959B397E5852597FB20BF89B614ABFBD2977E951299ED87C9
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    generate_abis: false
+    install_dir: ~
+    force_recompilation: false
+    lock_file: ~
+    additional_named_addresses: {}
+    architecture: ~
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+    bytecode_version: ~
+dependencies:
+  - MoveStdlib

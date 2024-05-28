@@ -33,6 +33,7 @@ magnet-primitives-order = { path = "../primitives/order"}
 magnet-client-consensus-aura = {path ="../client/consensus/aura"}
 pallet-pot-rpc = { path = "../pallets/pot/rpc" }
 mp-system = { path = "../primitives/system"}
+pallet-move-rpc = { path = "../pallets/move-vm/rpc" }
 
 # Substrate
 frame-benchmarking = { workspace = true }

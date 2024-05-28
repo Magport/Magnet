@@ -1,0 +1,25 @@
+---
+compiled_package_info:
+  package_name: gas-costs
+  address_alias_instantiation:
+    DeveloperBob: 8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48
+    std: "0000000000000000000000000000000000000000000000000000000000000001"
+    substrate: "0000000000000000000000000000000000000000000000000000000000000001"
+  source_digest: 6CFC375BE57C05E1833FB3114C84285D13F7544CE73D224C80D682D911F882D8
+  build_flags:
+    dev_mode: false
+    test_mode: false
+    generate_docs: false
+    generate_abis: false
+    install_dir: ~
+    force_recompilation: false
+    lock_file: ~
+    additional_named_addresses: {}
+    architecture: ~
+    fetch_deps_only: false
+    skip_fetch_latest_git_deps: false
+    bytecode_version: ~
+dependencies:
+  - MoveStdlib
+  - SubstrateStdlib
+  - car-wash-example
