@@ -12,9 +12,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub use crate as assets_bridge;
-pub use assets_bridge::{Config, Error, Event as AssetsBridgeEvent};
-
-use sp_std::collections::btree_set::BTreeSet;
+pub use assets_bridge::{Error, Event as AssetsBridgeEvent};
 
 use frame_support::{
 	derive_impl,
@@ -27,7 +25,6 @@ use frame_system::EnsureSigned;
 
 use sp_core::{H160, H256};
 pub use sp_runtime::{
-	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 	AccountId32, BuildStorage,
 };
@@ -129,12 +126,6 @@ parameter_types! {
 	// 0x1111111111111111111111111111111111111111
 	pub EvmCaller: H160 = H160::from_slice(&[17u8;20][..]);
 	pub ClaimBond: u128 = 2;
-	//pub EvmAdmin: H160 = H160([0x05, 0xF9, 0xb8, 0xC7, 0x6E, 0x89, 0x87, 0xB8, 0x15, 0xC9, 0x3C, 0x27, 0xD1, 0x45, 0x20, 0xb6, 0xeD, 0x57, 0x39, 0x02]);
-	pub EvmAdmins: BTreeSet<H160> = {
-		let mut set = BTreeSet::new();
-		set.insert(H160([0x05, 0xF9, 0xb8, 0xC7, 0x6E, 0x89, 0x87, 0xB8, 0x15, 0xC9, 0x3C, 0x27, 0xD1, 0x45, 0x20, 0xb6, 0xeD, 0x57, 0x39, 0x02]));
-		set
-	};
 	pub const WeightPerGas: Weight = Weight::from_parts(20_000, 0);
 
 	pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE);
@@ -193,7 +184,6 @@ impl assets_bridge::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type EvmCaller = EvmCaller;
 	type ClaimBond = ClaimBond;
-	type EvmAdmins = EvmAdmins;
 }
 
 pub const ALICE: [u8; 32] = [1u8; 32];
