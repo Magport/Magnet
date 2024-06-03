@@ -55,7 +55,7 @@ impl<T: frame_system::Config> crate::weight_info::WeightInfo for SubstrateWeight
 		Weight::from_parts(35_000_000, 0)
 			.saturating_add(Weight::from_parts(0, 17303))
 			// Standard Error: 192_486_421
-			.saturating_add(Weight::from_parts(5_799_434_900, 0).saturating_mul(n.into()))
+			.saturating_add(Weight::from_parts(5_921_881, 0).saturating_mul(n.into()))
 			.saturating_add(T::DbWeight::get().reads(5))
 			.saturating_add(T::DbWeight::get().writes(3))
 			.saturating_add(Weight::from_parts(0, 1491).saturating_mul(n.into()))
