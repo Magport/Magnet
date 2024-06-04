@@ -223,16 +223,17 @@ pub mod pallet {
 		const INHERENT_IDENTIFIER: InherentIdentifier =
 			magnet_primitives_order::INHERENT_IDENTIFIER;
 		fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-			let data: magnet_primitives_order::OrderInherentData<T::AuthorityId> = data
-				.get_data(&magnet_primitives_order::INHERENT_IDENTIFIER)
-				.ok()
-				.flatten()
-				.expect("there is not data to be posted; qed");
-			if data.validation_data.is_some() {
-				Some(Call::create_order { data })
-			} else {
-				None
-			}
+			// let data: magnet_primitives_order::OrderInherentData<T::AuthorityId> = data
+			// 	.get_data(&magnet_primitives_order::INHERENT_IDENTIFIER)
+			// 	.ok()
+			// 	.flatten()
+			// 	.expect("there is not data to be posted; qed");
+			// if data.validation_data.is_some() {
+			// 	Some(Call::create_order { data })
+			// } else {
+			// 	None
+			// }
+			None
 		}
 		fn is_inherent(call: &Self::Call) -> bool {
 			matches!(call, Call::create_order { .. })

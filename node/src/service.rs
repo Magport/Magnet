@@ -19,7 +19,10 @@ use cumulus_client_service::{
 	build_network, build_relay_chain_interface, prepare_node_config, start_relay_chain_tasks,
 	BuildNetworkParams, CollatorSybilResistance, DARecoveryProfile, StartRelayChainTasksParams,
 };
-use cumulus_primitives_core::{relay_chain::CollatorPair, ParaId};
+use cumulus_primitives_core::{
+	relay_chain::{CollatorPair, ValidationCode},
+	ParaId,
+};
 use cumulus_relay_chain_interface::{OverseerHandle, RelayChainInterface};
 
 // Substrate Imports
@@ -391,7 +394,7 @@ async fn start_node_impl(
 	spawn_frontier_tasks(
 		&task_manager,
 		client.clone(),
-		backend,
+		backend.clone(),
 		frontier_backend,
 		filter_pool,
 		overrides,
@@ -468,18 +471,19 @@ async fn start_node_impl(
 				author_pub: None,
 				txs: vec![],
 			}));
-		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
-			client.clone(),
-			para_id,
-			relay_chain_interface.clone(),
-			transaction_pool.clone(),
-			&task_manager,
-			params.keystore_container.keystore(),
-			order_record.clone(),
-			rpc_address,
-		)?;
+		// spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+		// 	client.clone(),
+		// 	para_id,
+		// 	relay_chain_interface.clone(),
+		// 	transaction_pool.clone(),
+		// 	&task_manager,
+		// 	params.keystore_container.keystore(),
+		// 	order_record.clone(),
+		// 	rpc_address,
+		// )?;
 		start_consensus(
 			client.clone(),
+			backend.clone(),
 			block_import,
 			prometheus_registry.as_ref(),
 			telemetry.as_ref().map(|t| t.handle()),
@@ -535,6 +539,7 @@ fn build_import_queue(
 
 fn start_consensus(
 	client: Arc<ParachainClient>,
+	backend: Arc<ParachainBackend>,
 	block_import: ParachainBlockImport,
 	prometheus_registry: Option<&Registry>,
 	telemetry: Option<TelemetryHandle>,
@@ -550,12 +555,13 @@ fn start_consensus(
 	announce_block: Arc<dyn Fn(Hash, Option<Vec<u8>>) + Send + Sync>,
 	order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
 ) -> Result<(), sc_service::Error> {
+	use cumulus_client_consensus_aura::collators::lookahead::{self as aura, Params as AuraParams};
 	// use cumulus_client_consensus_aura::collators::basic::{
 	// 	self as basic_aura, Params as BasicAuraParams,
 	// };
-	use magnet_client_consensus_aura::collators::on_demand::{
-		self as on_demand_aura, Params as BasicAuraParams,
-	};
+	// use magnet_client_consensus_aura::collators::on_demand::{
+	// 	self as on_demand_aura, Params as BasicAuraParams,
+	// };
 
 	// NOTE: because we use Aura here explicitly, we can use `CollatorSybilResistance::Resistant`
 	// when starting the network.
@@ -579,37 +585,42 @@ fn start_consensus(
 		client.clone(),
 	);
 	let relay_chain_interface_clone = relay_chain_interface.clone();
-	let params = BasicAuraParams {
-		create_inherent_data_providers: move |_block_hash,
-		                                      (
-			relay_parent,
-			validation_data,
-			para_id,
-			sequence_number,
-			author_pub,
-		)| {
-			let relay_chain_interface = relay_chain_interface.clone();
-			async move {
-				let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
-					relay_parent,
-					&relay_chain_interface,
-					&validation_data,
-					para_id,
-					sequence_number,
-					&author_pub,
-				)
-				.await;
-				let order_inherent = order_inherent.ok_or_else(|| {
-					Box::<dyn std::error::Error + Send + Sync>::from(
-						"Failed to create order inherent",
-					)
-				})?;
-				Ok(order_inherent)
-			}
-		},
+	let params = AuraParams {
+		create_inherent_data_providers: move |_, ()| async move { Ok(()) },
+		// create_inherent_data_providers: move |_block_hash,
+		//                                       (
+		// 	relay_parent,
+		// 	validation_data,
+		// 	para_id,
+		// 	sequence_number,
+		// 	author_pub,
+		// )| {
+		// 	let relay_chain_interface = relay_chain_interface.clone();
+		// 	async move {
+		// 		let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
+		// 			relay_parent,
+		// 			&relay_chain_interface,
+		// 			&validation_data,
+		// 			para_id,
+		// 			sequence_number,
+		// 			&author_pub,
+		// 		)
+		// 		.await;
+		// 		let order_inherent = order_inherent.ok_or_else(|| {
+		// 			Box::<dyn std::error::Error + Send + Sync>::from(
+		// 				"Failed to create order inherent",
+		// 			)
+		// 		})?;
+		// 		Ok(order_inherent)
+		// 	}
+		// },
 		block_import,
-		para_client: client,
+		para_client: client.clone(),
+		para_backend: backend.clone(),
 		relay_client: relay_chain_interface_clone,
+		code_hash_provider: move |block_hash| {
+			client.code_at(block_hash).ok().map(|c| ValidationCode::from(c).hash())
+		},
 		sync_oracle,
 		keystore,
 		collator_key,
@@ -620,21 +631,14 @@ fn start_consensus(
 		proposer,
 		collator_service,
 		// Very limited proposal time.
-		authoring_duration: Duration::from_millis(500),
-		collation_request_receiver: None,
+		authoring_duration: Duration::from_millis(1500),
+		reinitialize: false,
 	};
 
-	let fut = on_demand_aura::run::<
-		Block,
-		sp_consensus_aura::sr25519::AuthorityPair,
-		_,
-		_,
-		_,
-		_,
-		_,
-		_,
-		_,
-	>(params, order_record);
+	let fut =
+		aura::run::<Block, sp_consensus_aura::sr25519::AuthorityPair, _, _, _, _, _, _, _, _, _>(
+			params,
+		);
 	task_manager.spawn_essential_handle().spawn("on_demand_aura", None, fut);
 
 	Ok(())
