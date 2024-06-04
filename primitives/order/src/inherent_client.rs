@@ -21,6 +21,8 @@ use {
 	cumulus_relay_chain_interface::{PHash, RelayChainInterface},
 };
 
+/// Collect the relevant relay chain state in form of a proof
+/// for putting it into the order inherent.
 async fn collect_relay_storage_proof(
 	relay_chain_interface: &impl RelayChainInterface,
 	relay_parent: PHash,
@@ -43,6 +45,9 @@ async fn collect_relay_storage_proof(
 }
 
 impl OrderInherentData<AuthorityId> {
+	/// Create the [`OrderInherentData`] at the given `relay_parent`.
+	///
+	/// Returns `None` if the creation failed.
 	pub async fn create_at(
 		relay_parent: PHash,
 		relay_chain_interface: &impl RelayChainInterface,
@@ -64,6 +69,7 @@ impl OrderInherentData<AuthorityId> {
 	}
 }
 
+// Implementation of InherentDataProvider
 #[async_trait::async_trait]
 impl sp_inherents::InherentDataProvider for OrderInherentData<AuthorityId> {
 	async fn provide_inherent_data(
