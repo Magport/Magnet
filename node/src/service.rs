@@ -471,16 +471,16 @@ async fn start_node_impl(
 				author_pub: None,
 				txs: vec![],
 			}));
-		// spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
-		// 	client.clone(),
-		// 	para_id,
-		// 	relay_chain_interface.clone(),
-		// 	transaction_pool.clone(),
-		// 	&task_manager,
-		// 	params.keystore_container.keystore(),
-		// 	order_record.clone(),
-		// 	rpc_address,
-		// )?;
+		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+			client.clone(),
+			para_id,
+			relay_chain_interface.clone(),
+			transaction_pool.clone(),
+			&task_manager,
+			params.keystore_container.keystore(),
+			order_record.clone(),
+			rpc_address,
+		)?;
 		start_consensus(
 			client.clone(),
 			backend.clone(),
@@ -586,34 +586,37 @@ fn start_consensus(
 	);
 	let relay_chain_interface_clone = relay_chain_interface.clone();
 	let params = AuraParams {
-		create_inherent_data_providers: move |_, ()| async move { Ok(()) },
-		// create_inherent_data_providers: move |_block_hash,
-		//                                       (
-		// 	relay_parent,
-		// 	validation_data,
-		// 	para_id,
-		// 	sequence_number,
-		// 	author_pub,
-		// )| {
-		// 	let relay_chain_interface = relay_chain_interface.clone();
-		// 	async move {
-		// 		let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
-		// 			relay_parent,
-		// 			&relay_chain_interface,
-		// 			&validation_data,
-		// 			para_id,
-		// 			sequence_number,
-		// 			&author_pub,
-		// 		)
-		// 		.await;
-		// 		let order_inherent = order_inherent.ok_or_else(|| {
-		// 			Box::<dyn std::error::Error + Send + Sync>::from(
-		// 				"Failed to create order inherent",
-		// 			)
-		// 		})?;
-		// 		Ok(order_inherent)
-		// 	}
-		// },
+		create_inherent_data_providers: move |_, ()| {
+			let relay_chain_interface = relay_chain_interface.clone();
+			let order_record_clone = order_record.clone();
+			async move {
+				let (relay_parent, validation_data, sequence_number, author_pub) = {
+					let order_record_local = order_record_clone.lock().await;
+					(
+						order_record_local.relay_parent.expect("can not get relay_parent hash"),
+						order_record_local.validation_data.clone(),
+						order_record_local.sequence_number,
+						order_record_local.author_pub.clone(),
+					)
+				};
+				let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
+					relay_parent,
+					&relay_chain_interface,
+					&validation_data,
+					para_id,
+					sequence_number,
+					&author_pub,
+				)
+				.await;
+				let order_inherent = order_inherent.ok_or_else(|| {
+					Box::<dyn std::error::Error + Send + Sync>::from(
+						"Failed to create order inherent",
+					)
+				})?;
+				Ok(order_inherent)
+			}
+		},
+
 		block_import,
 		para_client: client.clone(),
 		para_backend: backend.clone(),
@@ -639,7 +642,7 @@ fn start_consensus(
 		aura::run::<Block, sp_consensus_aura::sr25519::AuthorityPair, _, _, _, _, _, _, _, _, _>(
 			params,
 		);
-	task_manager.spawn_essential_handle().spawn("on_demand_aura", None, fut);
+	task_manager.spawn_essential_handle().spawn("aura", None, fut);
 
 	Ok(())
 }
