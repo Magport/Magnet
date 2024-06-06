@@ -590,14 +590,19 @@ fn start_consensus(
 			let relay_chain_interface = relay_chain_interface.clone();
 			let order_record_clone = order_record.clone();
 			async move {
+				let parent_hash = relay_chain_interface.best_block_hash().await?;
 				let (relay_parent, validation_data, sequence_number, author_pub) = {
 					let order_record_local = order_record_clone.lock().await;
-					(
-						order_record_local.relay_parent.expect("can not get relay_parent hash"),
-						order_record_local.validation_data.clone(),
-						order_record_local.sequence_number,
-						order_record_local.author_pub.clone(),
-					)
+					if order_record_local.validation_data.is_none() {
+						(parent_hash, None, order_record_local.sequence_number, None)
+					} else {
+						(
+							order_record_local.relay_parent.expect("can not get relay_parent hash"),
+							order_record_local.validation_data.clone(),
+							order_record_local.sequence_number,
+							order_record_local.author_pub.clone(),
+						)
+					}
 				};
 				let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
 					relay_parent,
