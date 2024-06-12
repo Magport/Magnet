@@ -28,8 +28,6 @@ members = [
 	"pallets/assurance",
     "pallets/liquidation",
 	"pallets/assets-bridge",
-	"pallets/move-vm/pallet",
-	"pallets/move-vm/rpc"
 ]
 resolver = "2"
 
@@ -66,11 +64,10 @@ subxt = {version = "0.33.0"}
 subxt-signer = {version = "0.33.0"}
 tracing = "0.1.37"
 url = "2.4.0"
-anyhow = { version = "1.0", default-features = false }
-blake2 = { version = "0.10", default-features = false }
-hashbrown = { version = "0.14", default-features = false }
-rand = { version = "0.8", default-features = false }
 termcolor = "1.1.3"
+rand = "0.8.5"
+rand_core = "0.6.4"
+rand_chacha = "0.3.1"
 
 # Substrate Client
 sc-basic-authorship = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.7.0" }
@@ -231,9 +228,6 @@ pallet-evm-precompile-simple = { version = "2.0.0-dev", git = "https://github.co
 pallet-hotfix-sufficients = { version = "1.0.0", git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.7.0", default-features = false }
 precompile-utils = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.7.0", default-features = false }
 
-# Eiger crates
-bcs = { git = "https://github.com/eigerco/bcs.git", branch = "master", default-features = false }
-move-core-types = { git = "https://github.com/eigerco/substrate-move.git", branch = "main", default-features = false }
-move-stdlib = { git = "https://github.com/eigerco/substrate-move.git", branch = "main", default-features = false }
-move-vm-backend = { git = "https://github.com/eigerco/substrate-move.git", branch = "main", default-features = false }
-move-vm-backend-common = { git = "https://github.com/eigerco/substrate-move.git", branch = "main", default-features = false }
+#Move pallet
+pallet-move = { git = "https://github.com/Magport/pallet-move", branch = "main", default-features = false }
+pallet-move-rpc = {package = "pallet-move-rpc", git = "https://github.com/Magport/pallet-move", branch = "main", default-features = false }

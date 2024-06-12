@@ -33,7 +33,6 @@ pallet-pot = { path = "../pallets/pot", default-features = false }
 pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
 pallet-liquidation = {path = "../pallets/liquidation", default-features = false}
-pallet-move = { path = "../pallets/move-vm/pallet", default-features = false }
 
 # Substrate
 frame-benchmarking = { workspace = true, default-features = false, optional = true}
@@ -117,6 +116,9 @@ fp-account = { workspace = true, default-features = false }
 fp-dynamic-fee = { workspace = true, default-features = false }
 fp-rpc = { workspace = true, default-features = false }
 fp-self-contained = { workspace = true, default-features = false, features = ["serde", "try-runtime"] }
+
+#move pallet
+pallet-move = { workspace = true, default-features = false }
 
 [features]
 default = ["std", "with-rocksdb-weights"]
