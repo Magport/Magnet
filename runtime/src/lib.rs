@@ -966,15 +966,10 @@ impl pallet_liquidation::Config for Runtime {
 	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = OrderGasCostHandler;
-	type SystemRatio = SystemRatio;
-	type TreasuryRatio = TreasuryRatio;
-	type OperationRatio = OperationRatio;
 	type ExistentialDeposit = ExistDeposit;
-	type MinLiquidationThreshold = MinLiquidationThreshold;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
 	type OperationAccountName = OperationAccountName;
-	type ProfitDistributionCycle = ProfitDistributionCycle;
 }
 
 parameter_types! {
