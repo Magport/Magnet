@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod collator;
-pub mod collators;
-
 const LOG_TARGET: &str = "on_demand_aura::magnet";
 
 use sp_core::crypto::{ByteArray, Pair};
