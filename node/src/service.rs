@@ -24,6 +24,7 @@ use cumulus_relay_chain_interface::{OverseerHandle, RelayChainInterface};
 
 // Substrate Imports
 use frame_benchmarking_cli::SUBSTRATE_REFERENCE_HARDWARE;
+use magnet_client_coretime_bulk::spawn_bulk_task;
 use sc_client_api::Backend;
 use sc_consensus::ImportQueue;
 use sc_executor::{
@@ -478,6 +479,7 @@ async fn start_node_impl(
 			order_record.clone(),
 			rpc_address,
 		)?;
+		spawn_bulk_task(client.clone(), para_id, relay_chain_interface.clone(), &task_manager)?;
 		start_consensus(
 			client.clone(),
 			block_import,
