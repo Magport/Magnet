@@ -27,7 +27,7 @@ use sp_runtime::{
 		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
-	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature, Percent,
+	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent,
 };
 
 use scale_info::prelude::string::String;
@@ -66,6 +66,7 @@ use frame_system::{
 	EnsureRoot, EnsureSigned,
 };
 pub use pallet_balances::{Call as BalancesCall, NegativeImbalance};
+use pallet_move::api::{ModuleAbi, MoveApiEstimation};
 use pallet_xcm::{EnsureXcm, IsVoiceOfBody};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, Perbill, Permill};
@@ -102,6 +103,7 @@ use pallet_ethereum::{
 use pallet_evm::{
 	Account as EVMAccount, EnsureAddressTruncated, FeeCalculator, HashedAddressMapping, Runner,
 };
+pub use pallet_move;
 
 mod precompiles;
 use precompiles::FrontierPrecompiles;
@@ -1101,6 +1103,20 @@ impl pallet_treasury::Config for Runtime {
 
 impl pallet_insecure_randomness_collective_flip::Config for Runtime {}
 
+parameter_types! {
+	pub const MultisigReqExpireTime: BlockNumber = 50400;
+	pub const MaxScriptSigners: u32 = 8;
+}
+
+impl pallet_move::Config for Runtime {
+	type Currency = Balances;
+	type CurrencyBalance = Balance;
+	type MultisigReqExpireTime = MultisigReqExpireTime;
+	type MaxScriptSigners = MaxScriptSigners;
+	type RuntimeEvent = RuntimeEvent;
+	type WeightInfo = pallet_move::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -1169,6 +1185,9 @@ construct_runtime!(
 		//Contracts
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip = 70,
 		Contracts: pallet_contracts = 71,
+
+		//Move-vm
+		MoveModule: pallet_move = 80,
 	}
 );
 
@@ -1183,6 +1202,7 @@ mod benches {
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_order, OrderPallet]
+		[pallet_move, MoveModule]
 	);
 }
 
@@ -1643,6 +1663,35 @@ impl_runtime_apis! {
 			key: Vec<u8>,
 		) -> pallet_contracts::GetStorageResult {
 			Contracts::get_storage(address, key)
+		}
+	}
+
+	impl pallet_move::api::MoveApi<Block, AccountId> for Runtime {
+		fn estimate_gas_publish_module(account: AccountId, bytecode: Vec<u8>) -> Result<MoveApiEstimation, DispatchError> {
+			MoveModule::rpc_estimate_gas_publish_module(&account, bytecode)
+		}
+
+		fn estimate_gas_publish_bundle(account: AccountId, bytecode: Vec<u8>) -> Result<MoveApiEstimation, DispatchError> {
+			MoveModule::rpc_estimate_gas_publish_bundle(&account, bytecode)
+		}
+
+		fn estimate_gas_execute_script(transaction_bc: Vec<u8>) -> Result<MoveApiEstimation, DispatchError> {
+			MoveModule::rpc_estimate_gas_execute_script(transaction_bc)
+		}
+
+		fn get_module(account: AccountId, name: String) -> Result<Option<Vec<u8>>, Vec<u8>> {
+			MoveModule::rpc_get_module(account, name)
+		}
+
+		fn get_module_abi(account: AccountId, name: String) -> Result<Option<ModuleAbi>, Vec<u8>> {
+			MoveModule::rpc_get_module_abi(account, name)
+		}
+
+		fn get_resource(
+			account: AccountId,
+			tag: Vec<u8>,
+		) -> Result<Option<Vec<u8>>, Vec<u8>> {
+			MoveModule::rpc_get_resource(account, tag)
 		}
 	}
 

@@ -73,6 +73,7 @@ where
 	C::Api: fp_rpc::ConvertTransactionRuntimeApi<Block>,
 	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
 	C::Api: pallet_pot_rpc::PotRPCApi<Block>,
+	C::Api: pallet_move_rpc::MoveRuntimeApi<Block, AccountId>,
 	C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
 	C: BlockchainEvents<Block> + AuxStore + UsageProvider<Block> + StorageProvider<Block, BE>,
 	BE: Backend<Block> + 'static,
@@ -81,6 +82,7 @@ where
 	CIDP: CreateInherentDataProviders<Block, ()> + Send + 'static,
 	CT: fp_rpc::ConvertTransaction<<Block as BlockT>::Extrinsic> + Send + Sync + 'static,
 {
+	use pallet_move_rpc::{MoveApiServer, MovePallet};
 	use pallet_transaction_payment_rpc::{TransactionPayment, TransactionPaymentApiServer};
 	use sc_consensus_manual_seal::rpc::{ManualSeal, ManualSealApiServer};
 	use substrate_frame_rpc_system::{System, SystemApiServer};
@@ -90,7 +92,8 @@ where
 
 	io.merge(System::new(client.clone(), pool, deny_unsafe).into_rpc())?;
 	io.merge(TransactionPayment::new(client.clone()).into_rpc())?;
-	io.merge(pallet_pot_rpc::Pot::new(client).into_rpc())?;
+	io.merge(pallet_pot_rpc::Pot::new(client.clone()).into_rpc())?;
+	io.merge(MovePallet::new(client.clone()).into_rpc())?;
 
 	if let Some(command_sink) = command_sink {
 		io.merge(
