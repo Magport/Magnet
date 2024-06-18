@@ -13,7 +13,10 @@ use frame_support::{
 	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
-use frame_system::{pallet_prelude::{BlockNumberFor, OriginFor}, ensure_signed_or_root};
+use frame_system::{
+	ensure_signed_or_root,
+	pallet_prelude::{BlockNumberFor, OriginFor},
+};
 use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
@@ -306,9 +309,7 @@ pub mod pallet {
 			});
 
 			let min_liquidation_threshold: Balance =
-				MinLiquidationThreshold::<T>::get()
-					.try_into()
-					.unwrap_or_else(|_| 0);
+				MinLiquidationThreshold::<T>::get().try_into().unwrap_or_else(|_| 0);
 			let profit = TotalIncome::<T>::get().saturating_sub(TotalCost::<T>::get());
 
 			if profit >= min_liquidation_threshold
@@ -534,8 +535,7 @@ pub mod pallet {
 	}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T>
-	{
+	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn set_admin(
