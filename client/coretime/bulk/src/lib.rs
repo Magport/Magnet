@@ -43,21 +43,19 @@ where
 		let parachain = parachain.clone();
 
 		async move {
-			let api = OnlineClient::<PolkadotConfig>::from_url("127.0.0.1:8855").await.unwrap();
+			let api =
+				OnlineClient::<PolkadotConfig>::from_url("ws://127.0.0.1:8855").await.unwrap();
 
 			loop {
 				let events = api.events().at_latest().await.unwrap();
 
-				// We can dynamically decode events:
-				println!("Dynamic event details:");
-				for event in events.iter() {
-					let event = event.unwrap();
-
-					let pallet = event.pallet_name();
-					let variant = event.variant_name();
-					let field_values = event.field_values().unwrap();
-
-					println!("{pallet}::{variant}: {field_values}");
+				let purchase_event =
+					events.find_first::<metadata::api::broker::events::Purchased>().unwrap();
+				if let Some(ev) = purchase_event {
+					println!(
+						"Purchased success: value: {:?},{:?},{:?},{:?}",
+						ev.who, ev.region_id, ev.price, ev.duration
+					);
 				}
 			}
 		}
