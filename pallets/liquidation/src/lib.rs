@@ -13,7 +13,7 @@ use frame_support::{
 	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
-use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
+use frame_system::{pallet_prelude::{BlockNumberFor, OriginFor}, ensure_signed_or_root};
 use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
@@ -312,7 +312,7 @@ pub mod pallet {
 			let profit = TotalIncome::<T>::get().saturating_sub(TotalCost::<T>::get());
 
 			if profit >= min_liquidation_threshold
-				&& count % T::ProfitDistributionCycle::get() == Zero::zero()
+				&& count % ProfitDistributionCycle::<T>::get() == Zero::zero()
 			{
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
 				match Self::distribute_profit() {
@@ -565,7 +565,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			ratio: Perbill,
 		) -> DispatchResultWithPostInfo {
-			ensure_root_or_admin(origin)?;
+			ensure_root_or_admin::<T>(origin)?;
 
 			SystemRatio::<T>::put(ratio);
 			Self::deposit_event(Event::SystemRatioSet(ratio));
@@ -578,7 +578,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			ratio: Perbill,
 		) -> DispatchResultWithPostInfo {
-			ensure_root_or_admin(origin)?;
+			ensure_root_or_admin::<T>(origin)?;
 
 			TreasuryRatio::<T>::put(ratio);
 			Self::deposit_event(Event::TreasuryRatioSet(ratio));
@@ -591,7 +591,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			ratio: Perbill,
 		) -> DispatchResultWithPostInfo {
-			ensure_root_or_admin(origin)?;
+			ensure_root_or_admin::<T>(origin)?;
 
 			OperationRatio::<T>::put(ratio);
 			Self::deposit_event(Event::OperationRatioSet(ratio));
@@ -600,37 +600,24 @@ pub mod pallet {
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn set_existential_deposit(
-			origin: OriginFor<T>,
-			deposit: Balance,
-		) -> DispatchResultWithPostInfo {
-			ensure_root_or_admin(origin)?;
-
-			ExistentialDeposit::<T>::put(deposit);
-			Self::deposit_event(Event::ExistentialDepositSet(deposit));
-			Ok(Pays::No.into())
-		}
-
-		#[pallet::call_index(5)]
-		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn set_min_liquidation_threshold(
 			origin: OriginFor<T>,
 			threshold: Balance,
 		) -> DispatchResultWithPostInfo {
-			ensure_root_or_admin(origin)?;
+			ensure_root_or_admin::<T>(origin)?;
 
 			MinLiquidationThreshold::<T>::put(threshold);
 			Self::deposit_event(Event::MinLiquidationThresholdSet(threshold));
 			Ok(Pays::No.into())
 		}
 
-		#[pallet::call_index(6)]
+		#[pallet::call_index(5)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn set_profit_distribution_cycle(
 			origin: OriginFor<T>,
 			cycle: BlockNumberFor<T>,
 		) -> DispatchResultWithPostInfo {
-			ensure_root_or_admin(origin)?;
+			ensure_root_or_admin::<T>(origin)?;
 
 			ProfitDistributionCycle::<T>::put(cycle);
 			Self::deposit_event(Event::ProfitDistributionCycleSet(cycle));
