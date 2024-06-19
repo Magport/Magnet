@@ -13,7 +13,10 @@ use frame_support::{
 	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
-use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
+use frame_system::{
+	ensure_signed_or_root,
+	pallet_prelude::{BlockNumberFor, OriginFor},
+};
 use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
@@ -77,25 +80,9 @@ pub mod pallet {
 		///get real weight cost from coreTime placeOrder pallet
 		type OrderGasCost: OrderGasCost<Self>;
 
-		///profit distribute ratio to treasury account
-		#[pallet::constant]
-		type SystemRatio: Get<Perbill>;
-
-		///profit distribute ratio to treasury account
-		#[pallet::constant]
-		type TreasuryRatio: Get<Perbill>;
-
-		/// profit distribute ratio to operation account
-		#[pallet::constant]
-		type OperationRatio: Get<Perbill>;
-
 		/// ED necessitate the account to exist
 		#[pallet::constant]
 		type ExistentialDeposit: Get<Balance>;
-
-		///minimum liquidation threshold
-		#[pallet::constant]
-		type MinLiquidationThreshold: Get<Balance>;
 
 		/// system accountId
 		#[pallet::constant]
@@ -108,10 +95,6 @@ pub mod pallet {
 		/// operation accountId
 		#[pallet::constant]
 		type OperationAccountName: Get<&'static str>;
-
-		///how many blocks to distribute a profit distribution
-		#[pallet::constant]
-		type ProfitDistributionCycle: Get<BlockNumberFor<Self>>;
 	}
 
 	#[pallet::storage]
@@ -135,6 +118,57 @@ pub mod pallet {
 	#[pallet::getter(fn block_count)]
 	pub type DistributionBlockCount<T: Config> = StorageValue<_, BlockNumberFor<T>, ValueQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn system_ratio)]
+	pub type SystemRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn treasury_ratio)]
+	pub type TreasuryRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn operation_ratio)]
+	pub type OperationRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn min_liquidation_threshold)]
+	pub type MinLiquidationThreshold<T: Config> = StorageValue<_, Balance, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn profit_distribution_cycle)]
+	pub type ProfitDistributionCycle<T: Config> = StorageValue<_, BlockNumberFor<T>, ValueQuery>;
+
+	/// The pallet admin key.
+	#[pallet::storage]
+	#[pallet::getter(fn admin_key)]
+	pub type Admin<T: Config> = StorageValue<_, T::AccountId>;
+
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		/// The `AccountId` of the admin key.
+		pub admin_key: Option<T::AccountId>,
+		pub system_ratio: Perbill,
+		pub treasury_ratio: Perbill,
+		pub operation_ratio: Perbill,
+		pub min_liquidation_threshold: Balance,
+		pub profit_distribution_cycle: BlockNumberFor<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			if let Some(key) = &self.admin_key {
+				<Admin<T>>::put(key.clone());
+			}
+			SystemRatio::<T>::put(self.system_ratio);
+			TreasuryRatio::<T>::put(self.treasury_ratio);
+			OperationRatio::<T>::put(self.operation_ratio);
+			MinLiquidationThreshold::<T>::put(self.min_liquidation_threshold);
+			ProfitDistributionCycle::<T>::put(self.profit_distribution_cycle);
+		}
+	}
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -157,6 +191,24 @@ pub mod pallet {
 		/// collators compensated
 		CollatorsCompensated(Balance, Balance),
 
+		/// set admin(account_id)
+		SetAdmin(T::AccountId),
+
+		/// Set system ratio
+		SystemRatioSet(Perbill),
+
+		/// Set treasury ratio
+		TreasuryRatioSet(Perbill),
+
+		/// Set operation ratio
+		OperationRatioSet(Perbill),
+
+		/// Set min liquidation threshold
+		MinLiquidationThresholdSet(Balance),
+
+		/// Set profit distribution cycle
+		ProfitDistributionCycleSet(BlockNumberFor<T>),
+
 		/// error occurred
 		Error(Error<T>),
 	}
@@ -176,6 +228,8 @@ pub mod pallet {
 		///failed to process liquidation
 		ProcessLiquidationError,
 
+		/// Require admin authority
+		RequireAdmin,
 		///xcm error
 		XcmError,
 	}
@@ -255,13 +309,11 @@ pub mod pallet {
 			});
 
 			let min_liquidation_threshold: Balance =
-				<T as pallet::Config>::MinLiquidationThreshold::get()
-					.try_into()
-					.unwrap_or_else(|_| 0);
+				MinLiquidationThreshold::<T>::get().try_into().unwrap_or_else(|_| 0);
 			let profit = TotalIncome::<T>::get().saturating_sub(TotalCost::<T>::get());
 
 			if profit >= min_liquidation_threshold
-				&& count % T::ProfitDistributionCycle::get() == Zero::zero()
+				&& count % ProfitDistributionCycle::<T>::get() == Zero::zero()
 			{
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
 				match Self::distribute_profit() {
@@ -385,9 +437,9 @@ pub mod pallet {
 				Error::<T>::GetPotAccountError
 			})?;
 
-			let system_ratio = T::SystemRatio::get();
-			let treasury_ratio = T::TreasuryRatio::get();
-			let operation_ratio = T::OperationRatio::get();
+			let system_ratio = SystemRatio::<T>::get();
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
 
 			let treasury_amount = treasury_ratio * total_profit / PARACHAIN_TO_RELAYCHAIN_UNIT;
 			let operation_amount = operation_ratio * total_profit;
@@ -479,6 +531,106 @@ pub mod pallet {
 				},
 			}
 			Ok(())
+		}
+	}
+
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_admin(
+			origin: OriginFor<T>,
+			new_admin: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResultWithPostInfo {
+			let require = match ensure_signed_or_root(origin) {
+				Ok(s) if s == Self::admin_key() => true,
+				Ok(None) => true,
+				_ => false,
+			};
+
+			ensure!(require, Error::<T>::RequireAdmin);
+
+			let new_admin = T::Lookup::lookup(new_admin)?;
+
+			Admin::<T>::mutate(|admin| *admin = Some(new_admin.clone()));
+
+			Self::deposit_event(Event::SetAdmin(new_admin));
+
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_system_ratio(
+			origin: OriginFor<T>,
+			ratio: Perbill,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			SystemRatio::<T>::put(ratio);
+			Self::deposit_event(Event::SystemRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_treasury_ratio(
+			origin: OriginFor<T>,
+			ratio: Perbill,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			TreasuryRatio::<T>::put(ratio);
+			Self::deposit_event(Event::TreasuryRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(3)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_operation_ratio(
+			origin: OriginFor<T>,
+			ratio: Perbill,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			OperationRatio::<T>::put(ratio);
+			Self::deposit_event(Event::OperationRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(4)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_min_liquidation_threshold(
+			origin: OriginFor<T>,
+			threshold: Balance,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			MinLiquidationThreshold::<T>::put(threshold);
+			Self::deposit_event(Event::MinLiquidationThresholdSet(threshold));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(5)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_profit_distribution_cycle(
+			origin: OriginFor<T>,
+			cycle: BlockNumberFor<T>,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			ProfitDistributionCycle::<T>::put(cycle);
+			Self::deposit_event(Event::ProfitDistributionCycleSet(cycle));
+			Ok(Pays::No.into())
+		}
+	}
+
+	/// Ensure the origin is either root or admin.
+	fn ensure_root_or_admin<T: Config>(origin: OriginFor<T>) -> DispatchResult {
+		match ensure_signed_or_root(origin) {
+			Ok(s) if s == Pallet::<T>::admin_key() => Ok(()),
+			Ok(None) => Ok(()),
+			_ => Err(Error::<T>::RequireAdmin.into()),
 		}
 	}
 }

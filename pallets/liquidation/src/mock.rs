@@ -33,7 +33,6 @@ use xcm_builder::{
 use xcm_executor::XcmExecutor;
 
 type Balance = u128;
-type BlockNumber = u32;
 type Block = frame_system::mocking::MockBlock<Test>;
 
 pub const UNIT: Balance = 1_000_000_000_000_000_000;
@@ -68,18 +67,6 @@ const SYSTEM_ACCOUNT: AccountId32 = AccountId32::new(SYSTEM_ACCOUNT_BYTES);
 /// The existential deposit. Set to 1/10 of the Connected Relay Chain.
 pub const EXISTENTIAL_DEPOSIT: Balance = MILLIUNIT;
 
-parameter_types! {
-	pub const SystemRatio: Perbill = Perbill::from_percent(20); // 20% for system
-	pub const TreasuryRatio: Perbill = Perbill::from_percent(33); // 33% for treasury
-	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
-	pub const ProfitDistributionCycle: BlockNumber = 10;
-	pub const ExistDeposit: Balance = EXISTENTIAL_DEPOSIT;
-	pub const MinLiquidationThreshold: Balance = MILLIUNIT * 20;
-	pub const SystemAccountName: &'static str = "system";
-	pub const TreasuryAccountName: &'static str = "treasury";
-	pub const OperationAccountName: &'static str = "maintenance";
-}
-
 impl system::Config for Test {
 	type BaseCallFilter = frame_support::traits::Everything;
 	type BlockWeights = ();
@@ -109,6 +96,9 @@ impl system::Config for Test {
 
 parameter_types! {
 	pub const ExistentialDeposit: u128 = EXISTENTIAL_DEPOSIT;
+	pub const SystemAccountName: &'static str = "system";
+	pub const TreasuryAccountName: &'static str = "treasury";
+	pub const OperationAccountName: &'static str = "maintenance";
 }
 
 impl pallet_balances::Config for Test {
@@ -281,15 +271,10 @@ impl pallet_liquidation::Config for Test {
 	type XcmSender = XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = MockOrderGasCostHandler;
-	type SystemRatio = SystemRatio;
-	type TreasuryRatio = TreasuryRatio;
-	type OperationRatio = OperationRatio;
-	type ExistentialDeposit = ExistDeposit;
-	type MinLiquidationThreshold = MinLiquidationThreshold;
+	type ExistentialDeposit = ExistentialDeposit;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
 	type OperationAccountName = OperationAccountName;
-	type ProfitDistributionCycle = ProfitDistributionCycle;
 }
 
 pub struct WeightToFee;
@@ -323,17 +308,54 @@ where
 
 pub struct ExtBuilder {
 	existential_deposit: u128,
+	system_ratio: Perbill,
+	treasury_ratio: Perbill,
+	operation_ratio: Perbill,
+	min_liquidation_threshold: Balance,
+	profit_distribution_cycle: u64,
 }
 
 impl Default for ExtBuilder {
 	fn default() -> Self {
-		Self { existential_deposit: 1 }
+		Self {
+			existential_deposit: 1,
+			system_ratio: Perbill::from_percent(20),
+			treasury_ratio: Perbill::from_percent(33),
+			operation_ratio: Perbill::from_percent(25),
+			min_liquidation_threshold: MILLIUNIT * 20,
+			profit_distribution_cycle: 10,
+		}
 	}
 }
 
 impl ExtBuilder {
 	pub fn existential_deposit(mut self, existential_deposit: u128) -> Self {
 		self.existential_deposit = existential_deposit;
+		self
+	}
+
+	pub fn system_ratio(mut self, ratio: Perbill) -> Self {
+		self.system_ratio = ratio;
+		self
+	}
+
+	pub fn treasury_ratio(mut self, ratio: Perbill) -> Self {
+		self.treasury_ratio = ratio;
+		self
+	}
+
+	pub fn operation_ratio(mut self, ratio: Perbill) -> Self {
+		self.operation_ratio = ratio;
+		self
+	}
+
+	pub fn min_liquidation_threshold(mut self, threshold: Balance) -> Self {
+		self.min_liquidation_threshold = threshold;
+		self
+	}
+
+	pub fn profit_distribution_cycle(mut self, cycle: u64) -> Self {
+		self.profit_distribution_cycle = cycle;
 		self
 	}
 
@@ -344,6 +366,16 @@ impl ExtBuilder {
 			balances: vec![(COLLATOR, UNIT), (SYSTEM_ACCOUNT, UNIT)],
 		};
 		balances_config.assimilate_storage(&mut storage).unwrap();
+
+		let liquidation_config = pallet_liquidation::GenesisConfig::<Test> {
+			admin_key: Some(SYSTEM_ACCOUNT),
+			system_ratio: self.system_ratio,
+			treasury_ratio: self.treasury_ratio,
+			operation_ratio: self.operation_ratio,
+			min_liquidation_threshold: self.min_liquidation_threshold,
+			profit_distribution_cycle: self.profit_distribution_cycle,
+		};
+		liquidation_config.assimilate_storage(&mut storage).unwrap();
 
 		let mut ext = sp_io::TestExternalities::new(storage);
 		ext.execute_with(|| System::set_block_number(1));
