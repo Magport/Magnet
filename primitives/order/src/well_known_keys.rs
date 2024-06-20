@@ -20,8 +20,9 @@
 use cumulus_primitives_core::relay_chain::CoreIndex;
 use {
 	cumulus_primitives_core::ParaId,
+	pallet_broker::RegionId,
 	sp_core::Encode,
-	sp_io::hashing::{twox_256, twox_64},
+	sp_io::hashing::{blake2_128, twox_256, twox_64},
 	sp_std::vec::Vec,
 };
 
@@ -70,5 +71,16 @@ pub const CORE_DESCRIPTORS: &[u8] =
 pub fn paras_core_descriptors(core_index: CoreIndex) -> Vec<u8> {
 	core_index.using_encoded(|core_index: &[u8]| {
 		CORE_DESCRIPTORS.iter().chain(twox_256(core_index).iter()).cloned().collect()
+	})
+}
+
+// XXHash a String:Broker Regions
+pub const REGIONS: &[u8] =
+	&hex_literal::hex!["4dcb50595177a3177648411a42aca0f53dc63b0b76ffd6f80704a090da6f8719"];
+
+/// assigner coretime storage CoreDescriptors
+pub fn broker_regions(region_id: RegionId) -> Vec<u8> {
+	region_id.using_encoded(|core_index: &[u8]| {
+		REGIONS.iter().chain(blake2_128(core_index).iter()).cloned().collect()
 	})
 }

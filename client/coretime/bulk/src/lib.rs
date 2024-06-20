@@ -22,9 +22,15 @@ use sp_api::ProvideRuntimeApi;
 use std::error::Error;
 use std::sync::Arc;
 mod metadata;
+use magnet_primitives_order::{self, well_known_keys::broker_regions};
+use pallet_broker::{CoreMask, RegionId};
+use sp_storage::StorageKey;
 use subxt::client::OfflineClientT;
 use subxt::{
-	config::polkadot::PolkadotExtrinsicParamsBuilder as Params, tx::Signer, utils::MultiSignature,
+	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
+	config::polkadot::PolkadotExtrinsicParamsBuilder as Params,
+	tx::Signer,
+	utils::MultiSignature,
 	Config, OnlineClient, PolkadotConfig,
 };
 
@@ -43,8 +49,9 @@ where
 		let parachain = parachain.clone();
 
 		async move {
+			let rpc_client = RpcClient::from_url("ws://127.0.0.1:9944").await.unwrap();
 			let api =
-				OnlineClient::<PolkadotConfig>::from_url("ws://127.0.0.1:8855").await.unwrap();
+				OnlineClient::<PolkadotConfig>::from_url("ws://127.0.0.1:9944").await.unwrap();
 
 			loop {
 				let events = api.events().at_latest().await.unwrap();
@@ -56,6 +63,20 @@ where
 						"Purchased success: value: {:?},{:?},{:?},{:?}",
 						ev.who, ev.region_id, ev.price, ev.duration
 					);
+					let rpc = LegacyRpcMethods::<PolkadotConfig>::new(rpc_client.clone());
+					// let xxx = ev.region_id.mask.0.into();
+					// let coreMask = CoreMask::from(xxx);
+					// let region_id =RegionId{
+					// 	begin:ev.region_id.begin,
+					// 	core:ev.region_id.core,
+					// 	mask:coreMask,
+					// };
+					// let key = broker_regions(region_id);
+					// let mut relevant_keys = Vec::new();
+					// relevant_keys.push(key.as_slice());
+					// // let storage_keys: Vec<StorageKey> = relevant_keys.into_iter().map(StorageKey).collect();
+					// let proof = rpc.state_get_read_proof(relevant_keys, Some(events.block_hash())).await;
+					// println!("{:?}", proof);
 				}
 			}
 		}

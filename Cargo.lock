@@ -2886,6 +2886,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "dp-chain-state-snapshot"
+version = "0.1.0"
+dependencies = [
+ "cumulus-primitives-core",
+ "parity-scale-codec",
+ "sp-runtime 31.0.1",
+ "sp-state-machine 0.35.0",
+ "sp-trie 29.0.0",
+]
+
+[[package]]
 name = "dtoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6008,8 +6019,11 @@ dependencies = [
  "cumulus-primitives-core",
  "cumulus-primitives-parachain-inherent",
  "cumulus-relay-chain-interface",
+ "dp-chain-state-snapshot",
  "futures",
  "log",
+ "magnet-primitives-order",
+ "pallet-broker",
  "parity-scale-codec",
  "polkadot-node-primitives",
  "polkadot-node-subsystem",
@@ -6034,6 +6048,7 @@ dependencies = [
  "sp-keystore 0.34.0",
  "sp-runtime 31.0.1",
  "sp-state-machine 0.35.0",
+ "sp-storage 19.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
  "sp-timestamp",
  "substrate-prometheus-endpoint",
  "subxt",
@@ -6049,6 +6064,7 @@ dependencies = [
  "cumulus-relay-chain-interface",
  "hex-literal",
  "log",
+ "pallet-broker",
  "parity-scale-codec",
  "scale-info",
  "sp-api",
