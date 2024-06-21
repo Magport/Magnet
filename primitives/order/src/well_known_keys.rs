@@ -81,6 +81,11 @@ pub const REGIONS: &[u8] =
 /// assigner coretime storage CoreDescriptors
 pub fn broker_regions(region_id: RegionId) -> Vec<u8> {
 	region_id.using_encoded(|core_index: &[u8]| {
-		REGIONS.iter().chain(blake2_128(core_index).iter()).cloned().collect()
+		REGIONS
+			.iter()
+			.chain(blake2_128(core_index).iter())
+			.chain(core_index.iter())
+			.cloned()
+			.collect()
 	})
 }
