@@ -27,12 +27,11 @@ pallet-assets-bridge = { path = "../pallets/assets-bridge", default-features = f
 pallet-evm-utils = { path = "../pallets/evm-utils", default-features = false }
 pallet-precompile-substrate-utils = { path = "../pallets/evm/precompile/substrate-utils", default-features = false }
 pallet-precompile-transfer-to-magnet = { path = "../pallets/evm/precompile/transfer-to-magnet", default-features = false }
-pallet-order = { path = "../pallets/order", default-features = false }
-magnet-primitives-order = { path = "../primitives/order", default-features = false }
 pallet-pot = { path = "../pallets/pot", default-features = false }
 pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features = false }
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
 pallet-liquidation = {path = "../pallets/liquidation", default-features = false}
+pallet-bulk = { path = "../pallets/bulk", default-features = false }
 
 # Substrate
 frame-benchmarking = { workspace = true, default-features = false, optional = true}
@@ -191,8 +190,6 @@ std = [
 	"pallet-evm-utils/std",
 	"pallet-precompile-substrate-utils/std",
 	"pallet-precompile-transfer-to-magnet/std",
-	"magnet-primitives-order/std",
-	"pallet-order/std",
 	"sp-trie/std",
 	"cumulus-primitives-timestamp/std",
     "pallet-liquidation/std",
@@ -206,7 +203,8 @@ std = [
 	"pallet-ranked-collective/std",
 	"pallet-scheduler/std",
 	"pallet-insecure-randomness-collective-flip/std",
-	"pallet-contracts/std",	
+	"pallet-contracts/std",
+	"pallet-bulk/std",
 ]
 
 runtime-benchmarks = [
@@ -232,7 +230,7 @@ runtime-benchmarks = [
 	"pallet-evm-utils/runtime-benchmarks",
 	"pallet-precompile-substrate-utils/runtime-benchmarks",
 	"pallet-precompile-transfer-to-magnet/runtime-benchmarks",
-	"pallet-order/runtime-benchmarks",
+#	"pallet-order/runtime-benchmarks",
 	"pallet-collective/runtime-benchmarks",
 	"pallet-society/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",
@@ -277,7 +275,6 @@ try-runtime = [
 	"pallet-evm-utils/try-runtime",
 	"pallet-precompile-substrate-utils/try-runtime",
 	"pallet-precompile-transfer-to-magnet/try-runtime",
-	"pallet-order/try-runtime",
     "pallet-liquidation/try-runtime",
 	"pallet-assets/try-runtime",
 	"pallet-assets-bridge/try-runtime",

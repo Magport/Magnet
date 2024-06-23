@@ -14,30 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-const LOG_TARGET: &str = "on_demand_aura::magnet";
+//! Keys of well known.
+#![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_core::crypto::{ByteArray, Pair};
-use sp_keystore::KeystorePtr;
+use cumulus_primitives_core::relay_chain::CoreIndex;
+use {
+	cumulus_primitives_core::ParaId,
+	sp_core::Encode,
+	sp_io::hashing::{blake2_128, twox_256, twox_64},
+	sp_std::vec::Vec,
+};
 
-type AuthorityId<P> = <P as Pair>::Public;
+pub const PARAS_PARA_LIFECYCLES: &[u8] =
+	&hex_literal::hex!["cd710b30bd2eab0352ddcc26417aa194281e0bfde17b36573208a06cb5cfba6b"];
 
-pub async fn order_slot<P: Pair>(
-	idx: u32,
-	authorities: &[AuthorityId<P>],
-	keystore: &KeystorePtr,
-) -> Option<P::Public> {
-	if authorities.is_empty() {
-		return None;
-	}
-
-	let expected_author = authorities.get(idx as usize).expect(
-		"authorities not empty; index constrained to list length;this is a valid index; qed",
-	);
-
-	if keystore.has_keys(&[(expected_author.to_raw_vec(), sp_application_crypto::key_types::AURA)])
-	{
-		Some(expected_author.clone())
-	} else {
-		None
-	}
+// Paras pallet storage ParaLifecycles
+pub fn paras_para_lifecycles(para_id: ParaId) -> Vec<u8> {
+	para_id.using_encoded(|para_id: &[u8]| {
+		PARAS_PARA_LIFECYCLES
+			.iter()
+			.chain(twox_64(para_id).iter())
+			.chain(para_id.iter())
+			.cloned()
+			.collect()
+	})
 }

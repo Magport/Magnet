@@ -86,7 +86,8 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 
 // XCM Imports
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId, PersistedValidationData};
-pub use pallet_order::{self, OrderGasCost};
+pub use pallet_bulk;
+// pub use pallet_order::{self, OrderGasCost};
 use xcm::latest::prelude::{
 	Asset as MultiAsset, BodyId, InteriorLocation as InteriorMultiLocation,
 	Junction::PalletInstance, Location as MultiLocation,
@@ -333,7 +334,7 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 /// up by `pallet_aura` to implement `fn slot_duration()`.
 ///
 /// Change this to adjust the block time.
-pub const MILLISECS_PER_BLOCK: u64 = 12000;
+pub const MILLISECS_PER_BLOCK: u64 = 6000;
 pub const WEIGHT_MILLISECS_PER_BLOCK: u64 = 2000;
 
 // NOTE: Currently it is not possible to change the slot duration after the chain has started.
@@ -689,52 +690,60 @@ impl pallet_collator_selection::Config for Runtime {
 	type WeightInfo = ();
 }
 
-pub struct OrderGasCostHandler();
+// pub struct OrderGasCostHandler();
 
-impl<T> OrderGasCost<T> for OrderGasCostHandler
-where
-	T: pallet_order::Config,
-	T::AccountId: From<[u8; 32]>,
-{
-	fn gas_cost(
-		block_number: BlockNumberFor<T>,
-	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
-		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number);
-		if sequece_number.is_none() {
-			return Ok(None);
-		}
-		let order = <pallet_order::Pallet<T>>::order_map(
-			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
-		)
-		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
-		let mut r = [0u8; 32];
-		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r)
-			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
-		Ok(Some((account, order.price)))
-	}
-}
+// impl<T> OrderGasCost<T> for OrderGasCostHandler
+// where
+// 	T: pallet_order::Config,
+// 	T::AccountId: From<[u8; 32]>,
+// {
+// 	fn gas_cost(
+// 		block_number: BlockNumberFor<T>,
+// 	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
+// 		let sequece_number = <pallet_order::Pallet<T>>::block_2_sequence(block_number);
+// 		if sequece_number.is_none() {
+// 			return Ok(None);
+// 		}
+// 		let order = <pallet_order::Pallet<T>>::order_map(
+// 			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
+// 		)
+// 		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
+// 		let mut r = [0u8; 32];
+// 		r.copy_from_slice(order.orderer.encode().as_slice());
+// 		let account = T::AccountId::try_from(r)
+// 			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
+// 		Ok(Some((account, order.price)))
+// 	}
+// }
 
-parameter_types! {
-	pub const SlotWidth: u32 = 2;
-	pub const OrderMaxAmount:Balance = 200000000;
-	pub const TxPoolThreshold:Balance = 3000000000;
-}
+// parameter_types! {
+// 	pub const SlotWidth: u32 = 2;
+// 	pub const OrderMaxAmount:Balance = 200000000;
+// 	pub const TxPoolThreshold:Balance = 3000000000;
+// }
 
 type EnsureRootOrHalf = EitherOfDiverse<
 	EnsureRoot<AccountId>,
 	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
 >;
 
-impl pallet_order::Config for Runtime {
+// impl pallet_order::Config for Runtime {
+// 	type RuntimeEvent = RuntimeEvent;
+// 	type AuthorityId = AuraId;
+// 	type Currency = Balances;
+// 	type UpdateOrigin = EnsureRootOrHalf;
+// 	type OrderMaxAmount = OrderMaxAmount;
+// 	type SlotWidth = SlotWidth;
+// 	type TxPoolThreshold = TxPoolThreshold;
+// 	type WeightInfo = pallet_order::weights::SubstrateWeight<Runtime>;
+// }
+
+impl pallet_bulk::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type AuthorityId = AuraId;
 	type Currency = Balances;
 	type UpdateOrigin = EnsureRootOrHalf;
-	type OrderMaxAmount = OrderMaxAmount;
-	type SlotWidth = SlotWidth;
-	type TxPoolThreshold = TxPoolThreshold;
-	type WeightInfo = pallet_order::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -970,7 +979,7 @@ impl pallet_liquidation::Config for Runtime {
 	type Currency = Balances;
 	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
-	type OrderGasCost = OrderGasCostHandler;
+	type OrderGasCost = ();
 	type SystemRatio = SystemRatio;
 	type TreasuryRatio = TreasuryRatio;
 	type OperationRatio = OperationRatio;
@@ -1167,7 +1176,7 @@ construct_runtime!(
 		HotfixSufficients: pallet_hotfix_sufficients = 45,
 
 		//Magnet
-		OrderPallet: pallet_order = 51,
+		// OrderPallet: pallet_order = 51,
 		EVMUtils: pallet_evm_utils = 60,
 		Pot: pallet_pot = 61,
 		Assurance: pallet_assurance = 62,
@@ -1176,6 +1185,7 @@ construct_runtime!(
 		//Contracts
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip = 70,
 		Contracts: pallet_contracts = 71,
+		BulkPallet: pallet_bulk = 72,
 	}
 );
 
@@ -1189,7 +1199,7 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
-		[pallet_order, OrderPallet]
+		// [pallet_order, OrderPallet]
 	);
 }
 
@@ -1537,39 +1547,39 @@ impl_runtime_apis! {
 			ParachainSystem::collect_collation_info(header)
 		}
 	}
-	impl magnet_primitives_order::OrderRuntimeApi<Block, Balance, AuraId> for Runtime {
+	// impl magnet_primitives_order::OrderRuntimeApi<Block, Balance, AuraId> for Runtime {
 
-		fn slot_width()-> u32{
-			OrderPallet::slot_width()
-		}
-		fn order_max_amount() -> Balance {
-			OrderPallet::order_max_amount()
-		}
-		fn sequence_number()-> u64 {
-			OrderPallet::sequence_number()
-		}
+	// 	fn slot_width()-> u32{
+	// 		OrderPallet::slot_width()
+	// 	}
+	// 	fn order_max_amount() -> Balance {
+	// 		OrderPallet::order_max_amount()
+	// 	}
+	// 	fn sequence_number()-> u64 {
+	// 		OrderPallet::sequence_number()
+	// 	}
 
-		fn current_relay_height()-> u32 {
-			OrderPallet::current_relay_height()
-		}
+	// 	fn current_relay_height()-> u32 {
+	// 		OrderPallet::current_relay_height()
+	// 	}
 
-		fn order_placed(
-			relay_storage_proof: sp_trie::StorageProof,
-			validation_data: PersistedValidationData,
-			para_id:ParaId,
-		)-> Option<AuraId> {
-			OrderPallet::order_placed(relay_storage_proof, validation_data, para_id)
-		}
+	// 	fn order_placed(
+	// 		relay_storage_proof: sp_trie::StorageProof,
+	// 		validation_data: PersistedValidationData,
+	// 		para_id:ParaId,
+	// 	)-> Option<AuraId> {
+	// 		OrderPallet::order_placed(relay_storage_proof, validation_data, para_id)
+	// 	}
 
-		fn reach_txpool_threshold(gas_balance:Balance) -> bool {
-			OrderPallet::reach_txpool_threshold(gas_balance)
-		}
+	// 	fn reach_txpool_threshold(gas_balance:Balance) -> bool {
+	// 		OrderPallet::reach_txpool_threshold(gas_balance)
+	// 	}
 
 
-		fn order_executed(sequence_number:u64) -> bool {
-			OrderPallet::order_executed(sequence_number)
-		}
-	}
+	// 	fn order_executed(sequence_number:u64) -> bool {
+	// 		OrderPallet::order_executed(sequence_number)
+	// 	}
+	// }
 
 	impl mp_system::OnRelayChainApi<Block> for Runtime {
 		fn on_relaychain(block_number: u32) -> i32 {

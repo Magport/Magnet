@@ -1,7 +1,7 @@
 [package]
-name = "pallet-order"
+name = "pallet-bulk"
 authors = ["Anonymous"]
-description = "On demand order runtime logic."
+description = "bulk mode runtime logic."
 version = "0.2.0"
 license = "Apache-2.0"
 homepage = "https://magnet.magport.io/"
@@ -18,7 +18,8 @@ log = { workspace = true, default-features = false }
 hex-literal = { workspace = true }
 
 # Local
-magnet-primitives-order = { path = "../../primitives/order", default-features = false }
+mp-coretime-bulk = { path = "../../primitives/coretime/bulk", default-features = false }
+dp-chain-state-snapshot = { path = "../../primitives/chain-state-snapshot", default-features = false}
 
 # Cumulus
 cumulus-pallet-parachain-system = { workspace = true, default-features = false}
@@ -37,6 +38,7 @@ sp-runtime = { workspace = true, default-features = false}
 sp-trie = { workspace = true, default-features = false }
 pallet-balances = { workspace = true, default-features = false }
 sp-core = { workspace = true , default-features = false}
+pallet-broker = { workspace = true, default-features = false }
 
 [dev-dependencies]
 serde = { workspace = true }
@@ -73,7 +75,7 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"magnet-primitives-order/std",
+	"mp-coretime-bulk/std",
 	"log/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-primitives-core/std",
@@ -82,6 +84,8 @@ std = [
 	"sp-trie/std",
 	"pallet-balances/std",
 	"sp-core/std",
+	"dp-chain-state-snapshot/std",
+	"pallet-broker/std",
 ]
 try-runtime = [
 	"frame-support/try-runtime",

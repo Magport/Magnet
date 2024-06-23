@@ -29,11 +29,12 @@ subxt-signer = { workspace = true }
 
 # Local
 parachain-magnet-runtime = { path = "../runtime" }
-magnet-primitives-order = { path = "../primitives/order"}
-magnet-client-consensus-aura = {path ="../client/consensus/aura"}
+#magnet-primitives-order = { path = "../primitives/order"}
+#magnet-client-consensus-aura = {path ="../client/consensus/aura"}
 pallet-pot-rpc = { path = "../pallets/pot/rpc" }
 mp-system = { path = "../primitives/system"}
-magnet-client-coretime-bulk = {path ="../client/coretime/bulk"}
+mc-coretime-bulk = {path ="../client/coretime/bulk"}
+mp-coretime-bulk = { path = "../primitives/coretime/bulk"}
 
 # Substrate
 frame-benchmarking = { workspace = true }
@@ -78,6 +79,7 @@ frame-system = { workspace = true }
 pallet-transaction-payment = { workspace = true }
 sp-application-crypto= { workspace = true }
 sp-std = { workspace = true }
+sp-trie = { workspace = true }
 
 # Polkadot
 polkadot-cli = { workspace = true, features = ["rococo-native"] }

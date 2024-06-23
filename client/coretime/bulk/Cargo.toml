@@ -1,7 +1,7 @@
 [package]
-name = "magnet-client-coretime-bulk"
+name = "mc-coretime-bulk"
 authors = ["Anonymous"]
-description = "magnet-coretime"
+description = "client of magnet coretime bulk mode"
 license = "Apache License 2.0"
 homepage = "https://magnet.magport.io/"
 repository.workspace = true
@@ -19,7 +19,8 @@ subxt = { workspace = true, features = ["substrate-compat"]}
 
 # Local
 dp-chain-state-snapshot = { path = "../../../primitives/chain-state-snapshot"}
-magnet-primitives-order = { path = "../../../primitives/order"}
+mp-coretime-bulk = { path = "../../../primitives/coretime/bulk"}
+mc-coretime-common = { path = "../common"}
 
 # Substrate
 sc-client-api = { workspace = true }
