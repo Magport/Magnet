@@ -99,6 +99,7 @@ pallet-collator-selection = { workspace = true, default-features = false }
 parachain-info = { workspace = true, default-features = false }
 parachains-common = { workspace = true, default-features = false }
 cumulus-primitives-timestamp ={ workspace = true, default-features = false }
+cumulus-primitives-aura ={ workspace = true, default-features = false }
 
 #Frontier FRAME
 pallet-evm-chain-id = { workspace = true, default-features = false }
@@ -209,7 +210,8 @@ std = [
 	"pallet-ranked-collective/std",
 	"pallet-scheduler/std",
 	"pallet-insecure-randomness-collective-flip/std",
-	"pallet-contracts/std",
+	"pallet-contracts/std",	
+	"cumulus-primitives-aura/std",
 	"pallet-move/std",
 ]
 

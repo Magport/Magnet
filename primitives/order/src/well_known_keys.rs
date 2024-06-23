@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Keys of well known.
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use cumulus_primitives_core::relay_chain::CoreIndex;
@@ -27,6 +28,7 @@ use {
 pub const PARAS_PARA_LIFECYCLES: &[u8] =
 	&hex_literal::hex!["cd710b30bd2eab0352ddcc26417aa194281e0bfde17b36573208a06cb5cfba6b"];
 
+// Paras pallet storage ParaLifecycles
 pub fn paras_para_lifecycles(para_id: ParaId) -> Vec<u8> {
 	para_id.using_encoded(|para_id: &[u8]| {
 		PARAS_PARA_LIFECYCLES
@@ -38,6 +40,7 @@ pub fn paras_para_lifecycles(para_id: ParaId) -> Vec<u8> {
 	})
 }
 
+/// System pallet
 pub const SYSTEM_BLOCKHASH: &[u8] = &hex_literal::hex![
 	"26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000"
 ];
@@ -63,6 +66,7 @@ pub const ACTIVE_CONFIG: &[u8] =
 pub const CORE_DESCRIPTORS: &[u8] =
 	&hex_literal::hex!["638595eebaa445ce03a13547bece90e704e6ac775a3245623103ffec2cb2c92f"];
 
+/// assigner coretime storage CoreDescriptors
 pub fn paras_core_descriptors(core_index: CoreIndex) -> Vec<u8> {
 	core_index.using_encoded(|core_index: &[u8]| {
 		CORE_DESCRIPTORS.iter().chain(twox_256(core_index).iter()).cloned().collect()
