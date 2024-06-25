@@ -230,6 +230,14 @@ pub mod pallet {
 
 		/// Require admin authority
 		RequireAdmin,
+
+		/// Invalid ratio sum (must be <= 100%)
+		InvalidRatio,
+		/// MinLiquidationThreshold must be greater than ExistentialDeposit
+		InvalidMinLiquidationThreshold,
+		/// ProfitDistributionCycle must be greater than 1
+		InvalidProfitDistributionCycle,
+
 		///xcm error
 		XcmError,
 	}
@@ -567,6 +575,13 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
+			ensure!(
+				ratio + treasury_ratio + operation_ratio <= Perbill::one(),
+				Error::<T>::InvalidRatio
+			);
+
 			SystemRatio::<T>::put(ratio);
 			Self::deposit_event(Event::SystemRatioSet(ratio));
 			Ok(Pays::No.into())
@@ -579,6 +594,13 @@ pub mod pallet {
 			ratio: Perbill,
 		) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
+
+			let system_ratio = SystemRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
+			ensure!(
+				system_ratio + ratio + operation_ratio <= Perbill::one(),
+				Error::<T>::InvalidRatio
+			);
 
 			TreasuryRatio::<T>::put(ratio);
 			Self::deposit_event(Event::TreasuryRatioSet(ratio));
@@ -593,6 +615,13 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
+			let system_ratio = SystemRatio::<T>::get();
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			ensure!(
+				system_ratio + treasury_ratio + ratio <= Perbill::one(),
+				Error::<T>::InvalidRatio
+			);
+
 			OperationRatio::<T>::put(ratio);
 			Self::deposit_event(Event::OperationRatioSet(ratio));
 			Ok(Pays::No.into())
@@ -606,6 +635,9 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
+			let existential_deposit = <T as pallet::Config>::ExistentialDeposit::get();
+			ensure!(threshold > existential_deposit, Error::<T>::InvalidMinLiquidationThreshold);
+
 			MinLiquidationThreshold::<T>::put(threshold);
 			Self::deposit_event(Event::MinLiquidationThresholdSet(threshold));
 			Ok(Pays::No.into())
@@ -618,6 +650,8 @@ pub mod pallet {
 			cycle: BlockNumberFor<T>,
 		) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
+
+			ensure!(cycle > 1u32.into(), Error::<T>::InvalidProfitDistributionCycle);
 
 			ProfitDistributionCycle::<T>::put(cycle);
 			Self::deposit_event(Event::ProfitDistributionCycleSet(cycle));
