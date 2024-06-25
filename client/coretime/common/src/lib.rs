@@ -26,7 +26,9 @@ use runtime_parachains::{configuration::HostConfiguration, paras::ParaLifecycle}
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
+use sp_core::crypto::{ByteArray, Pair};
 use sp_core::H256;
+use sp_keystore::KeystorePtr;
 use sp_state_machine::StorageProof;
 use sp_storage::StorageKey;
 use std::error::Error;
@@ -39,6 +41,7 @@ use subxt::{
 	utils::MultiSignature,
 	Config, OnlineClient, PolkadotConfig,
 };
+type AuthorityId<P> = <P as Pair>::Public;
 
 pub async fn is_parathread(
 	relay_chain: impl RelayChainInterface + Clone,
@@ -61,4 +64,25 @@ pub async fn is_parathread(
 		None => false,
 	};
 	Ok(is_parathread)
+}
+
+pub async fn order_slot<P: Pair>(
+	idx: u32,
+	authorities: &[AuthorityId<P>],
+	keystore: &KeystorePtr,
+) -> Option<P::Public> {
+	if authorities.is_empty() {
+		return None;
+	}
+
+	let expected_author = authorities.get(idx as usize).expect(
+		"authorities not empty; index constrained to list length;this is a valid index; qed",
+	);
+
+	if keystore.has_keys(&[(expected_author.to_raw_vec(), sp_application_crypto::key_types::AURA)])
+	{
+		Some(expected_author.clone())
+	} else {
+		None
+	}
 }

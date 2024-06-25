@@ -13,7 +13,6 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
-use cumulus_primitives_core::BlockT;
 use cumulus_primitives_core::ParaId;
 use cumulus_relay_chain_interface::RelayChainInterface;
 use polkadot_primitives::AccountId;
@@ -26,6 +25,7 @@ use std::error::Error;
 use std::sync::Arc;
 mod metadata;
 use codec::{Codec, Decode};
+use cumulus_primitives_core::relay_chain::BlockNumber as RelayBlockNumber;
 use dp_chain_state_snapshot::GenericStateProof;
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
 use mc_coretime_common::is_parathread;
@@ -36,10 +36,12 @@ use mp_coretime_bulk::{self, well_known_keys::broker_regions};
 use pallet_broker::RegionRecord;
 use pallet_broker::{CoreMask, RegionId};
 use sp_application_crypto::AppPublic;
+use sp_consensus_aura::AuraApi;
 use sp_core::{crypto::Pair, H256};
+use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	codec::Encode,
-	traits::{AtLeast32BitUnsigned, Header as HeaderT, MaybeDisplay, Member},
+	traits::{AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, Member},
 };
 use sp_state_machine::StorageProof;
 use sp_storage::StorageKey;
@@ -61,30 +63,57 @@ fn u8_array_to_u128(array: [u8; 10]) -> u128 {
 	result
 }
 
-pub async fn coretime_bulk_task<R>(
+pub async fn coretime_bulk_task<P, R, Block, PB>(
+	parachain: &P,
 	relay_chain: R,
+	height: RelayBlockNumber,
 	p_hash: H256,
 	para_id: ParaId,
 	bulk_record: Arc<Mutex<BulkMemRecord>>,
+	keystore: KeystorePtr,
 ) -> Result<(), Box<dyn Error>>
 where
+	Block: BlockT,
+	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	R: RelayChainInterface + Clone,
+	P::Api: AuraApi<Block, PB::Public>,
+	PB: Pair + 'static,
+	PB::Public: AppPublic + Member + Codec,
+	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
 	// Determine whether it is a parathread
 	let parathread = is_parathread(relay_chain, p_hash, para_id).await?;
 	if !parathread {
 		return Ok(());
 	}
-	// Query CoreAssigned Event
+
+	// Randomly select a collator to perform the following operations.
+	let hash = parachain.usage_info().chain.finalized_hash;
+	let authorities = parachain.runtime_api().authorities(hash).map_err(Box::new)?;
+	let auth_len = authorities.len() as u32;
+	let idx = height % auth_len;
+	let collator_public = mc_coretime_common::order_slot::<PB>(idx, &authorities, &keystore).await;
+
+	if collator_public.is_none() {
+		return Ok(());
+	}
+	// Query Broker Assigned Event
 	let api = OnlineClient::<PolkadotConfig>::from_url("ws://127.0.0.1:8855").await?;
 	let block = api.blocks().at_latest().await?;
+	{
+		let mut bulk_record_local = bulk_record.lock().await;
+		let pre_block_height = bulk_record_local.coretime_para_height;
+		let block_number = block.number();
+		if pre_block_height != block_number {
+			bulk_record_local.coretime_para_height = block_number;
+		} else {
+			return Ok(());
+		}
+	}
+
 	let events = block.events().await?;
 	for event in events.iter() {
 		let event = event?;
-		let pallet = event.pallet_name();
-		let variant = event.variant_name();
-		let field_values = event.field_values()?;
-		log::info!("{:?},{:?},{:?}", pallet, variant, field_values);
 		let event_detail = event.as_event::<metadata::api::broker::events::Assigned>();
 		if let Ok(assigned_event) = event_detail {
 			if let Some(ev) = assigned_event {
@@ -134,12 +163,20 @@ where
 	Ok(())
 }
 
-pub async fn run_coretime_bulk_task<R>(
+pub async fn run_coretime_bulk_task<P, R, Block, PB>(
+	parachain: Arc<P>,
 	relay_chain: R,
 	para_id: ParaId,
 	bulk_record: Arc<Mutex<BulkMemRecord>>,
+	keystore: KeystorePtr,
 ) where
+	Block: BlockT,
+	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	R: RelayChainInterface + Clone,
+	P::Api: AuraApi<Block, PB::Public>,
+	PB: Pair + 'static,
+	PB::Public: AppPublic + Member + Codec,
+	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
 	let relay_chain_notification = async move {
 		let new_best_heads = relay_chain
@@ -153,8 +190,7 @@ pub async fn run_coretime_bulk_task<R>(
 				h = new_best_heads.next() => {
 								match h {
 					Some((height, hash)) => {
-						log::info!("{:?},{:?}",height, hash);
-						coretime_bulk_task(relay_chain.clone(), hash, para_id, bulk_record.clone()).await?;
+						coretime_bulk_task::<_,_,_, PB>(&*parachain, relay_chain.clone(), height, hash, para_id, bulk_record.clone(), keystore.clone()).await?;
 					},
 					None => {
 						return Ok::<(), Box<dyn Error>>(());
@@ -169,20 +205,30 @@ pub async fn run_coretime_bulk_task<R>(
 	}
 }
 
-pub fn spawn_bulk_task<T, R, Block>(
-	parachain: Arc<T>,
+pub fn spawn_bulk_task<P, R, Block, PB>(
+	parachain: Arc<P>,
 	para_id: ParaId,
 	relay_chain: R,
 	task_manager: &TaskManager,
 	bulk_record: Arc<Mutex<BulkMemRecord>>,
+	keystore: KeystorePtr,
 ) -> sc_service::error::Result<()>
 where
 	Block: BlockT,
 	R: RelayChainInterface + Clone + 'static,
-	T: Send + Sync + 'static + ProvideRuntimeApi<Block> + UsageProvider<Block>,
+	P: Send + Sync + 'static + ProvideRuntimeApi<Block> + UsageProvider<Block>,
+	P::Api: AuraApi<Block, PB::Public>,
+	PB: Pair + 'static,
+	PB::Public: AppPublic + Member + Codec,
+	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
-	let coretime_bulk_task =
-		run_coretime_bulk_task(relay_chain.clone(), para_id, bulk_record.clone());
+	let coretime_bulk_task = run_coretime_bulk_task::<_, _, _, PB>(
+		parachain.clone(),
+		relay_chain.clone(),
+		para_id,
+		bulk_record.clone(),
+		keystore,
+	);
 	task_manager
 		.spawn_essential_handle()
 		.spawn("bulk task", "magport", coretime_bulk_task);

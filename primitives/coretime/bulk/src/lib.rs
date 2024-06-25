@@ -47,6 +47,8 @@ pub struct BulkInherentData {
 pub struct BulkMemRecord {
 	/// Proof of coretime parachain storage.
 	pub storage_proof: sp_trie::StorageProof,
+	/// Block height of coretime parachain.
+	pub coretime_para_height: u32,
 	/// Root of coretime parachain storage.
 	pub storage_root: PHash,
 	pub region_id: RegionId,

@@ -486,14 +486,16 @@ async fn start_node_impl(
 		let bulk_mem_record = Arc::new(Mutex::new(BulkMemRecord {
 			storage_proof: StorageProof::empty(),
 			storage_root: Default::default(),
+			coretime_para_height: 0,
 			region_id: 0u128.into(),
 		}));
-		spawn_bulk_task(
+		spawn_bulk_task::<_, _, _, sp_consensus_aura::sr25519::AuthorityPair>(
 			client.clone(),
 			para_id,
 			relay_chain_interface.clone(),
 			&task_manager,
 			bulk_mem_record.clone(),
+			params.keystore_container.keystore().clone(),
 		)?;
 		start_consensus(
 			client.clone(),
@@ -642,7 +644,7 @@ fn start_consensus(
 				.await;
 				let bulk_inherent = bulk_inherent.ok_or_else(|| {
 					Box::<dyn std::error::Error + Send + Sync>::from(
-						"Failed to create order inherent",
+						"Failed to create bulk inherent",
 					)
 				})?;
 				Ok(bulk_inherent)
