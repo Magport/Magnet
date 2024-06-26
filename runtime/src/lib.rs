@@ -86,7 +86,7 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 
 // XCM Imports
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId, PersistedValidationData};
-pub use pallet_bulk;
+pub use pallet_bulk::{self, BulkGasCost};
 // pub use pallet_order::{self, OrderGasCost};
 use xcm::latest::prelude::{
 	Asset as MultiAsset, BodyId, InteriorLocation as InteriorMultiLocation,
@@ -737,12 +737,30 @@ type EnsureRootOrHalf = EitherOfDiverse<
 // 	type TxPoolThreshold = TxPoolThreshold;
 // 	type WeightInfo = pallet_order::weights::SubstrateWeight<Runtime>;
 // }
+pub struct OrderGasCostHandler();
+
+impl<T> BulkGasCost<T> for OrderGasCostHandler
+where
+	T: pallet_bulk::Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
+		Ok(None)
+	}
+}
+parameter_types! {
+	pub const MaxUrlLength: u32 = 300;
+}
 
 impl pallet_bulk::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type AuthorityId = AuraId;
 	type Currency = Balances;
+	type RelayChainStateProvider = cumulus_pallet_parachain_system::RelaychainDataProvider<Self>;
 	type UpdateOrigin = EnsureRootOrHalf;
+	type MaxUrlLength = MaxUrlLength;
 	type WeightInfo = ();
 }
 
@@ -1580,6 +1598,12 @@ impl_runtime_apis! {
 	// 		OrderPallet::order_executed(sequence_number)
 	// 	}
 	// }
+	impl mp_coretime_bulk::BulkRuntimeApi<Block> for Runtime {
+
+		fn rpc_url()-> Vec<u8>{
+			BulkPallet::rpc_url()
+		}
+	}
 
 	impl mp_system::OnRelayChainApi<Block> for Runtime {
 		fn on_relaychain(block_number: u32) -> i32 {

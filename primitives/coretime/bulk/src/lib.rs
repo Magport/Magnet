@@ -37,31 +37,53 @@ use {scale_info::TypeInfo, sp_inherents::InherentIdentifier};
 #[derive(Encode, Decode, sp_core::RuntimeDebug, Clone, PartialEq, TypeInfo)]
 pub struct BulkInherentData {
 	/// Proof of coretime parachain storage.
-	pub storage_proof: sp_trie::StorageProof,
+	pub storage_proof: Option<sp_trie::StorageProof>,
 	/// Root of coretime parachain storage.
 	pub storage_root: PHash,
+	/// The identity of the Region.
 	pub region_id: RegionId,
+	/// Relaychain block number of start schedule coretime core.
+	pub start_relaychain_height: u32,
+	/// Relaychain block number of end schedule coretime core.
+	pub end_relaychain_height: u32,
+}
+
+/// Status of bulk purchased then assigned.
+#[derive(Clone, PartialEq, Eq)]
+pub enum BulkStatus {
+	/// User call broker purchase.
+	Purchased,
+	/// User call broker assign.
+	Assigned,
+	/// broker do_tick().
+	CoreAssigned,
 }
 
 #[derive(Clone)]
 pub struct BulkMemRecord {
-	/// Proof of coretime parachain storage.
-	pub storage_proof: sp_trie::StorageProof,
 	/// Block height of coretime parachain.
 	pub coretime_para_height: u32,
+	/// Proof of coretime parachain storage.
+	pub storage_proof: sp_trie::StorageProof,
 	/// Root of coretime parachain storage.
 	pub storage_root: PHash,
+	/// The identity of the Region.
 	pub region_id: RegionId,
+	/// Relaychain block number of start schedule coretime core.
+	pub start_relaychain_height: u32,
+	/// Relaychain block number of end schedule coretime core.
+	pub end_relaychain_height: u32,
+	pub duration: u32,
+	pub status: BulkStatus,
 }
+
 // Identifier of the order inherent
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"bulkihrt";
 
-// sp_api::decl_runtime_apis! {
-// 	#[api_version(2)]
-// 	pub trait BulkRuntimeApi<Balance, AuthorityId> where
-// 		Balance: Codec + MaybeDisplay,
-// 		AuthorityId:Codec
-// 	{
-
-// 	}
-// }
+sp_api::decl_runtime_apis! {
+	#[api_version(2)]
+	pub trait BulkRuntimeApi
+	{
+		fn rpc_url() -> Vec<u8>;
+	}
+}

@@ -69,6 +69,10 @@ pub struct BulkRecord<Balance, AuthorityId> {
 	pub price: Balance,
 	/// Purchase duration.
 	pub duration: u32,
+	/// Relaychain block number of start schedule coretime core.
+	pub start_relaychain_height: u32,
+	/// Relaychain block number of end schedule coretime core.
+	pub end_relaychain_height: u32,
 }
 #[frame_support::pallet]
 pub mod pallet {
@@ -82,6 +86,8 @@ pub mod pallet {
 
 		type Currency: Currency<Self::AccountId>;
 
+		type RelayChainStateProvider: cumulus_pallet_parachain_system::RelaychainStateProvider;
+
 		type AuthorityId: Member
 			+ Parameter
 			+ RuntimeAppPublic
@@ -92,10 +98,19 @@ pub mod pallet {
 		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		type WeightInfo: WeightInfo;
+
+		/// Max length of url, coretime parachain rpc url.
+		#[pallet::constant]
+		type MaxUrlLength: Get<u32>;
 	}
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(PhantomData<T>);
+
+	/// Url storage.
+	#[pallet::storage]
+	#[pallet::getter(fn coretime_rpc_url)]
+	pub type RpcUrl<T: Config> = StorageValue<_, BoundedVec<u8, T::MaxUrlLength>, OptionQuery>;
 
 	#[pallet::type_value]
 	pub fn RecordIndexOnEmpty<T: Config>() -> u32 {
@@ -111,6 +126,25 @@ pub mod pallet {
 	#[pallet::getter(fn bulk_records)]
 	pub type BulkRecords<T: Config> =
 		StorageMap<_, Twox64Concat, u32, BulkRecord<BalanceOf<T>, T::AuthorityId>, OptionQuery>;
+
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		pub rpc_url: BoundedVec<u8, T::MaxUrlLength>,
+		pub _marker: PhantomData<T>,
+	}
+
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			Self { rpc_url: BoundedVec::new(), _marker: Default::default() }
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			RpcUrl::<T>::put(&self.rpc_url);
+		}
+	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -138,9 +172,16 @@ pub mod pallet {
 		const INHERENT_IDENTIFIER: InherentIdentifier = mp_coretime_bulk::INHERENT_IDENTIFIER;
 
 		fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-			let data = data.get_data(&mp_coretime_bulk::INHERENT_IDENTIFIER).ok().flatten();
+			let data: Option<mp_coretime_bulk::BulkInherentData> =
+				data.get_data(&mp_coretime_bulk::INHERENT_IDENTIFIER).ok().flatten();
 			match data {
-				Some(data) => Some(Call::create_record { data }),
+				Some(data) => {
+					if data.storage_proof.is_none() {
+						None
+					} else {
+						Some(Call::create_record { data })
+					}
+				},
 				None => None,
 			}
 		}
@@ -165,11 +206,16 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
 
-			let mp_coretime_bulk::BulkInherentData { storage_proof, storage_root, region_id } =
-				data;
+			let mp_coretime_bulk::BulkInherentData {
+				storage_proof,
+				storage_root,
+				region_id,
+				start_relaychain_height,
+				end_relaychain_height,
+			} = data;
 			let relay_storage_rooted_proof: GenericStateProof<
 				cumulus_primitives_core::relay_chain::Block,
-			> = GenericStateProof::new(storage_root, storage_proof).unwrap();
+			> = GenericStateProof::new(storage_root, storage_proof.unwrap()).unwrap();
 			let key = broker_regions(region_id);
 			let region_record_data = relay_storage_rooted_proof
 				.read_entry::<RegionRecord<T::AuthorityId, BalanceOf<T>>>(key.as_slice(), None)
@@ -182,24 +228,53 @@ pub mod pallet {
 						purchaser: region_record.owner,
 						price: region_record.paid.unwrap(),
 						duration: region_record.end,
+						start_relaychain_height,
+						end_relaychain_height,
 					},
 				);
+				RecordIndex::<T>::set(old_record_index + 1);
 			}
 
 			let total_weight = T::DbWeight::get().reads_writes(2, 1);
 			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
 		}
+
+		/// Set coretime parachain rpc url.
+		///
+		/// Parameters:
+		/// - `url`: Url.
+		#[pallet::call_index(1)]
+		#[pallet::weight(0)]
+		pub fn set_rpc_url(
+			origin: OriginFor<T>,
+			url: BoundedVec<u8, T::MaxUrlLength>,
+		) -> DispatchResult {
+			T::UpdateOrigin::ensure_origin(origin)?;
+
+			RpcUrl::<T>::put(url.clone());
+
+			Ok(())
+		}
 	}
 }
 
-impl<T: Config> Pallet<T> {}
+impl<T: Config> Pallet<T> {
+	pub fn rpc_url() -> Vec<u8> {
+		let rpc_url = RpcUrl::<T>::get();
+		if let Some(url) = rpc_url {
+			url.into()
+		} else {
+			Vec::new()
+		}
+	}
+}
 
-// pub trait OrderGasCost<T: frame_system::Config> {
-// 	/// Gas consumed by placing an order in a certain block.
-// 	///
-// 	/// Parameters:
-// 	/// - `block_number`: The block number of para chain.
-// 	fn gas_cost(
-// 		block_number: BlockNumberFor<T>,
-// 	) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
-// }
+pub trait BulkGasCost<T: frame_system::Config> {
+	/// In Bulk mode, the average gas consumed by a block.
+	///
+	/// Parameters:
+	/// - `block_number`: The block number of para chain.
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
+}

@@ -8642,6 +8642,7 @@ dependencies = [
  "frame-try-runtime",
  "hex-literal",
  "log",
+ "mp-coretime-bulk",
  "mp-system",
  "pallet-assets",
  "pallet-assets-bridge",

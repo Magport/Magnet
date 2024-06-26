@@ -17,13 +17,7 @@
 //! Keys of well known.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use cumulus_primitives_core::relay_chain::CoreIndex;
-use {
-	cumulus_primitives_core::ParaId,
-	sp_core::Encode,
-	sp_io::hashing::{blake2_128, twox_256, twox_64},
-	sp_std::vec::Vec,
-};
+use {cumulus_primitives_core::ParaId, sp_core::Encode, sp_io::hashing::twox_64, sp_std::vec::Vec};
 
 pub const PARAS_PARA_LIFECYCLES: &[u8] =
 	&hex_literal::hex!["cd710b30bd2eab0352ddcc26417aa194281e0bfde17b36573208a06cb5cfba6b"];

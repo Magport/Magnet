@@ -32,6 +32,8 @@ pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
 pallet-liquidation = {path = "../pallets/liquidation", default-features = false}
 pallet-bulk = { path = "../pallets/bulk", default-features = false }
+mp-coretime-bulk = { path = "../primitives/coretime/bulk", default-features = false }
+
 
 # Substrate
 frame-benchmarking = { workspace = true, default-features = false, optional = true}
@@ -205,6 +207,7 @@ std = [
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-contracts/std",
 	"pallet-bulk/std",
+	"mp-coretime-bulk/std",
 ]
 
 runtime-benchmarks = [

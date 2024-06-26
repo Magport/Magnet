@@ -51,6 +51,7 @@ use futures::lock::Mutex;
 // use magnet_primitives_order::{OrderRecord, OrderStatus};
 use mc_coretime_bulk::spawn_bulk_task;
 use mp_coretime_bulk::BulkMemRecord;
+use mp_coretime_bulk::BulkStatus;
 use sp_core::ByteArray;
 use sp_runtime::AccountId32;
 use sp_trie::StorageProof;
@@ -488,6 +489,10 @@ async fn start_node_impl(
 			storage_root: Default::default(),
 			coretime_para_height: 0,
 			region_id: 0u128.into(),
+			start_relaychain_height: 0,
+			end_relaychain_height: 0,
+			status: BulkStatus::Purchased,
+			duration: 0,
 		}));
 		spawn_bulk_task::<_, _, _, sp_consensus_aura::sr25519::AuthorityPair>(
 			client.clone(),
@@ -603,45 +608,24 @@ fn start_consensus(
 	let params = BasicAuraParams {
 		// create_inherent_data_providers: move |_, ()| async move { Ok(()) },
 		create_inherent_data_providers: move |_, ()| {
-			// let relay_chain_interface = relay_chain_interface.clone();
 			let bulk_mem_record_clone = bulk_mem_record.clone();
 			async move {
-				// let parent_hash = relay_chain_interface.best_block_hash().await?;
-				// let (relay_parent, validation_data, sequence_number, author_pub) = {
-				// 	let order_record_local = order_record_clone.lock().await;
-				// 	if order_record_local.validation_data.is_none() {
-				// 		(parent_hash, None, order_record_local.sequence_number, None)
-				// 	} else {
-				// 		(
-				// 			order_record_local.relay_parent.expect("can not get relay_parent hash"),
-				// 			order_record_local.validation_data.clone(),
-				// 			order_record_local.sequence_number,
-				// 			order_record_local.author_pub.clone(),
-				// 		)
-				// 	}
-				// };
-				// let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
-				// 	relay_parent,
-				// 	&relay_chain_interface,
-				// 	&validation_data,
-				// 	para_id,
-				// 	sequence_number,
-				// 	&author_pub,
-				// )
-				// .await;
-				// let order_inherent = order_inherent.ok_or_else(|| {
-				// 	Box::<dyn std::error::Error + Send + Sync>::from(
-				// 		"Failed to create order inherent",
-				// 	)
-				// })?;
-				// Ok(order_inherent)
-				let bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
+				let mut bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
+				let storage_proof =
+					if bulk_mem_record_clone_local.status == BulkStatus::CoreAssigned {
+						Some(&bulk_mem_record_clone_local.storage_proof)
+					} else {
+						None
+					};
 				let bulk_inherent = mp_coretime_bulk::BulkInherentData::create_at(
-					&bulk_mem_record_clone_local.storage_proof,
+					storage_proof,
 					bulk_mem_record_clone_local.storage_root,
 					bulk_mem_record_clone_local.region_id,
+					bulk_mem_record_clone_local.start_relaychain_height,
+					bulk_mem_record_clone_local.end_relaychain_height,
 				)
 				.await;
+				bulk_mem_record_clone_local.status = BulkStatus::Purchased;
 				let bulk_inherent = bulk_inherent.ok_or_else(|| {
 					Box::<dyn std::error::Error + Send + Sync>::from(
 						"Failed to create bulk inherent",

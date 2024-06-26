@@ -20,11 +20,4 @@
 //! the order pallet inherent
 //!
 #![cfg_attr(not(feature = "std"), no_std)]
-use cumulus_primitives_core::{
-	relay_chain::BlockNumber as RelayBlockNumber, relay_chain::Hash as PHash, ParaId,
-	PersistedValidationData,
-};
-use sp_core::H256;
-use sp_runtime::sp_std::vec::Vec;
-use sp_runtime::traits::MaybeDisplay;
 pub mod well_known_keys;

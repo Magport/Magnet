@@ -24,47 +24,25 @@ use {
 	cumulus_relay_chain_interface::{PHash, RelayChainInterface},
 };
 
-/// Collect the relevant coretime para chain state in form of a proof
-/// for putting it into the bulk inherent.
-// async fn collect_coretime_parachain_storage_proof(
-// 	region_id: RegionId,
-// ) -> Option<sp_state_machine::StorageProof> {
-// 	let mut relevant_keys = Vec::new();
-// 	//Broker Regions
-// 	relevant_keys.push(broker_regions(region_id));
-
-// 	// let relay_storage_proof = relay_chain_interface.prove_read(relay_parent, &relevant_keys).await;
-// 	// match relay_storage_proof {
-// 	// 	Ok(proof) => Some(proof),
-// 	// 	Err(err) => {
-// 	// 		log::info!("RelayChainError:{:?}", err);
-// 	// 		None
-// 	// 	},
-// 	// }
-// 	None
-// }
-
 impl BulkInherentData {
 	/// Create the [`BulkInherentData`] at the given `relay_parent`.
 	///
 	/// Returns `None` if the creation failed.
 	pub async fn create_at(
-		// relay_parent: PHash,
-		// author_pub: &AuthorityId,
-		// region_id: RegionId,
-		storage_proof: &sp_trie::StorageProof,
+		storage_proof: Option<&sp_trie::StorageProof>,
 		storage_root: PHash,
 		region_id: RegionId,
+		start: u32,
+		end: u32,
 	) -> Option<BulkInherentData> {
-		// let storage_proof = collect_coretime_parachain_storage_proof(region_id).await?;
-
+		let storage_proof =
+			if let Some(proof) = storage_proof { Some(proof.clone()) } else { None };
 		Some(BulkInherentData {
-			storage_proof: storage_proof.clone(),
+			storage_proof,
 			storage_root,
 			region_id,
-			// purchaser: author_pub.clone(),
-			// price: 0,
-			// duration: 0,
+			start_relaychain_height: start,
+			end_relaychain_height: end,
 		})
 	}
 }

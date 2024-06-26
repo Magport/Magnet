@@ -15,6 +15,7 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 use cumulus_primitives_core::ParaId;
 use cumulus_relay_chain_interface::RelayChainInterface;
+use mp_coretime_bulk::BulkStatus;
 use polkadot_primitives::AccountId;
 use polkadot_primitives::Balance;
 use sc_client_api::UsageProvider;
@@ -29,10 +30,12 @@ use cumulus_primitives_core::relay_chain::BlockNumber as RelayBlockNumber;
 use dp_chain_state_snapshot::GenericStateProof;
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
 use mc_coretime_common::is_parathread;
+use metadata::api::runtime_types::pallet_broker::coretime_interface;
 use metadata::api::{runtime_types, runtime_types::coretime_rococo_runtime as polakdot_runtime};
 use mp_coretime_bulk::well_known_keys::REGIONS;
 use mp_coretime_bulk::BulkMemRecord;
 use mp_coretime_bulk::{self, well_known_keys::broker_regions};
+use pallet_broker::CoreAssignment;
 use pallet_broker::RegionRecord;
 use pallet_broker::{CoreMask, RegionId};
 use sp_application_crypto::AppPublic;
@@ -54,6 +57,10 @@ use subxt::{
 	utils::MultiSignature,
 	Config, OnlineClient, PolkadotConfig,
 };
+// use subxt::ext::scale_encode;
+// use subxt::ext::scale_decode;
+// use subxt::ext::scale_decode::DecodeAsType;
+// use subxt::ext::scale_encode::EncodeAsType;
 
 fn u8_array_to_u128(array: [u8; 10]) -> u128 {
 	let mut result: u128 = 0;
@@ -62,6 +69,32 @@ fn u8_array_to_u128(array: [u8; 10]) -> u128 {
 	}
 	result
 }
+
+// #[derive(Encode, Decode)]
+// enum CoretimeParaRuntimePallets {
+// 	#[codec(index = 50)]
+// 	Broker(BrokerProviderEvents),
+// }
+
+// #[derive(Encode, Decode, EncodeAsType, DecodeAsType)]
+// struct 	CoreAssigned {
+// 	/// The index of the Core which has been assigned.
+// 	core: u16,
+// 	/// The Relay-chain block at which this assignment should take effect.
+// 	when: u32,
+// 	/// The workload to be done on the Core.
+// 	assignment: Vec<(CoreAssignment, u16)>,
+// }
+// impl subxt::events::StaticEvent for CoreAssigned {
+// 	const PALLET: &'static str = "Broker";
+// 	const EVENT: &'static str = "CoreAssigned";
+// }
+
+// #[derive(Encode, Decode)]
+// enum BrokerProviderEvents {
+// 	#[codec(index = 26)]
+// 	CoreAssigned(CoreAssigned),
+// }
 
 pub async fn coretime_bulk_task<P, R, Block, PB>(
 	parachain: &P,
@@ -94,67 +127,93 @@ where
 	let idx = height % auth_len;
 	let collator_public = mc_coretime_common::order_slot::<PB>(idx, &authorities, &keystore).await;
 
-	if collator_public.is_none() {
-		return Ok(());
-	}
+	// if collator_public.is_none() {
+	// 	return Ok(());
+	// }
+	let mut bulk_record_local = bulk_record.lock().await;
+	let bulk_status = bulk_record_local.status.clone();
 	// Query Broker Assigned Event
 	let api = OnlineClient::<PolkadotConfig>::from_url("ws://127.0.0.1:8855").await?;
 	let block = api.blocks().at_latest().await?;
-	{
-		let mut bulk_record_local = bulk_record.lock().await;
-		let pre_block_height = bulk_record_local.coretime_para_height;
-		let block_number = block.number();
-		if pre_block_height != block_number {
-			bulk_record_local.coretime_para_height = block_number;
-		} else {
-			return Ok(());
-		}
+	let pre_block_height = bulk_record_local.coretime_para_height;
+	let block_number = block.number();
+	if pre_block_height != block_number {
+		bulk_record_local.coretime_para_height = block_number;
+	} else {
+		return Ok(());
 	}
 
 	let events = block.events().await?;
 	for event in events.iter() {
 		let event = event?;
-		let event_detail = event.as_event::<metadata::api::broker::events::Assigned>();
-		if let Ok(assigned_event) = event_detail {
-			if let Some(ev) = assigned_event {
-				log::info!("{:?},{:?},{:?}", ev.region_id, ev.task, ev.duration);
-				let pid: u32 = para_id.into();
-				if ev.task == pid {
-					//
-					let rpc_client = RpcClient::from_url("ws://127.0.0.1:8855").await?;
-					let rpc = LegacyRpcMethods::<PolkadotConfig>::new(rpc_client.clone());
-					let mask = u8_array_to_u128(ev.region_id.mask.0);
-					let core_mask = CoreMask::from(mask);
-					let region_id = RegionId {
-						begin: ev.region_id.begin,
-						core: ev.region_id.core,
-						mask: core_mask,
-					};
-					println!("region_id:{:?}", region_id);
-					let key = broker_regions(region_id);
-					println!("key:{:?}", key);
-					let mut relevant_keys = Vec::new();
-					relevant_keys.push(key.as_slice());
-					let proof = rpc
-						.state_get_read_proof(relevant_keys, Some(events.block_hash()))
-						.await
-						.unwrap();
-					let storage_proof =
-						StorageProof::new(proof.proof.into_iter().map(|bytes| bytes.to_vec()));
-					println!("{:?}", storage_proof);
-					let storage_root = block.header().state_root;
-					let relay_storage_rooted_proof: GenericStateProof<
-						cumulus_primitives_core::relay_chain::Block,
-					> = GenericStateProof::new(storage_root, storage_proof.clone()).unwrap();
-					let head_data = relay_storage_rooted_proof
-						.read_entry::<RegionRecord<AccountId, Balance>>(key.as_slice(), None)
-						.ok();
-					println!("head_data:{:?}", head_data);
-					if let Some(region_record) = head_data {
-						let mut bulk_record_local = bulk_record.lock().await;
-						bulk_record_local.storage_proof = storage_proof;
-						bulk_record_local.storage_root = storage_root;
-						bulk_record_local.region_id = region_id;
+		if bulk_status == BulkStatus::Purchased {
+			let ev_assigned = event.as_event::<metadata::api::broker::events::Assigned>();
+			if let Ok(assigned_event) = ev_assigned {
+				if let Some(ev) = assigned_event {
+					log::info!("{:?},{:?},{:?}", ev.region_id, ev.task, ev.duration);
+					let pid: u32 = para_id.into();
+					if ev.task == pid {
+						//
+						let rpc_client = RpcClient::from_url("ws://127.0.0.1:8855").await?;
+						let rpc = LegacyRpcMethods::<PolkadotConfig>::new(rpc_client.clone());
+						let mask = u8_array_to_u128(ev.region_id.mask.0);
+						let core_mask = CoreMask::from(mask);
+						let region_id = RegionId {
+							begin: ev.region_id.begin,
+							core: ev.region_id.core,
+							mask: core_mask,
+						};
+						println!("region_id:{:?}", region_id);
+						let key = broker_regions(region_id);
+						println!("key:{:?}", key);
+						let mut relevant_keys = Vec::new();
+						relevant_keys.push(key.as_slice());
+						let proof = rpc
+							.state_get_read_proof(relevant_keys, Some(events.block_hash()))
+							.await
+							.unwrap();
+						let storage_proof =
+							StorageProof::new(proof.proof.into_iter().map(|bytes| bytes.to_vec()));
+						println!("{:?}", storage_proof);
+						let storage_root = block.header().state_root;
+						let relay_storage_rooted_proof: GenericStateProof<
+							cumulus_primitives_core::relay_chain::Block,
+						> = GenericStateProof::new(storage_root, storage_proof.clone()).unwrap();
+						let head_data = relay_storage_rooted_proof
+							.read_entry::<RegionRecord<AccountId, Balance>>(key.as_slice(), None)
+							.ok();
+						println!("head_data:{:?}", head_data);
+						if let Some(region_record) = head_data {
+							bulk_record_local.storage_proof = storage_proof;
+							bulk_record_local.storage_root = storage_root;
+							bulk_record_local.region_id = region_id;
+							bulk_record_local.status = BulkStatus::Assigned;
+							bulk_record_local.duration = ev.duration;
+						}
+					}
+				}
+				continue;
+			}
+		}
+		if bulk_status == BulkStatus::Assigned {
+			let ev_core_assigned = event.as_event::<metadata::api::broker::events::CoreAssigned>();
+			if let Ok(core_assigned_event) = ev_core_assigned {
+				if let Some(ev) = core_assigned_event {
+					log::info!("{:?},{:?},{:?}", ev.core, ev.when, ev.assignment);
+					for (core_assign, _) in ev.assignment {
+						if let coretime_interface::CoreAssignment::Task(id) = core_assign {
+							let pid: u32 = para_id.into();
+							if id == pid {
+								bulk_record_local.start_relaychain_height = ev.when;
+								let constant_query =
+									metadata::api::ConstantsApi.broker().timeslice_period();
+								let time_slice = api.constants().at(&constant_query)?;
+								bulk_record_local.end_relaychain_height =
+									ev.when + bulk_record_local.duration * time_slice;
+								// find it.
+								bulk_record_local.status = BulkStatus::CoreAssigned;
+							}
+						}
 					}
 				}
 			}
