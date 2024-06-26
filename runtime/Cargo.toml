@@ -99,6 +99,7 @@ pallet-collator-selection = { workspace = true, default-features = false }
 parachain-info = { workspace = true, default-features = false }
 parachains-common = { workspace = true, default-features = false }
 cumulus-primitives-timestamp ={ workspace = true, default-features = false }
+cumulus-primitives-aura ={ workspace = true, default-features = false }
 
 #Frontier FRAME
 pallet-evm-chain-id = { workspace = true, default-features = false }
@@ -116,6 +117,9 @@ fp-account = { workspace = true, default-features = false }
 fp-dynamic-fee = { workspace = true, default-features = false }
 fp-rpc = { workspace = true, default-features = false }
 fp-self-contained = { workspace = true, default-features = false, features = ["serde", "try-runtime"] }
+
+#move pallet
+pallet-move = { workspace = true, default-features = false }
 
 [features]
 default = ["std", "with-rocksdb-weights"]
@@ -142,7 +146,7 @@ std = [
 	"pallet-authorship/std",
 	"pallet-balances/std",
 	"pallet-collator-selection/std",
-	"pallet-message-queue/std",	
+	"pallet-message-queue/std",
 	"pallet-session/std",
 	"pallet-sudo/std",
 	"pallet-timestamp/std",
@@ -207,6 +211,8 @@ std = [
 	"pallet-scheduler/std",
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-contracts/std",	
+	"cumulus-primitives-aura/std",
+	"pallet-move/std",
 ]
 
 runtime-benchmarks = [
@@ -220,7 +226,7 @@ runtime-benchmarks = [
 	"hex-literal",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-collator-selection/runtime-benchmarks",
-	"pallet-message-queue/runtime-benchmarks",	
+	"pallet-message-queue/runtime-benchmarks",
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"pallet-xcm/runtime-benchmarks",
@@ -247,7 +253,8 @@ runtime-benchmarks = [
 	"pallet-conviction-voting/runtime-benchmarks",
 	"pallet-ranked-collective/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
-	"pallet-contracts/runtime-benchmarks",	
+	"pallet-contracts/runtime-benchmarks",
+	"pallet-move/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -265,7 +272,7 @@ try-runtime = [
 	"pallet-authorship/try-runtime",
 	"pallet-balances/try-runtime",
 	"pallet-collator-selection/try-runtime",
-	"pallet-message-queue/try-runtime",	
+	"pallet-message-queue/try-runtime",
 	"pallet-session/try-runtime",
 	"pallet-sudo/try-runtime",
 	"pallet-timestamp/try-runtime",
@@ -300,7 +307,8 @@ try-runtime = [
 	"pallet-ranked-collective/try-runtime",
 	"pallet-scheduler/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
-	"pallet-contracts/try-runtime",	
+	"pallet-contracts/try-runtime",
+	"pallet-move/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]

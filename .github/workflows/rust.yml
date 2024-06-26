@@ -9,7 +9,6 @@ on:
     branches: 
       - 'main'
       - 'main-develop'
-
 env:
   CARGO_TERM_COLOR: always
 
@@ -36,13 +35,16 @@ jobs:
         override: true
         components: rustfmt, clippy
 
+    - name: Install smove
+      run: cargo install --git https://github.com/eigerco/smove
+
     - name: Install protoc
       run: |
         sudo apt-get install -y protobuf-compiler
         protoc --version
 
     - uses: actions/checkout@v3
-    
+
     - name: Rustfmt
       uses: actions-rs/cargo@v1
       with:
@@ -59,8 +61,18 @@ jobs:
     - name: Add rust-src
       run: |
         rustup component add rust-src
-            
+
+    - name: Cargo Clean
+      run: cargo clean
+
+    - name: Remove Cargo.lock
+      run: rm Cargo.lock
+
+    - name: Cargo Update
+      run: cargo update
+
     - name: Build
       run: cargo check --release
+
     - name: Run tests
       run: cargo test --release --locked --verbose --all

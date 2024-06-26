@@ -14,6 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Ondemand order Spawner
+//!
+//! The logic of placing an order to purchase core is as follows.
+//! Every time a relay chain block is received, check whether the parachain is in parallel thread mode.
+//! If so, read the events of the relay chain to see if there is an order to purchase core. , if there is a purchase,
+//! record the purchase information. If not, then determine whether it is necessary to purchase core, such as whether
+//! the transactions in the mempool reach a certain threshold.
+//!
 use crate::{
 	metadata::api::runtime_types::pallet_broker::coretime_interface::CoreAssignment,
 	submit_order::{build_rpc_for_submit_order, SubmitOrderError},
@@ -58,16 +66,22 @@ use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
 
 #[derive(Encode, Decode, Debug, PartialEq, Clone)]
 struct EnqueuedOrder {
+	/// Parachain ID
 	pub para_id: ParaId,
 }
 
+/// Order type
 #[derive(Clone, PartialEq)]
 pub enum OrderType {
+	/// The mem pool gas reaches the threshold.
 	Normal,
+	/// Reaching the forced block threshold.
 	Force,
+	/// Receive xcm transaction from relay chain.
 	XCMEvent,
 }
 
+/// Get the spot price of the relay chain.
 async fn get_spot_price<Balance>(
 	relay_chain: impl RelayChainInterface + Clone,
 	hash: H256,
@@ -96,6 +110,7 @@ where
 	}
 }
 
+/// Whether the relay chain has ondemand function enabled.
 async fn start_on_demand(
 	relay_chain: impl RelayChainInterface + Clone,
 	hash: H256,
@@ -137,6 +152,7 @@ async fn start_on_demand(
 	}
 }
 
+/// Create an order to purchase core.
 async fn try_place_order<Balance>(
 	hash: H256,
 	keystore: KeystorePtr,
@@ -167,6 +183,7 @@ where
 	.await
 }
 
+/// Whether the mem pool reaches the threshold for purchasing cores.
 async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
 	parachain: &P,
 	transaction_pool: Arc<ExPool>,
@@ -232,6 +249,7 @@ where
 	Some((is_place_order, order_type))
 }
 
+/// Whether the xcm transaction event of the relay chain is received.
 async fn relay_chain_xcm_event(
 	relay_chain_interface: impl RelayChainInterface + Clone,
 	para_id: ParaId,
@@ -247,6 +265,7 @@ async fn relay_chain_xcm_event(
 	return Some((can_order, OrderType::XCMEvent));
 }
 
+/// Get the transactions in the ready queue in the mem pool
 async fn get_txs<Block, ExPool>(transaction_pool: Arc<ExPool>) -> Vec<H256>
 where
 	Block: BlockT,
@@ -262,6 +281,7 @@ where
 	return back_txs;
 }
 
+/// The main processing logic of purchasing core.
 async fn handle_new_best_parachain_head<P, Block, PB, ExPool, Balance>(
 	validation_data: PersistedValidationData,
 	height: RelayBlockNumber,
