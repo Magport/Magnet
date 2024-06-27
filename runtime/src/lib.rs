@@ -11,7 +11,7 @@ mod weights;
 pub mod xcm_config;
 pub mod xcms;
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
@@ -22,7 +22,7 @@ use sp_core::{
 	OpaqueMetadata, H160, H256, U256,
 };
 use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys,
+	create_runtime_str, generic, impl_opaque_keys, RuntimeDebug,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, DispatchInfoOf, Dispatchable, Get,
 		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
@@ -52,7 +52,7 @@ use frame_support::{
 	traits::{
 		fungible::HoldConsideration, AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32,
 		ConstU64, ConstU8, Currency, EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance,
-		LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp, TransformOrigin,
+		InstanceFilter, LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp, TransformOrigin,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -1134,7 +1134,6 @@ impl pallet_multisig::Config for Runtime {
 }
 
 #[derive(
-    Debug,
 	Copy,
 	Clone,
 	Eq,
