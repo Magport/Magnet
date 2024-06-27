@@ -85,5 +85,6 @@ sp_api::decl_runtime_apis! {
 	pub trait BulkRuntimeApi
 	{
 		fn rpc_url() -> Vec<u8>;
+		fn relaychain_block_number()->u32;
 	}
 }

@@ -34,6 +34,7 @@ use metadata::api::runtime_types::pallet_broker::coretime_interface;
 use metadata::api::{runtime_types, runtime_types::coretime_rococo_runtime as polakdot_runtime};
 use mp_coretime_bulk::well_known_keys::REGIONS;
 use mp_coretime_bulk::BulkMemRecord;
+use mp_coretime_bulk::BulkRuntimeApi;
 use mp_coretime_bulk::{self, well_known_keys::broker_regions};
 use pallet_broker::CoreAssignment;
 use pallet_broker::RegionRecord;
@@ -109,7 +110,7 @@ where
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	R: RelayChainInterface + Clone,
-	P::Api: AuraApi<Block, PB::Public>,
+	P::Api: AuraApi<Block, PB::Public> + BulkRuntimeApi<Block>,
 	PB: Pair + 'static,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
@@ -133,7 +134,9 @@ where
 	let mut bulk_record_local = bulk_record.lock().await;
 	let bulk_status = bulk_record_local.status.clone();
 	// Query Broker Assigned Event
-	let api = OnlineClient::<PolkadotConfig>::from_url("ws://127.0.0.1:8855").await?;
+	let url = parachain.runtime_api().rpc_url(hash)?;
+	let rpc_url = std::str::from_utf8(&url)?;
+	let api = OnlineClient::<PolkadotConfig>::from_url(rpc_url).await?;
 	let block = api.blocks().at_latest().await?;
 	let pre_block_height = bulk_record_local.coretime_para_height;
 	let block_number = block.number();
@@ -154,7 +157,7 @@ where
 					let pid: u32 = para_id.into();
 					if ev.task == pid {
 						//
-						let rpc_client = RpcClient::from_url("ws://127.0.0.1:8855").await?;
+						let rpc_client = RpcClient::from_url(rpc_url).await?;
 						let rpc = LegacyRpcMethods::<PolkadotConfig>::new(rpc_client.clone());
 						let mask = u8_array_to_u128(ev.region_id.mask.0);
 						let core_mask = CoreMask::from(mask);
@@ -232,7 +235,7 @@ pub async fn run_coretime_bulk_task<P, R, Block, PB>(
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	R: RelayChainInterface + Clone,
-	P::Api: AuraApi<Block, PB::Public>,
+	P::Api: AuraApi<Block, PB::Public> + BulkRuntimeApi<Block>,
 	PB: Pair + 'static,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
@@ -276,7 +279,7 @@ where
 	Block: BlockT,
 	R: RelayChainInterface + Clone + 'static,
 	P: Send + Sync + 'static + ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	P::Api: AuraApi<Block, PB::Public>,
+	P::Api: AuraApi<Block, PB::Public> + BulkRuntimeApi<Block>,
 	PB: Pair + 'static,
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,

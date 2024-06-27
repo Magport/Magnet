@@ -11,6 +11,8 @@ mod weights;
 pub mod xcm_config;
 pub mod xcms;
 
+use core::ops::Div;
+
 use codec::{Decode, Encode};
 
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
@@ -24,7 +26,7 @@ use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, DispatchInfoOf, Dispatchable, Get,
-		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
+		IdentifyAccount, PostDispatchInfoOf, Saturating, UniqueSaturatedInto, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
 	ApplyExtrinsicResult, ConsensusEngineId, MultiSignature, Percent,
@@ -82,8 +84,8 @@ pub use parachains_common::message_queue::{NarrowOriginToSibling, ParaIdToSiblin
 use polkadot_runtime_common::xcm_sender::NoPriceForMessageDelivery;
 use polkadot_runtime_common::{BlockHashCount, SlowAdjustingFeeUpdate};
 
+use sp_runtime::SaturatedConversion;
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
-
 // XCM Imports
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId, PersistedValidationData};
 pub use pallet_bulk::{self, BulkGasCost};
@@ -747,7 +749,29 @@ where
 	fn gas_cost(
 		block_number: BlockNumberFor<T>,
 	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
-		Ok(None)
+		let record_index = <pallet_bulk::Pallet<T>>::record_index();
+		let mut result = None;
+		for i in 0..record_index {
+			let bulk_record = <pallet_bulk::Pallet<T>>::bulk_records(i);
+			if let Some(record) = bulk_record {
+				if block_number.into() >= record.start_relaychain_height.into()
+					&& block_number.into() <= record.end_relaychain_height.into()
+				{
+					let price: u128 = record.price.saturated_into();
+					let duration =
+						(record.end_relaychain_height - record.start_relaychain_height) as u128;
+					let balance = price
+						.checked_div(duration)
+						.ok_or(sp_runtime::DispatchError::Other("duration error"))?;
+					let mut r = [0u8; 32];
+					r.copy_from_slice(record.purchaser.encode().as_slice());
+					let account = T::AccountId::try_from(r)
+						.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
+					result = Some((account, balance));
+				}
+			}
+		}
+		Ok(result)
 	}
 }
 parameter_types! {
@@ -1602,6 +1626,10 @@ impl_runtime_apis! {
 
 		fn rpc_url()-> Vec<u8>{
 			BulkPallet::rpc_url()
+		}
+
+		fn relaychain_block_number()->u32 {
+			BulkPallet::relaychain_block_number()
 		}
 	}
 

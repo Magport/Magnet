@@ -282,5 +282,8 @@ fn testnet_genesis(
 		},
 
 		"evm": { "accounts": evm_accounts },
+		"bulkPallet":{
+			"rpcUrl": b"ws://127.0.0.1:8855".to_vec()
+		},
 	})
 }

@@ -43,6 +43,7 @@ use primitives::{Id as ParaId, PersistedValidationData};
 use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
+use cumulus_pallet_parachain_system::RelaychainStateProvider;
 use dp_chain_state_snapshot::GenericStateProof;
 use pallet_broker::RegionRecord;
 use sp_core::crypto::ByteArray;
@@ -259,6 +260,7 @@ pub mod pallet {
 }
 
 impl<T: Config> Pallet<T> {
+	/// Get coretime parachain rpc url.
 	pub fn rpc_url() -> Vec<u8> {
 		let rpc_url = RpcUrl::<T>::get();
 		if let Some(url) = rpc_url {
@@ -266,6 +268,12 @@ impl<T: Config> Pallet<T> {
 		} else {
 			Vec::new()
 		}
+	}
+
+	/// Get relaychain blocknumber.
+	pub fn relaychain_block_number() -> u32 {
+		let relay_chain_state = T::RelayChainStateProvider::current_relay_chain_state();
+		relay_chain_state.number
 	}
 }
 
