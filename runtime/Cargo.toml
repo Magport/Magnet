@@ -78,6 +78,7 @@ pallet-insecure-randomness-collective-flip = { workspace = true, default-feature
 pallet-contracts = { workspace = true, default-features = false}
 pallet-message-queue = { workspace = true, default-features = false }
 pallet-multisig = { workspace = true, default-features = false }
+pallet-proxy = { workspace = true, default-features = false }
 
 # Polkadot
 pallet-xcm = { workspace = true, default-features = false}
@@ -215,6 +216,7 @@ std = [
 	"cumulus-primitives-aura/std",
 	"pallet-move/std",
 	"pallet-multisig/std",
+	"pallet-proxy/std",
 ]
 
 runtime-benchmarks = [
@@ -258,6 +260,7 @@ runtime-benchmarks = [
 	"pallet-contracts/runtime-benchmarks",
 	"pallet-move/runtime-benchmarks",
 	"pallet-multisig/runtime-benchmarks",
+	"pallet-proxy/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -313,6 +316,7 @@ try-runtime = [
 	"pallet-contracts/try-runtime",
 	"pallet-move/try-runtime",
 	"pallet-multisig/try-runtime",
+	"pallet-proxy/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]

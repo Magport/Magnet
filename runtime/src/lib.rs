@@ -1133,6 +1133,62 @@ impl pallet-multisig::Config for Runtime {
 	type WeightInfo = pallet-multisig::weights::SubstrateWeight<Runtime>;
 }
 
+#[derive(
+	Copy,
+	Clone,
+	Eq,
+	PartialEq,
+	Ord,
+	PartialOrd,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	MaxEncodedLen,
+	scale_info::TypeInfo,
+)]
+pub enum ProxyType {
+	Any,
+	JustTransfer,
+	JustUtility,
+}
+impl Default for ProxyType {
+	fn default() -> Self {
+		Self::Any
+	}
+}
+impl InstanceFilter<RuntimeCall> for ProxyType {
+	fn filter(&self, c: &RuntimeCall) -> bool {
+		match self {
+			ProxyType::Any => true,
+			ProxyType::JustTransfer => {
+				matches!(
+					c,
+					RuntimeCall::Balances(pallet_balances::Call::transfer_allow_death { .. })
+				)
+			},
+			ProxyType::JustUtility => matches!(c, RuntimeCall::Utility { .. }),
+		}
+	}
+	fn is_superset(&self, o: &Self) -> bool {
+		self == &ProxyType::Any || self == o
+	}
+}
+
+impl pallet-proxy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;	
+	type Currency = Balances;
+    type ProxyType = ProxyType;
+	type ProxyDepositBase = ConstU64<160_000_000_000_000>;
+	type ProxyDepositFactor = ConstU64<33_000_000_000_000>;
+	type MaxProxies = ConstU32<100>;
+	type CallHasher = BlakeTwo256;
+	type MaxPending = ConstU32<1000>;
+	type AnnouncementDepositBase = ConstU64<16_000_000_000_000>;
+	type AnnouncementDepositFactor = ConstU64<64_000_000_000_000>;
+	type WeightInfo = pallet-proxy::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -1207,6 +1263,7 @@ construct_runtime!(
 		
 		//call util
 		Multisig: pallet-multisig = 90,
+		Proxy: pallet-proxy = 91,
 	}
 );
 
@@ -1222,7 +1279,8 @@ mod benches {
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_order, OrderPallet]
 		[pallet_move, MoveModule]
-		[pallet-multisig, Multsig]
+		[pallet-multisig, Multisig]
+		[pallet-proxy, Proxy]
 	);
 }
 
