@@ -1121,16 +1121,16 @@ impl pallet_move::Config for Runtime {
 	type MaxScriptSigners = MaxScriptSigners;
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_move::weights::SubstrateWeight<Runtime>;
-}pallet-multisig
+}
 
-impl pallet-multisig::Config for Runtime {
+impl pallet_multisig::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;	
 	type Currency = Balances;
 	type DepositBase = ConstU64<228_000_000_000_000>;
 	type DepositFactor = ConstU64<32_000_000_000_000>;
 	type MaxSignatories = ConstU32<20>;
-	type WeightInfo = pallet-multisig::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
 }
 
 #[derive(
@@ -1174,7 +1174,7 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 	}
 }
 
-impl pallet-proxy::Config for Runtime {
+impl pallet_proxy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;	
 	type Currency = Balances;
@@ -1186,7 +1186,7 @@ impl pallet-proxy::Config for Runtime {
 	type MaxPending = ConstU32<1000>;
 	type AnnouncementDepositBase = ConstU64<16_000_000_000_000>;
 	type AnnouncementDepositFactor = ConstU64<64_000_000_000_000>;
-	type WeightInfo = pallet-proxy::weights::SubstrateWeight<Runtime>;
+	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -1262,8 +1262,8 @@ construct_runtime!(
 		MoveModule: pallet_move = 80,
 		
 		//call util
-		Multisig: pallet-multisig = 90,
-		Proxy: pallet-proxy = 91,
+		Multisig: pallet_multisig = 90,
+		Proxy: pallet_proxy = 91,
 	}
 );
 
@@ -1279,8 +1279,8 @@ mod benches {
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_order, OrderPallet]
 		[pallet_move, MoveModule]
-		[pallet-multisig, Multisig]
-		[pallet-proxy, Proxy]
+		[pallet_multisig, Multisig]
+		[pallet_proxy, Proxy]
 	);
 }
 
