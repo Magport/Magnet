@@ -625,7 +625,9 @@ fn start_consensus(
 					bulk_mem_record_clone_local.end_relaychain_height,
 				)
 				.await;
-				bulk_mem_record_clone_local.status = BulkStatus::Purchased;
+				if storage_proof.is_some() {
+					bulk_mem_record_clone_local.status = BulkStatus::Purchased;
+				}
 				let bulk_inherent = bulk_inherent.ok_or_else(|| {
 					Box::<dyn std::error::Error + Send + Sync>::from(
 						"Failed to create bulk inherent",

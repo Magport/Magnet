@@ -48,15 +48,15 @@ use dp_chain_state_snapshot::GenericStateProof;
 use pallet_broker::RegionRecord;
 use sp_core::crypto::ByteArray;
 use weights::WeightInfo;
-// #[cfg(test)]
-// mod mock;
+#[cfg(test)]
+mod mock;
 
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 // #[cfg(any(test, feature = "runtime-benchmarks"))]
 // mod benchmarking;
-// mod proof_data;
+mod proof_data;
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -214,6 +214,7 @@ pub mod pallet {
 				start_relaychain_height,
 				end_relaychain_height,
 			} = data;
+
 			let relay_storage_rooted_proof: GenericStateProof<
 				cumulus_primitives_core::relay_chain::Block,
 			> = GenericStateProof::new(storage_root, storage_proof.unwrap()).unwrap();

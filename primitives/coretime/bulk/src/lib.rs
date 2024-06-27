@@ -49,7 +49,7 @@ pub struct BulkInherentData {
 }
 
 /// Status of bulk purchased then assigned.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum BulkStatus {
 	/// User call broker purchase.
 	Purchased,
@@ -59,7 +59,7 @@ pub enum BulkStatus {
 	CoreAssigned,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BulkMemRecord {
 	/// Block height of coretime parachain.
 	pub coretime_para_height: u32,

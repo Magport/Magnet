@@ -200,6 +200,7 @@ where
 		}
 		if bulk_status == BulkStatus::Assigned {
 			let ev_core_assigned = event.as_event::<metadata::api::broker::events::CoreAssigned>();
+			log::info!("ev_core_assigned:{:?}", ev_core_assigned);
 			if let Ok(core_assigned_event) = ev_core_assigned {
 				if let Some(ev) = core_assigned_event {
 					log::info!("{:?},{:?},{:?}", ev.core, ev.when, ev.assignment);
@@ -222,6 +223,7 @@ where
 			}
 		}
 	}
+	log::info!("bulk_record:{:?}", bulk_record_local);
 	Ok(())
 }
 
