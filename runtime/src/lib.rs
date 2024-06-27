@@ -1127,13 +1127,14 @@ impl pallet_multisig::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeCall = RuntimeCall;	
 	type Currency = Balances;
-	type DepositBase = ConstU64<228_000_000_000_000>;
-	type DepositFactor = ConstU64<32_000_000_000_000>;
+	type DepositBase = ConstU128<228_000_000_000_000>;
+	type DepositFactor = ConstU128<32_000_000_000_000>;
 	type MaxSignatories = ConstU32<20>;
 	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
 }
 
 #[derive(
+    Debug,
 	Copy,
 	Clone,
 	Eq,
