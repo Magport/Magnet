@@ -1179,13 +1179,13 @@ impl pallet_proxy::Config for Runtime {
 	type RuntimeCall = RuntimeCall;	
 	type Currency = Balances;
     type ProxyType = ProxyType;
-	type ProxyDepositBase = ConstU64<160_000_000_000_000>;
-	type ProxyDepositFactor = ConstU64<33_000_000_000_000>;
+	type ProxyDepositBase = ConstU128<160_000_000_000_000>;
+	type ProxyDepositFactor = ConstU128<33_000_000_000_000>;
 	type MaxProxies = ConstU32<100>;
 	type CallHasher = BlakeTwo256;
 	type MaxPending = ConstU32<1000>;
-	type AnnouncementDepositBase = ConstU64<16_000_000_000_000>;
-	type AnnouncementDepositFactor = ConstU64<64_000_000_000_000>;
+	type AnnouncementDepositBase = ConstU128<16_000_000_000_000>;
+	type AnnouncementDepositFactor = ConstU128<64_000_000_000_000>;
 	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
 }
 
