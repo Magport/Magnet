@@ -1121,6 +1121,16 @@ impl pallet_move::Config for Runtime {
 	type MaxScriptSigners = MaxScriptSigners;
 	type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = pallet_move::weights::SubstrateWeight<Runtime>;
+}pallet-multisig
+
+impl pallet-multisig::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;	
+	type Currency = Balances;
+	type DepositBase = ConstU64<228_000_000_000_000>;
+	type DepositFactor = ConstU64<32_000_000_000_000>;
+	type MaxSignatories = ConstU32<20>;
+	type WeightInfo = pallet-multisig::weights::SubstrateWeight<Runtime>;
 }
 
 // Create the runtime by composing the FRAME pallets that were previously configured.
@@ -1194,6 +1204,9 @@ construct_runtime!(
 
 		//Move-vm
 		MoveModule: pallet_move = 80,
+		
+		//call util
+		Multisig: pallet-multisig = 90,
 	}
 );
 
@@ -1209,6 +1222,7 @@ mod benches {
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_order, OrderPallet]
 		[pallet_move, MoveModule]
+		[pallet-multisig, Multsig]
 	);
 }
 
