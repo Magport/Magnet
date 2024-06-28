@@ -22,13 +22,13 @@ use sp_core::{
 	OpaqueMetadata, H160, H256, U256,
 };
 use sp_runtime::{
-	create_runtime_str, generic, impl_opaque_keys, RuntimeDebug,
+	create_runtime_str, generic, impl_opaque_keys,
 	traits::{
 		AccountIdLookup, BlakeTwo256, Block as BlockT, DispatchInfoOf, Dispatchable, Get,
 		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
-	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent,
+	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent, RuntimeDebug,
 };
 
 use scale_info::prelude::string::String;
@@ -52,7 +52,8 @@ use frame_support::{
 	traits::{
 		fungible::HoldConsideration, AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32,
 		ConstU64, ConstU8, Currency, EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance,
-		InstanceFilter, LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp, TransformOrigin,
+		InstanceFilter, LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp,
+		TransformOrigin,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -1125,7 +1126,7 @@ impl pallet_move::Config for Runtime {
 
 impl pallet_multisig::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;	
+	type RuntimeCall = RuntimeCall;
 	type Currency = Balances;
 	type DepositBase = ConstU128<228_000_000_000_000>;
 	type DepositFactor = ConstU128<32_000_000_000_000>;
@@ -1176,9 +1177,9 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 
 impl pallet_proxy::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type RuntimeCall = RuntimeCall;	
+	type RuntimeCall = RuntimeCall;
 	type Currency = Balances;
-    type ProxyType = ProxyType;
+	type ProxyType = ProxyType;
 	type ProxyDepositBase = ConstU128<160_000_000_000_000>;
 	type ProxyDepositFactor = ConstU128<33_000_000_000_000>;
 	type MaxProxies = ConstU32<100>;
@@ -1260,7 +1261,7 @@ construct_runtime!(
 
 		//Move-vm
 		MoveModule: pallet_move = 80,
-		
+
 		//call util
 		Multisig: pallet_multisig = 90,
 		Proxy: pallet_proxy = 91,
