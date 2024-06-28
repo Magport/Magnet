@@ -13,6 +13,11 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
+
+//! The code here is implemented, constructing a transaction from the parachain and sending it to the relay chain to purchase core.
+//!
+//! Subxt is used here to construct and submit the transaction.
+//!
 use crate::metadata;
 use cumulus_primitives_core::{
 	relay_chain::BlockId, relay_chain::BlockNumber as RelayBlockNumber, ParaId,
@@ -52,7 +57,9 @@ impl From<Signature> for MultiSignature {
 	}
 }
 pub struct SignerKeystore<T: Config> {
+	/// Account ID
 	account_id: T::AccountId,
+	/// Keystore of node
 	keystore: KeystorePtr,
 }
 impl<T> SignerKeystore<T>
@@ -87,6 +94,8 @@ where
 		self.account_id.clone().into()
 	}
 
+	/// Use aura's key to sign
+	/// TODO:Modify to other keys, or load the key in some way.
 	fn sign(&self, signer_payload: &[u8]) -> T::Signature {
 		let pub_key =
 			self.keystore.sr25519_public_keys(sp_consensus_aura::sr25519::AuthorityPair::ID)[0];
@@ -101,6 +110,7 @@ where
 	}
 }
 
+/// Construct the transaction and sign it, and then submit the transaction through the rpc interface.
 pub async fn build_rpc_for_submit_order(
 	url: &str,
 	para_id: ParaId,
