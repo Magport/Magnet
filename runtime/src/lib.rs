@@ -785,7 +785,7 @@ impl pallet_bulk::Config for Runtime {
 	type RelayChainStateProvider = cumulus_pallet_parachain_system::RelaychainDataProvider<Self>;
 	type UpdateOrigin = EnsureRootOrHalf;
 	type MaxUrlLength = MaxUrlLength;
-	type WeightInfo = ();
+	type WeightInfo = pallet_bulk::weights::SubstrateWeight<Runtime>;
 }
 
 parameter_types! {
@@ -1241,6 +1241,7 @@ mod benches {
 		[pallet_sudo, Sudo]
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
+		[pallet_bulk, BulkPallet]
 		// [pallet_order, OrderPallet]
 	);
 }

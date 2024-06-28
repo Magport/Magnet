@@ -54,8 +54,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-// #[cfg(any(test, feature = "runtime-benchmarks"))]
-// mod benchmarking;
+#[cfg(any(test, feature = "runtime-benchmarks"))]
+mod benchmarking;
 mod proof_data;
 
 type BalanceOf<T> =
@@ -246,7 +246,7 @@ pub mod pallet {
 		/// Parameters:
 		/// - `url`: Url.
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_rpc_url())]
 		pub fn set_rpc_url(
 			origin: OriginFor<T>,
 			url: BoundedVec<u8, T::MaxUrlLength>,

@@ -248,7 +248,8 @@ runtime-benchmarks = [
 	"pallet-conviction-voting/runtime-benchmarks",
 	"pallet-ranked-collective/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
-	"pallet-contracts/runtime-benchmarks",	
+	"pallet-contracts/runtime-benchmarks",
+	"pallet-bulk/runtime-benchmarks",
 ]
 
 try-runtime = [
