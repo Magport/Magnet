@@ -13,36 +13,25 @@
 
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
-use codec::{Codec, Decode};
-use cumulus_primitives_core::BlockT;
+
+//! Coretime common function of client.
+//!
+
+use codec::Decode;
 use cumulus_primitives_core::ParaId;
 use cumulus_relay_chain_interface::RelayChainInterface;
 use mp_coretime_common::well_known_keys::paras_para_lifecycles;
-use pallet_broker::RegionRecord;
-use pallet_broker::{CoreMask, RegionId};
-use polkadot_primitives::AccountId;
-use polkadot_primitives::Balance;
-use runtime_parachains::{configuration::HostConfiguration, paras::ParaLifecycle};
-use sc_client_api::UsageProvider;
-use sc_service::TaskManager;
-use sp_api::ProvideRuntimeApi;
-use sp_core::crypto::{ByteArray, Pair};
-use sp_core::H256;
-use sp_keystore::KeystorePtr;
-use sp_state_machine::StorageProof;
-use sp_storage::StorageKey;
-use std::error::Error;
-use std::sync::Arc;
-use subxt::client::OfflineClientT;
-use subxt::{
-	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
-	config::polkadot::PolkadotExtrinsicParamsBuilder as Params,
-	tx::Signer,
-	utils::MultiSignature,
-	Config, OnlineClient, PolkadotConfig,
+use runtime_parachains::paras::ParaLifecycle;
+use sp_core::{
+	crypto::{ByteArray, Pair},
+	H256,
 };
+use sp_keystore::KeystorePtr;
+use std::error::Error;
+
 type AuthorityId<P> = <P as Pair>::Public;
 
+/// Is it now a parathread.
 pub async fn is_parathread(
 	relay_chain: impl RelayChainInterface + Clone,
 	p_hash: H256,
@@ -66,6 +55,7 @@ pub async fn is_parathread(
 	Ok(is_parathread)
 }
 
+/// Randomly select a collator to place an order.
 pub async fn order_slot<P: Pair>(
 	idx: u32,
 	authorities: &[AuthorityId<P>],

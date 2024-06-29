@@ -2886,17 +2886,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
-name = "dp-chain-state-snapshot"
-version = "0.1.0"
-dependencies = [
- "cumulus-primitives-core",
- "parity-scale-codec",
- "sp-runtime 31.0.1",
- "sp-state-machine 0.35.0",
- "sp-trie 29.0.0",
-]
-
-[[package]]
 name = "dtoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6020,11 +6009,11 @@ dependencies = [
  "cumulus-primitives-core",
  "cumulus-primitives-parachain-inherent",
  "cumulus-relay-chain-interface",
- "dp-chain-state-snapshot",
  "futures",
  "log",
  "mc-coretime-common",
  "mp-coretime-bulk",
+ "mp-coretime-common",
  "pallet-broker",
  "parity-scale-codec",
  "polkadot-node-primitives",
@@ -6307,7 +6296,7 @@ dependencies = [
 
 [[package]]
 name = "mp-coretime-bulk"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -6333,7 +6322,7 @@ dependencies = [
 
 [[package]]
 name = "mp-coretime-common"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "cumulus-primitives-core",
@@ -7300,7 +7289,6 @@ version = "0.2.0"
 dependencies = [
  "cumulus-pallet-parachain-system",
  "cumulus-primitives-core",
- "dp-chain-state-snapshot",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
@@ -7308,6 +7296,7 @@ dependencies = [
  "hex-literal",
  "log",
  "mp-coretime-bulk",
+ "mp-coretime-common",
  "pallet-balances",
  "pallet-broker",
  "pallet-collective",

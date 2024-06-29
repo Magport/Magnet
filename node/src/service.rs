@@ -500,7 +500,6 @@ async fn start_node_impl(
 			relay_chain_interface.clone(),
 			&task_manager,
 			bulk_mem_record.clone(),
-			params.keystore_container.keystore().clone(),
 		)?;
 		start_consensus(
 			client.clone(),

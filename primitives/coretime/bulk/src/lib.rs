@@ -14,26 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-//! # Order Inherent Primitives
+//! # Bulk Inherent Primitives
 //!
 //! This crate defines those primitives that should be taken into account when building
-//! the order pallet inherent
+//! the bulk pallet inherent
 //!
 #![cfg_attr(not(feature = "std"), no_std)]
-use cumulus_primitives_core::{
-	relay_chain::BlockNumber as RelayBlockNumber, relay_chain::Hash as PHash, ParaId,
-	PersistedValidationData,
-};
-use sp_core::H256;
+use cumulus_primitives_core::relay_chain::Hash as PHash;
 use sp_runtime::sp_std::vec::Vec;
-use sp_runtime::traits::MaybeDisplay;
 #[cfg(feature = "std")]
 pub mod inherent_client;
 pub mod well_known_keys;
-use codec::{Codec, Decode, Encode};
+use codec::{Decode, Encode};
 use pallet_broker::RegionId;
 use {scale_info::TypeInfo, sp_inherents::InherentIdentifier};
 
+/// Inherent data of bulk mode.
 #[derive(Encode, Decode, sp_core::RuntimeDebug, Clone, PartialEq, TypeInfo)]
 pub struct BulkInherentData {
 	/// Proof of coretime parachain storage.
@@ -73,18 +69,22 @@ pub struct BulkMemRecord {
 	pub start_relaychain_height: u32,
 	/// Relaychain block number of end schedule coretime core.
 	pub end_relaychain_height: u32,
+	/// Coretime duration.
 	pub duration: u32,
+	/// Status of bulk record.
 	pub status: BulkStatus,
 }
 
-// Identifier of the order inherent
+// Identifier of the bulk inherent
 pub const INHERENT_IDENTIFIER: InherentIdentifier = *b"bulkihrt";
 
 sp_api::decl_runtime_apis! {
 	#[api_version(2)]
 	pub trait BulkRuntimeApi
 	{
+		// Rpc url of coretime parachain.
 		fn rpc_url() -> Vec<u8>;
+		// Block number of relaychain.
 		fn relaychain_block_number()->u32;
 	}
 }

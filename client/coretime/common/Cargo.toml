@@ -1,6 +1,6 @@
 [package]
 name = "mc-coretime-common"
-authors = ["Anonymous"]
+authors = ["Magnet"]
 description = "magnet-coretime"
 license = "Apache License 2.0"
 homepage = "https://magnet.magport.io/"

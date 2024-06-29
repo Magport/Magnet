@@ -14,16 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-//! # Order Pallet
+//! # Bulk Pallet
 //!
-//! This pallet implements the recording and query functions of purchasing ondemand core.
+//! This pallet implements the recording and query functions of purchasing bulk core.
 //!
-//! By obtaining the inherent nature of the block, parsing it out of the validation_data of the relaychain,
-//! and querying whether there is an OnDemandOrderPlaced event, obtaining the order account and price from the event,
-//! and then writing this record to the blockchain.
-//!
-//! Provides many query methods for node or other pallets to use, such as querying the gas consumed by placing an order in a certain block,
-//! whether the order has been executed, whether the order threshold has been reached, etc.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
@@ -44,7 +38,7 @@ use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
 use cumulus_pallet_parachain_system::RelaychainStateProvider;
-use dp_chain_state_snapshot::GenericStateProof;
+use mp_coretime_common::chain_state_snapshot::GenericStateProof;
 use pallet_broker::RegionRecord;
 use sp_core::crypto::ByteArray;
 use weights::WeightInfo;

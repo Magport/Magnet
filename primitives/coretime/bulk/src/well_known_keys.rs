@@ -17,14 +17,7 @@
 //! Keys of well known.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use cumulus_primitives_core::relay_chain::CoreIndex;
-use {
-	cumulus_primitives_core::ParaId,
-	pallet_broker::RegionId,
-	sp_core::Encode,
-	sp_io::hashing::{blake2_128, twox_256, twox_64},
-	sp_std::vec::Vec,
-};
+use {pallet_broker::RegionId, sp_core::Encode, sp_io::hashing::blake2_128, sp_std::vec::Vec};
 
 // XXHash a String:Broker Regions
 pub const REGIONS: &[u8] =

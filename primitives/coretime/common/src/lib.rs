@@ -14,10 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-//! # Order Inherent Primitives
+//! Common Magnet Primitives
 //!
-//! This crate defines those primitives that should be taken into account when building
-//! the order pallet inherent
 //!
 #![cfg_attr(not(feature = "std"), no_std)]
+pub mod chain_state_snapshot;
 pub mod well_known_keys;

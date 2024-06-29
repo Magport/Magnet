@@ -19,7 +19,7 @@ hex-literal = { workspace = true }
 
 # Local
 mp-coretime-bulk = { path = "../../primitives/coretime/bulk", default-features = false }
-dp-chain-state-snapshot = { path = "../../primitives/chain-state-snapshot", default-features = false}
+mp-coretime-common = { path = "../../primitives/coretime/common", default-features = false}
 
 # Cumulus
 cumulus-pallet-parachain-system = { workspace = true, default-features = false}
@@ -85,7 +85,7 @@ std = [
 	"sp-trie/std",
 	"pallet-balances/std",
 	"sp-core/std",
-	"dp-chain-state-snapshot/std",
+	"mp-coretime-common/std",
 	"pallet-broker/std",
 ]
 try-runtime = [

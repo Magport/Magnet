@@ -3,8 +3,8 @@ name = "mp-coretime-bulk"
 authors.workspace = true
 description = "primitives related to bulk inherent"
 edition.workspace = true
-license = "Unlicense"
-version = "0.2.0"
+license = "Apache-2.0"
+version = "0.1.0"
 
 [dependencies]
 log = { workspace = true, default-features = false }
