@@ -21,29 +21,27 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
-use cumulus_pallet_parachain_system::{
-	relay_state_snapshot::Error as Relay_Error, RelayChainStateProof,
-};
+use cumulus_pallet_parachain_system::RelaychainStateProvider;
 use frame_support::{
 	dispatch::DispatchResultWithPostInfo, dispatch::PostDispatchInfo, pallet_prelude::*,
 	traits::Currency,
 };
 use frame_system::pallet_prelude::*;
-use frame_system::{self, EventRecord};
-use mp_coretime_bulk::well_known_keys::{broker_regions, REGIONS};
-pub use pallet::*;
-use primitives::Balance;
-use primitives::{Id as ParaId, PersistedValidationData};
-use sp_runtime::sp_std::{prelude::*, vec};
-use sp_runtime::{traits::Member, RuntimeAppPublic};
-pub mod weights;
-use cumulus_pallet_parachain_system::RelaychainStateProvider;
+use mp_coretime_bulk::well_known_keys::broker_regions;
 use mp_coretime_common::chain_state_snapshot::GenericStateProof;
+pub use pallet::*;
 use pallet_broker::RegionRecord;
-use sp_core::crypto::ByteArray;
+use primitives::Balance;
+use sp_runtime::{
+	sp_std::{prelude::*, vec},
+	traits::Member,
+	RuntimeAppPublic,
+};
 use weights::WeightInfo;
+
 #[cfg(test)]
 mod mock;
+pub mod weights;
 
 #[cfg(test)]
 mod tests;
@@ -55,7 +53,7 @@ mod proof_data;
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
-/// ondemand order information.
+/// Purchase coretime information.
 #[derive(Encode, Decode, Default, Clone, Copy, TypeInfo, MaxEncodedLen, Debug)]
 pub struct BulkRecord<Balance, AuthorityId> {
 	/// Account for purchase.
@@ -112,11 +110,12 @@ pub mod pallet {
 		0
 	}
 
+	/// The index of the record, plus one for each additional record.
 	#[pallet::storage]
 	#[pallet::getter(fn record_index)]
 	pub type RecordIndex<T> = StorageValue<_, u32, ValueQuery, RecordIndexOnEmpty<T>>;
 
-	/// Order Information Map.
+	/// Bulk purchase Information Map.
 	#[pallet::storage]
 	#[pallet::getter(fn bulk_records)]
 	pub type BulkRecords<T: Config> =
@@ -144,20 +143,35 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// Create order event.
-		OrderCreate { sequence_number: u64, orderer: T::AuthorityId },
+		/// Create record event.
+		RecordCreated {
+			/// Account for purchase.
+			purchaser: T::AuthorityId,
+			/// Purchase price.
+			price: BalanceOf<T>,
+			/// Purchase duration.
+			duration: u32,
+			/// Relaychain block number of start schedule coretime core.
+			start_relaychain_height: u32,
+			/// Relaychain block number of end schedule coretime core.
+			end_relaychain_height: u32,
+		},
 	}
 
 	#[pallet::error]
 	pub enum Error<T> {
 		/// Error reading data.
 		FailedReading,
+		/// Storage proof is none.
+		ProofNone,
+		/// Create root proof failed.
+		FailedCreateProof,
+		/// Purchaser is none.
+		PurchaserNone,
 	}
 
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_finalize(block_number: BlockNumberFor<T>) {}
-	}
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 	#[pallet::inherent]
 	impl<T: Config> ProvideInherent for Pallet<T> {
@@ -187,14 +201,14 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Create an order, which is called by the pallet.
+		/// Create an bulk record, which is called by the pallet.
 		/// Users cannot actively call this function.
-		/// Obtain order information by parsing inherited data.
+		/// Obtain record information by parsing inherited data.
 		///
 		/// Parameters:
 		/// - `data`: The inherent data.
 		#[pallet::call_index(0)]
-		#[pallet::weight((0, DispatchClass::Mandatory))]
+		#[pallet::weight((<T as pallet::Config>::WeightInfo::create_record(1), DispatchClass::Mandatory))]
 		pub fn create_record(
 			origin: OriginFor<T>,
 			data: mp_coretime_bulk::BulkInherentData,
@@ -202,36 +216,51 @@ pub mod pallet {
 			ensure_none(origin)?;
 
 			let mp_coretime_bulk::BulkInherentData {
-				storage_proof,
+				storage_proof: p_storage_proof,
 				storage_root,
 				region_id,
 				start_relaychain_height,
 				end_relaychain_height,
 			} = data;
 
-			let relay_storage_rooted_proof: GenericStateProof<
+			let storage_proof = p_storage_proof.ok_or(Error::<T>::ProofNone)?;
+			// Create coretime parachain root proof
+			let storage_rooted_proof: GenericStateProof<
 				cumulus_primitives_core::relay_chain::Block,
-			> = GenericStateProof::new(storage_root, storage_proof.unwrap()).unwrap();
-			let key = broker_regions(region_id);
-			let region_record_data = relay_storage_rooted_proof
-				.read_entry::<RegionRecord<T::AuthorityId, BalanceOf<T>>>(key.as_slice(), None)
-				.ok();
-			if let Some(region_record) = region_record_data {
-				let old_record_index = RecordIndex::<T>::get();
-				BulkRecords::<T>::insert(
-					old_record_index,
-					BulkRecord::<BalanceOf<T>, T::AuthorityId> {
-						purchaser: region_record.owner,
-						price: region_record.paid.unwrap(),
-						duration: region_record.end,
-						start_relaychain_height,
-						end_relaychain_height,
-					},
-				);
-				RecordIndex::<T>::set(old_record_index + 1);
-			}
+			> = GenericStateProof::new(storage_root, storage_proof)
+				.map_err(|_| Error::<T>::FailedCreateProof)?;
 
-			let total_weight = T::DbWeight::get().reads_writes(2, 1);
+			let key = broker_regions(region_id);
+			// Read RegionRecord from proof.
+			let region_record = storage_rooted_proof
+				.read_entry::<RegionRecord<T::AuthorityId, BalanceOf<T>>>(key.as_slice(), None)
+				.ok()
+				.ok_or(Error::<T>::FailedReading)?;
+
+			let old_record_index = RecordIndex::<T>::get();
+			let balance = region_record.paid.ok_or(Error::<T>::PurchaserNone)?;
+			let purchaser = region_record.owner;
+			// Create record of purchase coretime.
+			BulkRecords::<T>::insert(
+				old_record_index,
+				BulkRecord::<BalanceOf<T>, T::AuthorityId> {
+					purchaser: purchaser.clone(),
+					price: balance,
+					duration: region_record.end,
+					start_relaychain_height,
+					end_relaychain_height,
+				},
+			);
+			RecordIndex::<T>::set(old_record_index + 1);
+			Self::deposit_event(Event::RecordCreated {
+				purchaser,
+				price: balance,
+				duration: region_record.end,
+				start_relaychain_height,
+				end_relaychain_height,
+			});
+
+			let total_weight = T::WeightInfo::create_record(1);
 			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
 		}
 

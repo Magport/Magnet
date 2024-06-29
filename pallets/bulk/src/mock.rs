@@ -15,7 +15,6 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::{self as bulk_pallet, BulkGasCost};
-use codec::Encode;
 use cumulus_pallet_parachain_system::{RelayChainState, RelaychainStateProvider};
 pub use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
@@ -137,7 +136,7 @@ where
 	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(
-		block_number: BlockNumberFor<T>,
+		_block_number: BlockNumberFor<T>,
 	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
 		Ok(None)
 	}

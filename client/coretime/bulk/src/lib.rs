@@ -42,7 +42,6 @@ use sp_api::ProvideRuntimeApi;
 use sp_application_crypto::AppPublic;
 use sp_consensus_aura::AuraApi;
 use sp_core::{crypto::Pair, H256};
-use sp_keystore::KeystorePtr;
 use sp_runtime::traits::{Block as BlockT, Member};
 use sp_state_machine::StorageProof;
 use std::{error::Error, sync::Arc};
@@ -64,7 +63,7 @@ fn u8_array_to_u128(array: [u8; 10]) -> u128 {
 pub async fn coretime_bulk_task<P, R, Block, PB>(
 	parachain: &P,
 	relay_chain: R,
-	height: RelayBlockNumber,
+	_height: RelayBlockNumber,
 	p_hash: H256,
 	para_id: ParaId,
 	bulk_record: Arc<Mutex<BulkMemRecord>>,

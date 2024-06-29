@@ -20,10 +20,54 @@ use super::*;
 
 #[allow(unused)]
 use crate::Pallet as Bulk;
-use frame_benchmarking::{benchmarks, impl_benchmark_test_suite, whitelisted_caller};
+use frame_benchmarking::{benchmarks, impl_benchmark_test_suite};
 use frame_system::RawOrigin;
+use pallet_broker::{CoreMask, RegionId};
+
+mod test_sproof {
+	use sp_trie::StorageProof;
+	#[derive(Clone, Default)]
+	pub struct ParaHeaderSproofBuilder {
+		pub num_items: usize,
+	}
+
+	impl ParaHeaderSproofBuilder {
+		pub fn into_state_root_and_proof(
+			self,
+		) -> (cumulus_primitives_core::relay_chain::Hash, StorageProof) {
+			let encoded = crate::proof_data::STORAGE_ROOT[self.num_items];
+
+			let root = hex::decode(encoded).unwrap();
+			let proof = StorageProof::new(
+				crate::proof_data::STORAGE_PROOF.iter().map(|s| hex::decode(s).unwrap()),
+			);
+
+			(<[u8; 32]>::try_from(root).unwrap().into(), proof)
+		}
+	}
+}
 
 benchmarks! {
+	create_record {
+		let s in 0..100;
+		let mut sproof_builder = test_sproof::ParaHeaderSproofBuilder::default();
+		sproof_builder.num_items = 0;
+
+		let (storage_root, coretime_chain_state_proof) = sproof_builder.into_state_root_and_proof();
+		let core_mask = CoreMask::from(0xFFFFFFFFFFFFFFFFFFFF);
+		let region_id = RegionId { begin: 12, core: 1, mask: core_mask };
+		let bulk_inherent_data = mp_coretime_bulk::BulkInherentData {
+			storage_proof: Some(coretime_chain_state_proof),
+			storage_root,
+			region_id,
+			start_relaychain_height: 120,
+			end_relaychain_height: 220,
+		};
+	}: _(RawOrigin::None, bulk_inherent_data)
+	verify {
+		assert_eq!(RecordIndex::<T>::get(), 1);
+	}
+
 	set_rpc_url {
 		let s in 0 .. 100;
 		let url = BoundedVec::try_from("ws://127.0.0.1:8855".as_bytes().to_vec()).unwrap();
