@@ -116,6 +116,9 @@ fc-rpc-core = { workspace = true }
 fc-storage = { workspace = true }
 fc-consensus = {  workspace = true }
 
+#move pallet rpc
+pallet-move-rpc = { workspace = true }
+
 [build-dependencies]
 substrate-build-script-utils = { workspace = true }
 

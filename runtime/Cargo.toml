@@ -100,6 +100,7 @@ pallet-collator-selection = { workspace = true, default-features = false }
 parachain-info = { workspace = true, default-features = false }
 parachains-common = { workspace = true, default-features = false }
 cumulus-primitives-timestamp ={ workspace = true, default-features = false }
+cumulus-primitives-aura ={ workspace = true, default-features = false }
 
 #Frontier FRAME
 pallet-evm-chain-id = { workspace = true, default-features = false }
@@ -117,6 +118,9 @@ fp-account = { workspace = true, default-features = false }
 fp-dynamic-fee = { workspace = true, default-features = false }
 fp-rpc = { workspace = true, default-features = false }
 fp-self-contained = { workspace = true, default-features = false, features = ["serde", "try-runtime"] }
+
+#move pallet
+pallet-move = { workspace = true, default-features = false }
 
 [features]
 default = ["std", "with-rocksdb-weights"]
@@ -206,6 +210,8 @@ std = [
 	"pallet-scheduler/std",
 	"pallet-insecure-randomness-collective-flip/std",
 	"pallet-contracts/std",
+	"cumulus-primitives-aura/std",
+	"pallet-move/std",
 	"pallet-bulk/std",
 	"mp-coretime-bulk/std",
 ]
@@ -249,6 +255,7 @@ runtime-benchmarks = [
 	"pallet-ranked-collective/runtime-benchmarks",
 	"pallet-scheduler/runtime-benchmarks",
 	"pallet-contracts/runtime-benchmarks",
+	"pallet-move/runtime-benchmarks",
 	"pallet-bulk/runtime-benchmarks",
 ]
 
@@ -301,7 +308,8 @@ try-runtime = [
 	"pallet-ranked-collective/try-runtime",
 	"pallet-scheduler/try-runtime",
 	"pallet-insecure-randomness-collective-flip/try-runtime",
-	"pallet-contracts/try-runtime",	
+	"pallet-contracts/try-runtime",
+	"pallet-move/try-runtime",
 ]
 
 experimental = [ "pallet-aura/experimental" ]
