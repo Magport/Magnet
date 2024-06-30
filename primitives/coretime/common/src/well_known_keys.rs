@@ -33,3 +33,24 @@ pub fn paras_para_lifecycles(para_id: ParaId) -> Vec<u8> {
 			.collect()
 	})
 }
+
+// System pallet BlockHash block number 0
+pub const SYSTEM_BLOCKHASH_GENESIS: &[u8] = &hex_literal::hex![
+	"26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000"
+];
+
+// System pallet BlockHash
+pub const SYSTEM_BLOCKHASH: &[u8] =
+	&hex_literal::hex!["26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746"];
+
+// System pallet BlockHash
+pub fn chain_block_hash(block_number: u32) -> Vec<u8> {
+	block_number.using_encoded(|block_number: &[u8]| {
+		SYSTEM_BLOCKHASH
+			.iter()
+			.chain(twox_64(block_number).iter())
+			.chain(block_number.iter())
+			.cloned()
+			.collect()
+	})
+}

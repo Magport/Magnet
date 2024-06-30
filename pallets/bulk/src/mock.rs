@@ -19,6 +19,7 @@ use cumulus_pallet_parachain_system::{RelayChainState, RelaychainStateProvider};
 pub use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
 	traits::{Everything, Hooks},
+	BoundedVec,
 };
 use frame_system as system;
 use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
@@ -28,6 +29,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
 	BuildStorage, MultiSignature,
 };
+use std::str::FromStr;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 type Signature = MultiSignature;
@@ -184,6 +186,16 @@ impl ExtBuilder {
 		pallet_balances::GenesisConfig::<Test> { balances: self.balances }
 			.assimilate_storage(&mut t)
 			.unwrap();
+		crate::GenesisConfig::<Test> {
+			rpc_url: BoundedVec::try_from("ws://127.0.0.1:8855".as_bytes().to_vec()).unwrap(),
+			genesis_hash: H256::from_str(
+				"0x4ea18c8f295ba903acbbed39c70ea0569cf1705fa954a537ffa3b8b7125eaf58",
+			)
+			.expect("internal U256 is valid; qed"),
+			_marker: Default::default(),
+		}
+		.assimilate_storage(&mut t)
+		.unwrap();
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext

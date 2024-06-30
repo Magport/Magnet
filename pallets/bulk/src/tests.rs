@@ -34,14 +34,14 @@ fn bulk_inherent_test() {
 		let storage_root: cumulus_primitives_core::relay_chain::Hash =
 			<[u8; 32]>::try_from(root).unwrap().into();
 		let core_mask = CoreMask::from(0xFFFFFFFFFFFFFFFFFFFF);
-		let region_id = RegionId { begin: 12, core: 1, mask: core_mask };
+		let region_id = RegionId { begin: 13, core: 1, mask: core_mask };
 		let mut inherent_data = InherentData::default();
 		let bulk_inherent_data = mp_coretime_bulk::BulkInherentData {
 			storage_proof: Some(coretime_chain_state_proof),
 			storage_root,
 			region_id,
-			start_relaychain_height: 120,
-			end_relaychain_height: 220,
+			start_relaychain_height: 130,
+			end_relaychain_height: 170,
 		};
 		inherent_data
 			.put_data(mp_coretime_bulk::INHERENT_IDENTIFIER, &bulk_inherent_data)
@@ -53,7 +53,7 @@ fn bulk_inherent_test() {
 		BulkPallet::on_finalize(1);
 		assert_eq!(BulkPallet::record_index(), 1);
 		let record = BulkPallet::bulk_records(0).unwrap();
-		assert_eq!(record.start_relaychain_height, 120);
-		assert_eq!(record.end_relaychain_height, 220);
+		assert_eq!(record.start_relaychain_height, 130);
+		assert_eq!(record.end_relaychain_height, 170);
 	});
 }

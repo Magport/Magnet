@@ -36,26 +36,26 @@ use core::marker::PhantomData;
 /// Weight functions needed for pallet.
 pub trait WeightInfo {
 	fn set_rpc_url() -> Weight;
-	fn create_record(s: u32, ) -> Weight;
+	fn create_record() -> Weight;
 }
 /// Weight functions for `pallet_bulk`.
 pub struct SubstrateWeight<T>(PhantomData<T>);
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
+	/// Storage: `BulkPallet::GenesisHash` (r:1 w:0)
+	/// Proof: `BulkPallet::GenesisHash` (`max_values`: Some(1), `max_size`: Some(32), added: 527, mode: `MaxEncodedLen`)
 	/// Storage: `BulkPallet::RecordIndex` (r:1 w:1)
 	/// Proof: `BulkPallet::RecordIndex` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// Storage: `BulkPallet::BulkRecords` (r:0 w:1)
 	/// Proof: `BulkPallet::BulkRecords` (`max_values`: None, `max_size`: Some(72), added: 2547, mode: `MaxEncodedLen`)
 	/// The range of component `s` is `[0, 100]`.
-	fn create_record(s: u32, ) -> Weight {
+	fn create_record() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `147`
-		//  Estimated: `1489`
-		// Minimum execution time: 30_127_000 picoseconds.
-		Weight::from_parts(33_526_304, 0)
-			.saturating_add(Weight::from_parts(0, 1489))
-			// Standard Error: 1_136
-			.saturating_add(Weight::from_parts(2_315, 0).saturating_mul(s.into()))
-			.saturating_add(T::DbWeight::get().reads(1))
+		//  Measured:  `199`
+		//  Estimated: `1517`
+		// Minimum execution time: 39_063_000 picoseconds.
+		Weight::from_parts(42_640_056, 0)
+			.saturating_add(Weight::from_parts(0, 1517))
+			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
 	/// Storage: `BulkPallet::RpcUrl` (r:0 w:1)
@@ -65,32 +65,30 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 4_729_000 picoseconds.
-		Weight::from_parts(5_325_688, 0)
+		// Minimum execution time: 3_858_000 picoseconds.
+		Weight::from_parts(4_289_031, 0)
 			.saturating_add(Weight::from_parts(0, 0))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 }
 
 impl WeightInfo for () {
-	fn create_record(s: u32, ) -> Weight {
+	fn create_record() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `147`
-		//  Estimated: `1489`
-		// Minimum execution time: 30_127_000 picoseconds.
-		Weight::from_parts(33_526_304, 0)
-			.saturating_add(Weight::from_parts(0, 1489))
-			// Standard Error: 1_136
-			.saturating_add(Weight::from_parts(2_315, 0).saturating_mul(s.into()))
-			.saturating_add(RocksDbWeight::get().reads(1))
+		//  Measured:  `199`
+		//  Estimated: `1517`
+		// Minimum execution time: 39_063_000 picoseconds.
+		Weight::from_parts(42_640_056, 0)
+			.saturating_add(Weight::from_parts(0, 1517))
+			.saturating_add(RocksDbWeight::get().reads(2))
 			.saturating_add(RocksDbWeight::get().writes(2))
 	}
 	fn set_rpc_url() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 4_729_000 picoseconds.
-		Weight::from_parts(5_325_688, 0)
+		// Minimum execution time: 3_858_000 picoseconds.
+		Weight::from_parts(4_289_031, 0)
 			.saturating_add(Weight::from_parts(0, 0))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}

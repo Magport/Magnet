@@ -22,13 +22,16 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
 use cumulus_pallet_parachain_system::RelaychainStateProvider;
+use cumulus_primitives_core::relay_chain::Hash as PHash;
 use frame_support::{
 	dispatch::DispatchResultWithPostInfo, dispatch::PostDispatchInfo, pallet_prelude::*,
 	traits::Currency,
 };
 use frame_system::pallet_prelude::*;
 use mp_coretime_bulk::well_known_keys::broker_regions;
-use mp_coretime_common::chain_state_snapshot::GenericStateProof;
+use mp_coretime_common::{
+	chain_state_snapshot::GenericStateProof, well_known_keys::SYSTEM_BLOCKHASH_GENESIS,
+};
 pub use pallet::*;
 use pallet_broker::RegionRecord;
 use primitives::Balance;
@@ -115,6 +118,11 @@ pub mod pallet {
 	#[pallet::getter(fn record_index)]
 	pub type RecordIndex<T> = StorageValue<_, u32, ValueQuery, RecordIndexOnEmpty<T>>;
 
+	/// Coretime parachain genesis block hash,for check.
+	#[pallet::storage]
+	#[pallet::getter(fn genesis_hash)]
+	pub type GenesisHash<T> = StorageValue<_, PHash, ValueQuery>;
+
 	/// Bulk purchase Information Map.
 	#[pallet::storage]
 	#[pallet::getter(fn bulk_records)]
@@ -124,12 +132,17 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		pub rpc_url: BoundedVec<u8, T::MaxUrlLength>,
+		pub genesis_hash: PHash,
 		pub _marker: PhantomData<T>,
 	}
 
 	impl<T: Config> Default for GenesisConfig<T> {
 		fn default() -> Self {
-			Self { rpc_url: BoundedVec::new(), _marker: Default::default() }
+			Self {
+				rpc_url: BoundedVec::new(),
+				genesis_hash: Default::default(),
+				_marker: Default::default(),
+			}
 		}
 	}
 
@@ -137,6 +150,7 @@ pub mod pallet {
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			RpcUrl::<T>::put(&self.rpc_url);
+			GenesisHash::<T>::put(&self.genesis_hash);
 		}
 	}
 
@@ -168,6 +182,8 @@ pub mod pallet {
 		FailedCreateProof,
 		/// Purchaser is none.
 		PurchaserNone,
+		/// Genesis hash inconsistency
+		GenesisHashInconsistency,
 	}
 
 	#[pallet::hooks]
@@ -208,7 +224,7 @@ pub mod pallet {
 		/// Parameters:
 		/// - `data`: The inherent data.
 		#[pallet::call_index(0)]
-		#[pallet::weight((<T as pallet::Config>::WeightInfo::create_record(1), DispatchClass::Mandatory))]
+		#[pallet::weight((<T as pallet::Config>::WeightInfo::create_record(), DispatchClass::Mandatory))]
 		pub fn create_record(
 			origin: OriginFor<T>,
 			data: mp_coretime_bulk::BulkInherentData,
@@ -230,12 +246,26 @@ pub mod pallet {
 			> = GenericStateProof::new(storage_root, storage_proof)
 				.map_err(|_| Error::<T>::FailedCreateProof)?;
 
-			let key = broker_regions(region_id);
+			let region_key = broker_regions(region_id);
 			// Read RegionRecord from proof.
 			let region_record = storage_rooted_proof
-				.read_entry::<RegionRecord<T::AuthorityId, BalanceOf<T>>>(key.as_slice(), None)
+				.read_entry::<RegionRecord<T::AuthorityId, BalanceOf<T>>>(
+					region_key.as_slice(),
+					None,
+				)
 				.ok()
 				.ok_or(Error::<T>::FailedReading)?;
+
+			let genesis_hash_key = SYSTEM_BLOCKHASH_GENESIS;
+			let genesis_hash = storage_rooted_proof
+				.read_entry::<PHash>(genesis_hash_key, None)
+				.ok()
+				.ok_or(Error::<T>::FailedReading)?;
+
+			let stored_hash = GenesisHash::<T>::get();
+			if genesis_hash != stored_hash {
+				Err(Error::<T>::GenesisHashInconsistency)?;
+			}
 
 			let old_record_index = RecordIndex::<T>::get();
 			let balance = region_record.paid.ok_or(Error::<T>::PurchaserNone)?;
@@ -260,7 +290,7 @@ pub mod pallet {
 				end_relaychain_height,
 			});
 
-			let total_weight = T::WeightInfo::create_record(1);
+			let total_weight = T::WeightInfo::create_record();
 			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
 		}
 

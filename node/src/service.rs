@@ -484,16 +484,8 @@ async fn start_node_impl(
 		// 	order_record.clone(),
 		// 	rpc_address,
 		// )?;
-		let bulk_mem_record = Arc::new(Mutex::new(BulkMemRecord {
-			storage_proof: StorageProof::empty(),
-			storage_root: Default::default(),
-			coretime_para_height: 0,
-			region_id: 0u128.into(),
-			start_relaychain_height: 0,
-			end_relaychain_height: 0,
-			status: BulkStatus::Purchased,
-			duration: 0,
-		}));
+		let bulk_mem_record =
+			Arc::new(Mutex::new(BulkMemRecord { coretime_para_height: 0, items: Vec::new() }));
 		spawn_bulk_task::<_, _, _, sp_consensus_aura::sr25519::AuthorityPair>(
 			client.clone(),
 			para_id,
@@ -610,22 +602,39 @@ fn start_consensus(
 			let bulk_mem_record_clone = bulk_mem_record.clone();
 			async move {
 				let mut bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
-				let storage_proof =
-					if bulk_mem_record_clone_local.status == BulkStatus::CoreAssigned {
-						Some(&bulk_mem_record_clone_local.storage_proof)
-					} else {
-						None
-					};
+				let record_items = &mut bulk_mem_record_clone_local.items;
+				let item = record_items.iter().find(|item| item.status == BulkStatus::CoreAssigned);
+				let (
+					storage_proof,
+					storage_root,
+					region_id,
+					start_relaychain_height,
+					end_relaychain_height,
+				) = if let Some(item) = item {
+					(
+						Some(&item.storage_proof),
+						item.storage_root,
+						item.region_id,
+						item.start_relaychain_height,
+						item.end_relaychain_height,
+					)
+				} else {
+					(None, Default::default(), 0u128.into(), 0, 0)
+				};
 				let bulk_inherent = mp_coretime_bulk::BulkInherentData::create_at(
 					storage_proof,
-					bulk_mem_record_clone_local.storage_root,
-					bulk_mem_record_clone_local.region_id,
-					bulk_mem_record_clone_local.start_relaychain_height,
-					bulk_mem_record_clone_local.end_relaychain_height,
+					storage_root,
+					region_id,
+					start_relaychain_height,
+					end_relaychain_height,
 				)
 				.await;
 				if storage_proof.is_some() {
-					bulk_mem_record_clone_local.status = BulkStatus::Purchased;
+					if let Some(pos) =
+						record_items.iter().position(|item| item.status == BulkStatus::CoreAssigned)
+					{
+						record_items.remove(pos);
+					}
 				}
 				let bulk_inherent = bulk_inherent.ok_or_else(|| {
 					Box::<dyn std::error::Error + Send + Sync>::from(

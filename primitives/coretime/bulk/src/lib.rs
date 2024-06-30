@@ -56,9 +56,7 @@ pub enum BulkStatus {
 }
 
 #[derive(Clone, Debug)]
-pub struct BulkMemRecord {
-	/// Block height of coretime parachain.
-	pub coretime_para_height: u32,
+pub struct BulkMemRecordItem {
 	/// Proof of coretime parachain storage.
 	pub storage_proof: sp_trie::StorageProof,
 	/// Root of coretime parachain storage.
@@ -73,6 +71,14 @@ pub struct BulkMemRecord {
 	pub duration: u32,
 	/// Status of bulk record.
 	pub status: BulkStatus,
+}
+
+#[derive(Clone, Debug)]
+pub struct BulkMemRecord {
+	/// Block height of coretime parachain.
+	pub coretime_para_height: u32,
+	/// Record item.
+	pub items: Vec<BulkMemRecordItem>,
 }
 
 // Identifier of the bulk inherent

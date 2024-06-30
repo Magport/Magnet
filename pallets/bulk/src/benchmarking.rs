@@ -55,13 +55,13 @@ benchmarks! {
 
 		let (storage_root, coretime_chain_state_proof) = sproof_builder.into_state_root_and_proof();
 		let core_mask = CoreMask::from(0xFFFFFFFFFFFFFFFFFFFF);
-		let region_id = RegionId { begin: 12, core: 1, mask: core_mask };
+		let region_id = RegionId { begin: 13, core: 1, mask: core_mask };
 		let bulk_inherent_data = mp_coretime_bulk::BulkInherentData {
 			storage_proof: Some(coretime_chain_state_proof),
 			storage_root,
 			region_id,
-			start_relaychain_height: 120,
-			end_relaychain_height: 220,
+			start_relaychain_height: 130,
+			end_relaychain_height: 170,
 		};
 	}: _(RawOrigin::None, bulk_inherent_data)
 	verify {

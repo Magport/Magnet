@@ -283,7 +283,8 @@ fn testnet_genesis(
 
 		"evm": { "accounts": evm_accounts },
 		"bulkPallet":{
-			"rpcUrl": b"ws://127.0.0.1:8855".to_vec()
+			"rpcUrl": b"ws://127.0.0.1:8855".to_vec(),
+			"genesisHash": U256::from_str("0x4ea18c8f295ba903acbbed39c70ea0569cf1705fa954a537ffa3b8b7125eaf58").expect("internal U256 is valid; qed")
 		},
 	})
 }
