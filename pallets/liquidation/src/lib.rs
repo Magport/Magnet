@@ -699,6 +699,7 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
+
 		#[pallet::call_index(6)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn set_profit_distribution_cycle(
