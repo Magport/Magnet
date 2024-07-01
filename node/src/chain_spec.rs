@@ -4,10 +4,7 @@ use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
 use sp_core::{sr25519, Pair, Public, H160, U256};
-use sp_runtime::{
-	traits::{IdentifyAccount, Verify},
-	Perbill,
-};
+use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_std::marker::PhantomData;
 use std::{collections::BTreeMap, str::FromStr};
 
@@ -292,10 +289,10 @@ fn testnet_genesis(
 		},
 		"liquidation":{
 			"adminKey": Some(root.clone()),
-			"systemRatio": Perbill::from_percent(20),
-			"treasuryRatio": Perbill::from_percent(33),
-			"operationRatio": Perbill::from_percent(25),
-			"collatorRatio":Perbill::from_percent(22),
+			"systemRatio": 20_000_0000,
+			"treasuryRatio": 33_000_0000,
+			"operationRatio": 25_000_0000,
+			"collatorRatio": 22_000_0000,
 			"minLiquidationThreshold": 20_000_000_000_000_000u128,
 			"profitDistributionCycle": 10,
 		}

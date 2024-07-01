@@ -21,7 +21,7 @@ use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
 	traits::{StaticLookup, Zero},
-	AccountId32, Perbill, Saturating,
+	AccountId32, Percent, Saturating,
 };
 use sp_std::{prelude::*, sync::Arc, vec};
 
@@ -38,6 +38,7 @@ type BalanceOf<T> =
 pub type Balance = u128;
 
 pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_000_000;
+pub const PERCENT_UNIT: u128 = 1_000_0000;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -120,19 +121,19 @@ pub mod pallet {
 
 	#[pallet::storage]
 	#[pallet::getter(fn system_ratio)]
-	pub type SystemRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+	pub type SystemRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn treasury_ratio)]
-	pub type TreasuryRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+	pub type TreasuryRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn operation_ratio)]
-	pub type OperationRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+	pub type OperationRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn collator_ratio)]
-	pub type CollatorRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+	pub type CollatorRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn min_liquidation_threshold)]
@@ -152,10 +153,10 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		/// The `AccountId` of the admin key.
 		pub admin_key: Option<T::AccountId>,
-		pub system_ratio: Perbill,
-		pub treasury_ratio: Perbill,
-		pub operation_ratio: Perbill,
-		pub collator_ratio: Perbill,
+		pub system_ratio: u32,
+		pub treasury_ratio: u32,
+		pub operation_ratio: u32,
+		pub collator_ratio: u32,
 		pub min_liquidation_threshold: Balance,
 		pub profit_distribution_cycle: BlockNumberFor<T>,
 	}
@@ -168,7 +169,7 @@ pub mod pallet {
 					+ self.treasury_ratio
 					+ self.operation_ratio
 					+ self.collator_ratio
-					<= Perbill::one(),
+					<= 100 * (PERCENT_UNIT as u32),
 				"Ratio sum must be <= 100%"
 			);
 			assert!(
@@ -218,16 +219,16 @@ pub mod pallet {
 		SetAdmin(T::AccountId),
 
 		/// Set system ratio
-		SystemRatioSet(Perbill),
+		SystemRatioSet(u32),
 
 		/// Set treasury ratio
-		TreasuryRatioSet(Perbill),
+		TreasuryRatioSet(u32),
 
 		/// Set operation ratio
-		OperationRatioSet(Perbill),
+		OperationRatioSet(u32),
 
 		///Set collator ratio
-		CollatorRatioSet(Perbill),
+		CollatorRatioSet(u32),
 
 		/// Set min liquidation threshold
 		MinLiquidationThresholdSet(Balance),
@@ -477,9 +478,10 @@ pub mod pallet {
 			let treasury_ratio = TreasuryRatio::<T>::get();
 			let operation_ratio = OperationRatio::<T>::get();
 
-			let treasury_amount = treasury_ratio * total_profit / PARACHAIN_TO_RELAYCHAIN_UNIT;
-			let operation_amount = operation_ratio * total_profit;
-			let system_amount = system_ratio * total_profit;
+			let treasury_amount = (treasury_ratio as u128) / PERCENT_UNIT * total_profit
+				/ PARACHAIN_TO_RELAYCHAIN_UNIT;
+			let operation_amount = (operation_ratio as u128) / PERCENT_UNIT * total_profit;
+			let system_amount = (system_ratio as u128) / PERCENT_UNIT * total_profit;
 			let total_collators_profit =
 				total_profit.saturating_sub(treasury_amount + operation_amount + system_amount);
 
@@ -504,7 +506,7 @@ pub mod pallet {
 			transfers.push((operation_account, operation_account_profit));
 
 			for (collator, collator_cost) in CollatorRealGasCosts::<T>::iter() {
-				let collator_ratio = Perbill::from_rational(collator_cost, total_cost);
+				let collator_ratio = Percent::from_rational(collator_cost, total_cost);
 				let collator_profit = collator_ratio * total_collators_profit;
 
 				let collator_addr_profit =
@@ -597,20 +599,22 @@ pub mod pallet {
 
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn set_system_ratio(
-			origin: OriginFor<T>,
-			ratio: Perbill,
-		) -> DispatchResultWithPostInfo {
+		pub fn set_system_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
 			let treasury_ratio = TreasuryRatio::<T>::get();
 			let operation_ratio = OperationRatio::<T>::get();
 			let collator_ratio = CollatorRatio::<T>::get();
 
-			ensure!(
-				ratio + treasury_ratio + operation_ratio + collator_ratio <= Perbill::one(),
-				Error::<T>::InvalidRatio
-			);
+			let total_ratio = treasury_ratio + ratio + operation_ratio + collator_ratio;
+			log::info!("1 +++++++++ set system ratio, total ratio:{:?}, treasury_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}, system_ratio:{:?}",
+            total_ratio, treasury_ratio, operation_ratio, collator_ratio, ratio);
+			ensure_total_ratio_not_exceed_one::<T>(
+				ratio,
+				treasury_ratio,
+				operation_ratio,
+				collator_ratio,
+			)?;
 
 			SystemRatio::<T>::put(ratio);
 			Self::deposit_event(Event::SystemRatioSet(ratio));
@@ -619,20 +623,23 @@ pub mod pallet {
 
 		#[pallet::call_index(2)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn set_treasury_ratio(
-			origin: OriginFor<T>,
-			ratio: Perbill,
-		) -> DispatchResultWithPostInfo {
+		pub fn set_treasury_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
 			let system_ratio = SystemRatio::<T>::get();
 			let operation_ratio = OperationRatio::<T>::get();
 			let collator_ratio = CollatorRatio::<T>::get();
 
-			ensure!(
-				system_ratio + ratio + operation_ratio + collator_ratio <= Perbill::one(),
-				Error::<T>::InvalidRatio
-			);
+			let total_ratio = system_ratio + ratio + operation_ratio + collator_ratio;
+			log::info!("2 =========== set treasury ratio, total ratio:{:?}, system_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}, treasury_ratio:{:?}",
+            total_ratio, system_ratio, operation_ratio, collator_ratio, ratio);
+
+			ensure_total_ratio_not_exceed_one::<T>(
+				system_ratio,
+				ratio,
+				operation_ratio,
+				collator_ratio,
+			)?;
 
 			TreasuryRatio::<T>::put(ratio);
 			Self::deposit_event(Event::TreasuryRatioSet(ratio));
@@ -641,20 +648,22 @@ pub mod pallet {
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn set_operation_ratio(
-			origin: OriginFor<T>,
-			ratio: Perbill,
-		) -> DispatchResultWithPostInfo {
+		pub fn set_operation_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
 			let system_ratio = SystemRatio::<T>::get();
 			let treasury_ratio = TreasuryRatio::<T>::get();
 			let collator_ratio = CollatorRatio::<T>::get();
 
-			ensure!(
-				system_ratio + treasury_ratio + ratio + collator_ratio <= Perbill::one(),
-				Error::<T>::InvalidRatio
-			);
+			let total_ratio = system_ratio + treasury_ratio + ratio + collator_ratio;
+			log::info!("3 -+-+-+-+-+ set operation ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, collator_ratio:{:?}, operation_ratio:{:?}",
+            total_ratio, system_ratio, treasury_ratio, collator_ratio, ratio);
+			ensure_total_ratio_not_exceed_one::<T>(
+				system_ratio,
+				treasury_ratio,
+				ratio,
+				collator_ratio,
+			)?;
 
 			OperationRatio::<T>::put(ratio);
 			Self::deposit_event(Event::OperationRatioSet(ratio));
@@ -663,20 +672,22 @@ pub mod pallet {
 
 		#[pallet::call_index(4)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn set_collator_ratio(
-			origin: OriginFor<T>,
-			ratio: Perbill,
-		) -> DispatchResultWithPostInfo {
+		pub fn set_collator_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
 			crate::pallet::ensure_root_or_admin::<T>(origin)?;
 
-			let system_ratio = crate::pallet::SystemRatio::<T>::get();
-			let treasury_ratio = crate::pallet::TreasuryRatio::<T>::get();
+			let system_ratio = SystemRatio::<T>::get();
+			let treasury_ratio = TreasuryRatio::<T>::get();
 			let operation_ratio = OperationRatio::<T>::get();
 
-			ensure!(
-				system_ratio + treasury_ratio + ratio + operation_ratio <= Perbill::one(),
-				Error::<T>::InvalidRatio
-			);
+			let total_ratio = system_ratio + treasury_ratio + ratio + operation_ratio;
+			log::info!("4. *********** set collator ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}",
+            total_ratio, system_ratio, treasury_ratio, operation_ratio, ratio);
+			ensure_total_ratio_not_exceed_one::<T>(
+				system_ratio,
+				treasury_ratio,
+				operation_ratio,
+				ratio,
+			)?;
 
 			CollatorRatio::<T>::put(ratio);
 			Self::deposit_event(Event::CollatorRatioSet(ratio));
@@ -722,5 +733,16 @@ pub mod pallet {
 			Ok(None) => Ok(()),
 			_ => Err(Error::<T>::RequireAdmin.into()),
 		}
+	}
+
+	fn ensure_total_ratio_not_exceed_one<T: Config>(
+		system_ratio: u32,
+		treasury_ratio: u32,
+		operation_ratio: u32,
+		collator_ratio: u32,
+	) -> DispatchResult {
+		let total_ratio = system_ratio + treasury_ratio + operation_ratio + collator_ratio;
+		ensure!((total_ratio as u128) <= 100 * PERCENT_UNIT, Error::<T>::InvalidRatio);
+		Ok(())
 	}
 }
