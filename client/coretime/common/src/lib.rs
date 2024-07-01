@@ -33,7 +33,7 @@ type AuthorityId<P> = <P as Pair>::Public;
 
 /// Is it now a parathread.
 pub async fn is_parathread(
-	relay_chain: impl RelayChainInterface + Clone,
+	relay_chain: &(impl RelayChainInterface + Clone),
 	p_hash: H256,
 	para_id: ParaId,
 ) -> Result<bool, Box<dyn Error>> {
