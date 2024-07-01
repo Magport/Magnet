@@ -308,10 +308,10 @@ where
 
 pub struct ExtBuilder {
 	existential_deposit: u128,
-	system_ratio: Perbill,
-	treasury_ratio: Perbill,
-	operation_ratio: Perbill,
-	collator_ratio: Perbill,
+	system_ratio: u32,
+	treasury_ratio: u32,
+	operation_ratio: u32,
+	collator_ratio: u32,
 	min_liquidation_threshold: Balance,
 	profit_distribution_cycle: u64,
 }
@@ -320,10 +320,10 @@ impl Default for ExtBuilder {
 	fn default() -> Self {
 		Self {
 			existential_deposit: 1,
-			system_ratio: Perbill::from_percent(20),
-			treasury_ratio: Perbill::from_percent(33),
-			operation_ratio: Perbill::from_percent(25),
-			collator_ratio: Perbill::from_percent(22),
+			system_ratio: 20_000_0000,
+			treasury_ratio: 33_000_0000,
+			operation_ratio: 25_000_0000,
+			collator_ratio: 22_000_0000,
 			min_liquidation_threshold: MILLIUNIT * 20,
 			profit_distribution_cycle: 10,
 		}
@@ -336,22 +336,22 @@ impl ExtBuilder {
 		self
 	}
 
-	pub fn system_ratio(mut self, ratio: Perbill) -> Self {
+	pub fn system_ratio(mut self, ratio: u32) -> Self {
 		self.system_ratio = ratio;
 		self
 	}
 
-	pub fn treasury_ratio(mut self, ratio: Perbill) -> Self {
+	pub fn treasury_ratio(mut self, ratio: u32) -> Self {
 		self.treasury_ratio = ratio;
 		self
 	}
 
-	pub fn operation_ratio(mut self, ratio: Perbill) -> Self {
+	pub fn operation_ratio(mut self, ratio: u32) -> Self {
 		self.operation_ratio = ratio;
 		self
 	}
 
-	pub fn collator_ratio(mut self, ratio: Perbill) -> Self {
+	pub fn collator_ratio(mut self, ratio: u32) -> Self {
 		self.collator_ratio = ratio;
 		self
 	}
