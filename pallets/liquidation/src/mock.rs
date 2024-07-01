@@ -311,6 +311,7 @@ pub struct ExtBuilder {
 	system_ratio: Perbill,
 	treasury_ratio: Perbill,
 	operation_ratio: Perbill,
+	collator_ratio: Perbill,
 	min_liquidation_threshold: Balance,
 	profit_distribution_cycle: u64,
 }
@@ -322,6 +323,7 @@ impl Default for ExtBuilder {
 			system_ratio: Perbill::from_percent(20),
 			treasury_ratio: Perbill::from_percent(33),
 			operation_ratio: Perbill::from_percent(25),
+			collator_ratio: Perbill::from_percent(22),
 			min_liquidation_threshold: MILLIUNIT * 20,
 			profit_distribution_cycle: 10,
 		}
@@ -349,6 +351,11 @@ impl ExtBuilder {
 		self
 	}
 
+	pub fn collator_ratio(mut self, ratio: Perbill) -> Self {
+		self.collator_ratio = ratio;
+		self
+	}
+
 	pub fn min_liquidation_threshold(mut self, threshold: Balance) -> Self {
 		self.min_liquidation_threshold = threshold;
 		self
@@ -372,6 +379,7 @@ impl ExtBuilder {
 			system_ratio: self.system_ratio,
 			treasury_ratio: self.treasury_ratio,
 			operation_ratio: self.operation_ratio,
+			collator_ratio: self.collator_ratio,
 			min_liquidation_threshold: self.min_liquidation_threshold,
 			profit_distribution_cycle: self.profit_distribution_cycle,
 		};

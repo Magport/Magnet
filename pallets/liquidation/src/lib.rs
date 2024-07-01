@@ -131,6 +131,10 @@ pub mod pallet {
 	pub type OperationRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
 	#[pallet::storage]
+	#[pallet::getter(fn collator_ratio)]
+	pub type CollatorRatio<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+
+	#[pallet::storage]
 	#[pallet::getter(fn min_liquidation_threshold)]
 	pub type MinLiquidationThreshold<T: Config> = StorageValue<_, Balance, ValueQuery>;
 
@@ -151,6 +155,7 @@ pub mod pallet {
 		pub system_ratio: Perbill,
 		pub treasury_ratio: Perbill,
 		pub operation_ratio: Perbill,
+		pub collator_ratio: Perbill,
 		pub min_liquidation_threshold: Balance,
 		pub profit_distribution_cycle: BlockNumberFor<T>,
 	}
@@ -158,12 +163,30 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
+			assert!(
+				self.system_ratio
+					+ self.treasury_ratio
+					+ self.operation_ratio
+					+ self.collator_ratio
+					<= Perbill::one(),
+				"Ratio sum must be <= 100%"
+			);
+			assert!(
+				self.min_liquidation_threshold > <T as pallet::Config>::ExistentialDeposit::get(),
+				"MinLiquidationThreshold must be greater than ExistentialDeposit"
+			);
+			assert!(
+				self.profit_distribution_cycle > 1u32.into(),
+				"ProfitDistributionCycle must be greater than 1"
+			);
+
 			if let Some(key) = &self.admin_key {
 				<Admin<T>>::put(key.clone());
 			}
 			SystemRatio::<T>::put(self.system_ratio);
 			TreasuryRatio::<T>::put(self.treasury_ratio);
 			OperationRatio::<T>::put(self.operation_ratio);
+			CollatorRatio::<T>::put(self.collator_ratio);
 			MinLiquidationThreshold::<T>::put(self.min_liquidation_threshold);
 			ProfitDistributionCycle::<T>::put(self.profit_distribution_cycle);
 		}
@@ -203,6 +226,9 @@ pub mod pallet {
 		/// Set operation ratio
 		OperationRatioSet(Perbill),
 
+		///Set collator ratio
+		CollatorRatioSet(Perbill),
+
 		/// Set min liquidation threshold
 		MinLiquidationThresholdSet(Balance),
 
@@ -233,8 +259,10 @@ pub mod pallet {
 
 		/// Invalid ratio sum (must be <= 100%)
 		InvalidRatio,
+
 		/// MinLiquidationThreshold must be greater than ExistentialDeposit
 		InvalidMinLiquidationThreshold,
+
 		/// ProfitDistributionCycle must be greater than 1
 		InvalidProfitDistributionCycle,
 
@@ -577,8 +605,10 @@ pub mod pallet {
 
 			let treasury_ratio = TreasuryRatio::<T>::get();
 			let operation_ratio = OperationRatio::<T>::get();
+			let collator_ratio = CollatorRatio::<T>::get();
+
 			ensure!(
-				ratio + treasury_ratio + operation_ratio <= Perbill::one(),
+				ratio + treasury_ratio + operation_ratio + collator_ratio <= Perbill::one(),
 				Error::<T>::InvalidRatio
 			);
 
@@ -597,8 +627,10 @@ pub mod pallet {
 
 			let system_ratio = SystemRatio::<T>::get();
 			let operation_ratio = OperationRatio::<T>::get();
+			let collator_ratio = CollatorRatio::<T>::get();
+
 			ensure!(
-				system_ratio + ratio + operation_ratio <= Perbill::one(),
+				system_ratio + ratio + operation_ratio + collator_ratio <= Perbill::one(),
 				Error::<T>::InvalidRatio
 			);
 
@@ -617,8 +649,10 @@ pub mod pallet {
 
 			let system_ratio = SystemRatio::<T>::get();
 			let treasury_ratio = TreasuryRatio::<T>::get();
+			let collator_ratio = CollatorRatio::<T>::get();
+
 			ensure!(
-				system_ratio + treasury_ratio + ratio <= Perbill::one(),
+				system_ratio + treasury_ratio + ratio + collator_ratio <= Perbill::one(),
 				Error::<T>::InvalidRatio
 			);
 
@@ -628,6 +662,28 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(4)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_collator_ratio(
+			origin: OriginFor<T>,
+			ratio: Perbill,
+		) -> DispatchResultWithPostInfo {
+			crate::pallet::ensure_root_or_admin::<T>(origin)?;
+
+			let system_ratio = crate::pallet::SystemRatio::<T>::get();
+			let treasury_ratio = crate::pallet::TreasuryRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
+
+			ensure!(
+				system_ratio + treasury_ratio + ratio + operation_ratio <= Perbill::one(),
+				Error::<T>::InvalidRatio
+			);
+
+			CollatorRatio::<T>::put(ratio);
+			Self::deposit_event(Event::CollatorRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(5)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn set_min_liquidation_threshold(
 			origin: OriginFor<T>,
@@ -643,7 +699,8 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		#[pallet::call_index(5)]
+
+		#[pallet::call_index(6)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn set_profit_distribution_cycle(
 			origin: OriginFor<T>,

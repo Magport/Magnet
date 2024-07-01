@@ -10,6 +10,7 @@ fn distribute_profit_should_work() {
 		.system_ratio(Perbill::from_percent(20))
 		.treasury_ratio(Perbill::from_percent(33))
 		.operation_ratio(Perbill::from_percent(25))
+		.collator_ratio(Perbill::from_percent(22))
 		.min_liquidation_threshold(1_000)
 		.profit_distribution_cycle(10)
 		.build()
