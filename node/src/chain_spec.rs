@@ -295,6 +295,7 @@ fn testnet_genesis(
 			"systemRatio": Perbill::from_percent(20),
 			"treasuryRatio": Perbill::from_percent(33),
 			"operationRatio": Perbill::from_percent(25),
+			"collatorRatio":Perbill::from_percent(22),
 			"minLiquidationThreshold": 20_000_000_000_000_000u128,
 			"profitDistributionCycle": 10,
 		}
