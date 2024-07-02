@@ -41,8 +41,17 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use pallet_balances;
-	use pallet_order::OrderGasCost;
+	// use pallet_order::OrderGasCost;
 	use pallet_utility;
+	pub trait OrderGasCost<T: frame_system::Config> {
+		/// Gas consumed by placing an order in a certain block.
+		///
+		/// Parameters:
+		/// - `block_number`: The block number of para chain.
+		fn gas_cost(
+			block_number: BlockNumberFor<T>,
+		) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
+	}
 
 	#[pallet::pallet]
 	#[pallet::without_storage_info]
@@ -52,7 +61,7 @@ pub mod pallet {
 	#[pallet::config]
 	pub trait Config:
 		frame_system::Config
-		+ pallet_order::Config
+		// + pallet_order::Config
 		+ pallet_pot::Config
 		+ pallet_balances::Config
 		+ pallet_utility::Config
@@ -480,5 +489,17 @@ pub mod pallet {
 			}
 			Ok(())
 		}
+	}
+}
+
+impl<T> OrderGasCost<T> for ()
+where
+	T: frame_system::Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
+		Ok(None)
 	}
 }

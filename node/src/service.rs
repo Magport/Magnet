@@ -49,9 +49,15 @@ use crate::eth::{
 	FrontierBlockImport as TFrontierBlockImport,
 	FrontierPartialComponents,
 };
-use crate::on_demand_order::spawn_on_demand_order;
+// use crate::on_demand_order::spawn_on_demand_order;
 use futures::lock::Mutex;
-use magnet_primitives_order::{OrderRecord, OrderStatus};
+// use magnet_primitives_order::{OrderRecord, OrderStatus};
+use mc_coretime_bulk::spawn_bulk_task;
+use mp_coretime_bulk::BulkMemRecord;
+use mp_coretime_bulk::BulkStatus;
+use sp_core::ByteArray;
+use sp_runtime::AccountId32;
+use sp_trie::StorageProof;
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 
@@ -458,28 +464,37 @@ async fn start_node_impl(
 		sync_service: sync_service.clone(),
 	})?;
 	if validator {
-		let order_record =
-			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
-				relay_parent: None,
-				relay_height: 0,
-				relay_base: Default::default(),
-				relay_base_height: 0,
-				order_status: OrderStatus::Init,
-				validation_data: None,
-				para_id,
-				sequence_number: 0,
-				author_pub: None,
-				txs: vec![],
-			}));
-		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+		// let order_record =
+		// 	Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
+		// 		relay_parent: None,
+		// 		relay_height: 0,
+		// 		relay_base: Default::default(),
+		// 		relay_base_height: 0,
+		// 		order_status: OrderStatus::Init,
+		// 		validation_data: None,
+		// 		para_id,
+		// 		sequence_number: 0,
+		// 		author_pub: None,
+		// 		txs: vec![],
+		// 	}));
+		// spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+		// 	client.clone(),
+		// 	para_id,
+		// 	relay_chain_interface.clone(),
+		// 	transaction_pool.clone(),
+		// 	&task_manager,
+		// 	params.keystore_container.keystore(),
+		// 	order_record.clone(),
+		// 	rpc_address,
+		// )?;
+		let bulk_mem_record =
+			Arc::new(Mutex::new(BulkMemRecord { coretime_para_height: 0, items: Vec::new() }));
+		spawn_bulk_task::<_, _, _, sp_consensus_aura::sr25519::AuthorityPair>(
 			client.clone(),
 			para_id,
 			relay_chain_interface.clone(),
-			transaction_pool.clone(),
 			&task_manager,
-			params.keystore_container.keystore(),
-			order_record.clone(),
-			rpc_address,
+			bulk_mem_record.clone(),
 		)?;
 		start_consensus(
 			client.clone(),
@@ -497,7 +512,8 @@ async fn start_node_impl(
 			collator_key.expect("Command line arguments do not allow this. qed"),
 			overseer_handle,
 			announce_block,
-			order_record,
+			// order_record,
+			bulk_mem_record,
 		)?;
 	}
 
@@ -553,7 +569,8 @@ fn start_consensus(
 	collator_key: CollatorPair,
 	overseer_handle: OverseerHandle,
 	announce_block: Arc<dyn Fn(Hash, Option<Vec<u8>>) + Send + Sync>,
-	order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
+	// order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
+	bulk_mem_record: Arc<Mutex<BulkMemRecord>>,
 ) -> Result<(), sc_service::Error> {
 	use cumulus_client_consensus_aura::collators::lookahead::{self as aura, Params as AuraParams};
 	// use cumulus_client_consensus_aura::collators::basic::{
@@ -585,40 +602,111 @@ fn start_consensus(
 		client.clone(),
 	);
 	let relay_chain_interface_clone = relay_chain_interface.clone();
+	// let params = AuraParams {
+	// 	create_inherent_data_providers: move |_, ()| {
+	// 		let relay_chain_interface = relay_chain_interface.clone();
+	// 		let order_record_clone = order_record.clone();
+	// 		async move {
+	// 			let parent_hash = relay_chain_interface.best_block_hash().await?;
+	// 			let (relay_parent, validation_data, sequence_number, author_pub) = {
+	// 				let order_record_local = order_record_clone.lock().await;
+	// 				if order_record_local.validation_data.is_none() {
+	// 					(parent_hash, None, order_record_local.sequence_number, None)
+	// 				} else {
+	// 					(
+	// 						order_record_local.relay_parent.expect("can not get relay_parent hash"),
+	// 						order_record_local.validation_data.clone(),
+	// 						order_record_local.sequence_number,
+	// 						order_record_local.author_pub.clone(),
+	// 					)
+	// 				}
+	// 			};
+	// 			let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
+	// 				relay_parent,
+	// 				&relay_chain_interface,
+	// 				&validation_data,
+	// 				para_id,
+	// 				sequence_number,
+	// 				&author_pub,
+	// 			)
+	// 			.await;
+	// 			let order_inherent = order_inherent.ok_or_else(|| {
+	// 				Box::<dyn std::error::Error + Send + Sync>::from(
+	// 					"Failed to create order inherent",
+	// 				)
+	// 			})?;
+	// 			Ok(order_inherent)
+	// 		}
+	// 	},
+
+	// 	block_import,
+	// 	para_client: client.clone(),
+	// 	para_backend: backend.clone(),
+	// 	relay_client: relay_chain_interface_clone,
+	// 	code_hash_provider: move |block_hash| {
+	// 		client.code_at(block_hash).ok().map(|c| ValidationCode::from(c).hash())
+	// 	},
+	// 	sync_oracle,
+	// 	keystore,
+	// 	collator_key,
+	// 	para_id,
+	// 	overseer_handle,
+	// 	slot_duration,
+	// 	relay_chain_slot_duration,
+	// 	proposer,
+	// 	collator_service,
+	// 	// Very limited proposal time.
+	// 	authoring_duration: Duration::from_millis(1500),
+	// 	reinitialize: false,
+	// };
 	let params = AuraParams {
 		create_inherent_data_providers: move |_, ()| {
-			let relay_chain_interface = relay_chain_interface.clone();
-			let order_record_clone = order_record.clone();
+			let bulk_mem_record_clone = bulk_mem_record.clone();
 			async move {
-				let parent_hash = relay_chain_interface.best_block_hash().await?;
-				let (relay_parent, validation_data, sequence_number, author_pub) = {
-					let order_record_local = order_record_clone.lock().await;
-					if order_record_local.validation_data.is_none() {
-						(parent_hash, None, order_record_local.sequence_number, None)
-					} else {
-						(
-							order_record_local.relay_parent.expect("can not get relay_parent hash"),
-							order_record_local.validation_data.clone(),
-							order_record_local.sequence_number,
-							order_record_local.author_pub.clone(),
-						)
-					}
+				let mut bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
+				let record_items = &mut bulk_mem_record_clone_local.items;
+				let item = record_items.iter().find(|item| item.status == BulkStatus::CoreAssigned);
+				let (
+					storage_proof,
+					storage_root,
+					region_id,
+					duration,
+					start_relaychain_height,
+					end_relaychain_height,
+				) = if let Some(item) = item {
+					(
+						Some(&item.storage_proof),
+						item.storage_root,
+						item.region_id,
+						item.duration,
+						item.start_relaychain_height,
+						item.end_relaychain_height,
+					)
+				} else {
+					(None, Default::default(), 0u128.into(), 0, 0, 0)
 				};
-				let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
-					relay_parent,
-					&relay_chain_interface,
-					&validation_data,
-					para_id,
-					sequence_number,
-					&author_pub,
+				let bulk_inherent = mp_coretime_bulk::BulkInherentData::create_at(
+					storage_proof,
+					storage_root,
+					region_id,
+					duration,
+					start_relaychain_height,
+					end_relaychain_height,
 				)
 				.await;
-				let order_inherent = order_inherent.ok_or_else(|| {
+				if storage_proof.is_some() {
+					if let Some(pos) =
+						record_items.iter().position(|item| item.status == BulkStatus::CoreAssigned)
+					{
+						record_items.remove(pos);
+					}
+				}
+				let bulk_inherent = bulk_inherent.ok_or_else(|| {
 					Box::<dyn std::error::Error + Send + Sync>::from(
-						"Failed to create order inherent",
+						"Failed to create bulk inherent",
 					)
 				})?;
-				Ok(order_inherent)
+				Ok(bulk_inherent)
 			}
 		},
 

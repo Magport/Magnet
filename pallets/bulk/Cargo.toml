@@ -1,7 +1,7 @@
 [package]
-name = "pallet-order"
+name = "pallet-bulk"
 authors = ["Anonymous"]
-description = "On demand order runtime logic."
+description = "bulk mode runtime logic."
 version = "0.2.0"
 license = "Apache-2.0"
 homepage = "https://magnet.magport.io/"
@@ -15,10 +15,12 @@ targets = ["x86_64-unknown-linux-gnu"]
 codec = { package = "parity-scale-codec", workspace = true, features = ["derive"], default-features = false }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 log = { workspace = true, default-features = false }
+hex = { workspace = true }
 hex-literal = { workspace = true }
 
 # Local
-magnet-primitives-order = { path = "../../primitives/order", default-features = false }
+mp-coretime-bulk = { path = "../../primitives/coretime/bulk", default-features = false }
+mp-coretime-common = { path = "../../primitives/coretime/common", default-features = false}
 
 # Cumulus
 cumulus-pallet-parachain-system = { workspace = true, default-features = false}
@@ -37,11 +39,12 @@ sp-runtime = { workspace = true, default-features = false}
 sp-trie = { workspace = true, default-features = false }
 pallet-balances = { workspace = true, default-features = false }
 sp-core = { workspace = true , default-features = false}
+pallet-broker = { workspace = true, default-features = false }
 
 [dev-dependencies]
 serde = { workspace = true }
 codec = { workspace = true, features = ["derive"], default-features = false }
-hex = { workspace = true, default-features = false }
+hex = { workspace = true }
 
 # Substrate
 sp-core = { workspace = true, default-features = false}
@@ -54,6 +57,7 @@ pallet-xcm = { workspace = true, default-features = false}
 pallet-society ={ workspace = true, default-features = false}
 xcm-builder = { workspace = true, default-features = false }
 parachains-common = { workspace = true, default-features = false }
+cumulus-pallet-parachain-system = { workspace = true, default-features = false, features = ["parameterized-consensus-hook",] }
 
 [features]
 default = [ "std" ]
@@ -73,7 +77,7 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"magnet-primitives-order/std",
+	"mp-coretime-bulk/std",
 	"log/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-primitives-core/std",
@@ -82,6 +86,8 @@ std = [
 	"sp-trie/std",
 	"pallet-balances/std",
 	"sp-core/std",
+	"mp-coretime-common/std",
+	"pallet-broker/std",
 ]
 try-runtime = [
 	"frame-support/try-runtime",
