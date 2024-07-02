@@ -670,6 +670,7 @@ fn start_consensus(
 					storage_proof,
 					storage_root,
 					region_id,
+					duration,
 					start_relaychain_height,
 					end_relaychain_height,
 				) = if let Some(item) = item {
@@ -677,16 +678,18 @@ fn start_consensus(
 						Some(&item.storage_proof),
 						item.storage_root,
 						item.region_id,
+						item.duration,
 						item.start_relaychain_height,
 						item.end_relaychain_height,
 					)
 				} else {
-					(None, Default::default(), 0u128.into(), 0, 0)
+					(None, Default::default(), 0u128.into(), 0, 0, 0)
 				};
 				let bulk_inherent = mp_coretime_bulk::BulkInherentData::create_at(
 					storage_proof,
 					storage_root,
 					region_id,
+					duration,
 					start_relaychain_height,
 					end_relaychain_height,
 				)

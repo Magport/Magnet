@@ -69,6 +69,10 @@ pub struct BulkRecord<Balance, AuthorityId> {
 	pub start_relaychain_height: u32,
 	/// Relaychain block number of end schedule coretime core.
 	pub end_relaychain_height: u32,
+	/// Relaychain block number of parachain start run.
+	pub real_start_relaychain_height: u32,
+	/// Relaychain block number of parachain end run.
+	pub real_end_relaychain_height: u32,
 }
 #[frame_support::pallet]
 pub mod pallet {
@@ -169,6 +173,10 @@ pub mod pallet {
 			start_relaychain_height: u32,
 			/// Relaychain block number of end schedule coretime core.
 			end_relaychain_height: u32,
+			/// Relaychain block number of parachain start run.
+			real_start_relaychain_height: u32,
+			/// Relaychain block number of parachain end run.
+			real_end_relaychain_height: u32,
 		},
 	}
 
@@ -235,6 +243,7 @@ pub mod pallet {
 				storage_proof: p_storage_proof,
 				storage_root,
 				region_id,
+				duration,
 				start_relaychain_height,
 				end_relaychain_height,
 			} = data;
@@ -266,7 +275,8 @@ pub mod pallet {
 			if genesis_hash != stored_hash {
 				Err(Error::<T>::GenesisHashInconsistency)?;
 			}
-
+			let real_start_relaychain_height = Self::relaychain_block_number();
+			let real_end_relaychain_height = real_start_relaychain_height + duration;
 			let old_record_index = RecordIndex::<T>::get();
 			let balance = region_record.paid.ok_or(Error::<T>::PurchaserNone)?;
 			let purchaser = region_record.owner;
@@ -276,9 +286,11 @@ pub mod pallet {
 				BulkRecord::<BalanceOf<T>, T::AuthorityId> {
 					purchaser: purchaser.clone(),
 					price: balance,
-					duration: region_record.end,
+					duration,
 					start_relaychain_height,
 					end_relaychain_height,
+					real_start_relaychain_height,
+					real_end_relaychain_height,
 				},
 			);
 			RecordIndex::<T>::set(old_record_index + 1);
@@ -288,6 +300,8 @@ pub mod pallet {
 				duration: region_record.end,
 				start_relaychain_height,
 				end_relaychain_height,
+				real_start_relaychain_height,
+				real_end_relaychain_height,
 			});
 
 			let total_weight = T::WeightInfo::create_record();

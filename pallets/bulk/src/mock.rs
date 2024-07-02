@@ -102,8 +102,11 @@ pub struct MockRelayStateProvider;
 
 impl RelaychainStateProvider for MockRelayStateProvider {
 	fn current_relay_chain_state() -> RelayChainState {
-		let root = frame_support::storage::unhashed::get(MOCK_RELAY_ROOT_KEY)
-			.expect("root should be set by mock");
+		let root = if let Some(root) = frame_support::storage::unhashed::get(MOCK_RELAY_ROOT_KEY) {
+			root
+		} else {
+			Default::default()
+		};
 
 		RelayChainState {
 			state_root: root,

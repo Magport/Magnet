@@ -40,8 +40,9 @@ fn bulk_inherent_test() {
 			storage_proof: Some(coretime_chain_state_proof),
 			storage_root,
 			region_id,
+			duration: 100,
 			start_relaychain_height: 130,
-			end_relaychain_height: 170,
+			end_relaychain_height: 230,
 		};
 		inherent_data
 			.put_data(mp_coretime_bulk::INHERENT_IDENTIFIER, &bulk_inherent_data)
@@ -54,6 +55,6 @@ fn bulk_inherent_test() {
 		assert_eq!(BulkPallet::record_index(), 1);
 		let record = BulkPallet::bulk_records(0).unwrap();
 		assert_eq!(record.start_relaychain_height, 130);
-		assert_eq!(record.end_relaychain_height, 170);
+		assert_eq!(record.end_relaychain_height, 230);
 	});
 }

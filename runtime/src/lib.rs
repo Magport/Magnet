@@ -762,12 +762,11 @@ where
 		for i in 0..record_index {
 			let bulk_record = <pallet_bulk::Pallet<T>>::bulk_records(i);
 			if let Some(record) = bulk_record {
-				if block_number.into() >= record.start_relaychain_height.into()
-					&& block_number.into() <= record.end_relaychain_height.into()
+				if block_number.into() >= record.real_start_relaychain_height.into()
+					&& block_number.into() <= record.real_end_relaychain_height.into()
 				{
 					let price: u128 = record.price.saturated_into();
-					let duration =
-						(record.end_relaychain_height - record.start_relaychain_height) as u128;
+					let duration = record.duration as u128;
 					let balance = price
 						.checked_div(duration)
 						.ok_or(sp_runtime::DispatchError::Other("duration error"))?;

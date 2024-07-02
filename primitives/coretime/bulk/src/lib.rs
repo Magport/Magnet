@@ -38,6 +38,8 @@ pub struct BulkInherentData {
 	pub storage_root: PHash,
 	/// The identity of the Region.
 	pub region_id: RegionId,
+	/// Coretime duration.
+	pub duration: u32,
 	/// Relaychain block number of start schedule coretime core.
 	pub start_relaychain_height: u32,
 	/// Relaychain block number of end schedule coretime core.

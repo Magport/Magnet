@@ -15,7 +15,7 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Benchmarking setup for pallet-bulk
-
+#![cfg(feature = "runtime-benchmarks")]
 use super::*;
 
 #[allow(unused)]
@@ -60,9 +60,14 @@ benchmarks! {
 			storage_proof: Some(coretime_chain_state_proof),
 			storage_root,
 			region_id,
+			duration: 100,
 			start_relaychain_height: 130,
-			end_relaychain_height: 170,
+			end_relaychain_height: 230,
 		};
+		T::RelayChainStateProvider::set_current_relay_chain_state(cumulus_pallet_parachain_system::RelayChainState {
+			state_root: storage_root,
+			number: 0,
+		});
 	}: _(RawOrigin::None, bulk_inherent_data)
 	verify {
 		assert_eq!(RecordIndex::<T>::get(), 1);

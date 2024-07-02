@@ -25,6 +25,7 @@ impl BulkInherentData {
 		storage_proof: Option<&sp_trie::StorageProof>,
 		storage_root: PHash,
 		region_id: RegionId,
+		duration: u32,
 		start: u32,
 		end: u32,
 	) -> Option<BulkInherentData> {
@@ -34,6 +35,7 @@ impl BulkInherentData {
 			storage_proof,
 			storage_root,
 			region_id,
+			duration,
 			start_relaychain_height: start,
 			end_relaychain_height: end,
 		})

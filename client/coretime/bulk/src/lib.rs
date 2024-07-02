@@ -214,13 +214,7 @@ where
 
 										item.end_relaychain_height =
 											ev.when + item.duration * time_slice;
-										log::info!(
-											"==============={:?},{:?},{:?},{:?},",
-											ev.when,
-											item.duration,
-											time_slice,
-											item
-										);
+										item.duration = item.duration * time_slice;
 										// find it.
 										item.status = BulkStatus::CoreAssigned;
 									}
