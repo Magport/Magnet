@@ -17,7 +17,7 @@ overflow-checks = true
 members = [
     "node",
     "runtime",
-#   "pallets/order",
+    "pallets/on-demand",
 	"pallets/bulk",
 	"primitives/system",
     "pallets/evm-utils",
