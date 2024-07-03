@@ -36,10 +36,10 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::*;
 use frame_system::{self, EventRecord};
-// use magnet_primitives_order::{
-// 	metadata::api::{runtime_types, runtime_types::rococo_runtime as polakdot_runtime},
-// 	well_known_keys::SYSTEM_EVENTS,
-// };
+use mp_coretime_on_demand::{
+	metadata::api::{runtime_types, runtime_types::rococo_runtime as polakdot_runtime},
+	well_known_keys::SYSTEM_EVENTS,
+};
 pub use pallet::*;
 use primitives::Balance;
 use primitives::{Id as ParaId, PersistedValidationData};
@@ -241,241 +241,241 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		// /// Create an order, which is called by the pallet.
-		// /// Users cannot actively call this function.
-		// /// Obtain order information by parsing inherited data.
-		// ///
-		// /// Parameters:
-		// /// - `data`: The inherent data.
-		// #[pallet::call_index(0)]
-		// #[pallet::weight((0, DispatchClass::Mandatory))]
-		// pub fn create_order(
-		// 	origin: OriginFor<T>,
-		// 	data: magnet_primitives_order::OrderInherentData<T::AuthorityId>,
-		// ) -> DispatchResultWithPostInfo {
-		// 	ensure_none(origin)?;
+		/// Create an order, which is called by the pallet.
+		/// Users cannot actively call this function.
+		/// Obtain order information by parsing inherited data.
+		///
+		/// Parameters:
+		/// - `data`: The inherent data.
+		#[pallet::call_index(0)]
+		#[pallet::weight((0, DispatchClass::Mandatory))]
+		pub fn create_order(
+			origin: OriginFor<T>,
+			data: mp_coretime_on_demand::OrderInherentData<T::AuthorityId>,
+		) -> DispatchResultWithPostInfo {
+			ensure_none(origin)?;
 
-		// 	let magnet_primitives_order::OrderInherentData {
-		// 		relay_storage_proof,
-		// 		validation_data,
-		// 		sequence_number,
-		// 		para_id,
-		// 		author_pub,
-		// 	} = data;
-		// 	let total_weight = match validation_data {
-		// 		Some(validation_data) => {
-		// 			let (_, price) = Self::check_order_proof(
-		// 				relay_storage_proof,
-		// 				validation_data.clone(),
-		// 				author_pub.clone(),
-		// 				para_id,
-		// 			)
-		// 			.ok_or(Error::<T>::CreateOrderFail)?;
-		// 			let old_sequence_number = SequenceNumber::<T>::get();
-		// 			let order = OrderMap::<T>::get(old_sequence_number);
-		// 			if sequence_number != old_sequence_number {
-		// 				// In the worst-case scenario, if there are multiple orders at the same
-		// 				// time,  it may be due to system issues or it may be due to human
-		// 				// intervention.   Currently, we only support running one order at the same
-		// 				// time Err(Error::<T>::WrongSequenceNumber)?;
-		// 				// Continuing to produce blocks, recording errors
-		// 				log::info!("========WrongSequenceNumber:{:?}========", sequence_number);
-		// 			}
-		// 			if order.is_none() {
-		// 				OrderMap::<T>::insert(
-		// 					old_sequence_number,
-		// 					Order::<T::AuthorityId> {
-		// 						sequence_number: old_sequence_number,
-		// 						orderer: author_pub.unwrap(),
-		// 						price,
-		// 						executed: false,
-		// 					},
-		// 				);
-		// 				CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
-		// 			} else {
-		// 				Err(Error::<T>::OrderExist)?;
-		// 			}
-		// 			T::DbWeight::get().reads_writes(2, 1)
-		// 		},
-		// 		None => T::DbWeight::get().reads_writes(0, 0),
-		// 	};
-		// 	Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
-		// }
+			let mp_coretime_on_demand::OrderInherentData {
+				relay_storage_proof,
+				validation_data,
+				sequence_number,
+				para_id,
+				author_pub,
+			} = data;
+			let total_weight = match validation_data {
+				Some(validation_data) => {
+					let (_, price) = Self::check_order_proof(
+						relay_storage_proof,
+						validation_data.clone(),
+						author_pub.clone(),
+						para_id,
+					)
+					.ok_or(Error::<T>::CreateOrderFail)?;
+					let old_sequence_number = SequenceNumber::<T>::get();
+					let order = OrderMap::<T>::get(old_sequence_number);
+					if sequence_number != old_sequence_number {
+						// In the worst-case scenario, if there are multiple orders at the same
+						// time,  it may be due to system issues or it may be due to human
+						// intervention.   Currently, we only support running one order at the same
+						// time Err(Error::<T>::WrongSequenceNumber)?;
+						// Continuing to produce blocks, recording errors
+						log::info!("========WrongSequenceNumber:{:?}========", sequence_number);
+					}
+					if order.is_none() {
+						OrderMap::<T>::insert(
+							old_sequence_number,
+							Order::<T::AuthorityId> {
+								sequence_number: old_sequence_number,
+								orderer: author_pub.unwrap(),
+								price,
+								executed: false,
+							},
+						);
+						CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
+					} else {
+						Err(Error::<T>::OrderExist)?;
+					}
+					T::DbWeight::get().reads_writes(2, 1)
+				},
+				None => T::DbWeight::get().reads_writes(0, 0),
+			};
+			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
+		}
 
-		// /// Order pallet parameter settings.
-		// /// It can only be called by accounts with sudo privileges or authorized organization members.
-		// ///
-		// /// Parameters:
-		// /// - `slot_width`: The order interval is 2^slotwidth..
-		// /// - `order_max_amount`: The maximum price the user is willing to pay when placing an order.
-		// /// - `tx_pool_threshold`: Gas threshold that triggers order placement.
-		// #[pallet::call_index(1)]
-		// #[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
-		// pub fn set_parameter(
-		// 	origin: OriginFor<T>,
-		// 	slot_width: Option<u32>,
-		// 	order_max_amount: Option<BalanceOf<T>>,
-		// 	tx_pool_threshold: Option<BalanceOf<T>>,
-		// ) -> DispatchResultWithPostInfo {
-		// 	T::UpdateOrigin::ensure_origin(origin)?;
+		/// Order pallet parameter settings.
+		/// It can only be called by accounts with sudo privileges or authorized organization members.
+		///
+		/// Parameters:
+		/// - `slot_width`: The order interval is 2^slotwidth..
+		/// - `order_max_amount`: The maximum price the user is willing to pay when placing an order.
+		/// - `tx_pool_threshold`: Gas threshold that triggers order placement.
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
+		pub fn set_parameter(
+			origin: OriginFor<T>,
+			slot_width: Option<u32>,
+			order_max_amount: Option<BalanceOf<T>>,
+			tx_pool_threshold: Option<BalanceOf<T>>,
+		) -> DispatchResultWithPostInfo {
+			T::UpdateOrigin::ensure_origin(origin)?;
 
-		// 	if let Some(t_slot_width) = slot_width {
-		// 		<SlotWidth<T>>::put(t_slot_width);
-		// 	}
-		// 	if let Some(t_order_max_amount) = order_max_amount {
-		// 		<OrderMaxAmount<T>>::put(t_order_max_amount);
-		// 	}
-		// 	if let Some(t_tx_pool_threshold) = tx_pool_threshold {
-		// 		<TxPoolThreshold<T>>::put(t_tx_pool_threshold);
-		// 	}
-		// 	Ok(().into())
-		// }
+			if let Some(t_slot_width) = slot_width {
+				<SlotWidth<T>>::put(t_slot_width);
+			}
+			if let Some(t_order_max_amount) = order_max_amount {
+				<OrderMaxAmount<T>>::put(t_order_max_amount);
+			}
+			if let Some(t_tx_pool_threshold) = tx_pool_threshold {
+				<TxPoolThreshold<T>>::put(t_tx_pool_threshold);
+			}
+			Ok(().into())
+		}
 	}
 }
 
 impl<T: Config> Pallet<T> {
-	// /// Obtain the order account and price from the relaychain's validation.
-	// ///
-	// /// Parameters:
-	// /// - `relay_storage_proof`: The proof of relay chain storage.
-	// ///- `validation_data`: The validation data.
-	// /// - `para_id`: ID of parachain.
-	// fn get_author_from_proof(
-	// 	relay_storage_proof: sp_trie::StorageProof,
-	// 	validation_data: PersistedValidationData,
-	// 	para_id: ParaId,
-	// ) -> Option<(T::AuthorityId, Balance)> {
-	// 	let relay_storage_root = validation_data.relay_parent_storage_root;
-	// 	let relay_storage_rooted_proof =
-	// 		RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
-	// 			.expect("Invalid relay chain state proof");
-	// 	let head_data = relay_storage_rooted_proof
-	// 		.read_entry::<Vec<Box<EventRecord<polakdot_runtime::RuntimeEvent, T::Hash>>>>(
-	// 			SYSTEM_EVENTS,
-	// 			None,
-	// 		)
-	// 		.ok()?;
-	// 	let v_price: Vec<u128> = head_data
-	// 		.iter()
-	// 		.filter_map(|item| {
-	// 			if let polakdot_runtime::RuntimeEvent::OnDemandAssignmentProvider(
-	// 				runtime_types::polkadot_runtime_parachains::assigner_on_demand::pallet::Event::OnDemandOrderPlaced{
-	// 						para_id: pid,
-	// 						spot_price: sprice,
-	// 					}) = &item.event
-	// 			{
-	// 				if pid.encode() == para_id.encode() {
-	// 					Some(*sprice)
-	// 				} else {
-	// 					None
-	// 				}
-	// 			} else {
-	// 				None
-	// 			}
-	// 		})
-	// 		.collect();
-	// 	let orderer: Vec<(T::AuthorityId, u128)> = v_price
-	// 		.iter()
-	// 		.filter_map(|item| {
-	// 			let mut orderer = None;
-	// 			let _: Vec<_> = head_data
-	// 				.iter()
-	// 				.filter_map(|event| {
-	// 					if let polakdot_runtime::RuntimeEvent::Balances(
-	// 						runtime_types::pallet_balances::pallet::Event::Withdraw {
-	// 							who: ref order,
-	// 							amount: eprice,
-	// 						},
-	// 					) = event.event
-	// 					{
-	// 						if eprice == *item {
-	// 							orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
-	// 								Ok(order) => Some((order, eprice)),
-	// 								Err(_) => None,
-	// 							};
-	// 							Some(())
-	// 						} else {
-	// 							None
-	// 						}
-	// 					} else {
-	// 						None
-	// 					}
-	// 				})
-	// 				.collect();
-	// 			orderer
-	// 		})
-	// 		.collect();
-	// 	if orderer.len() > 0 {
-	// 		Some(orderer[0].clone())
-	// 	} else {
-	// 		None
-	// 	}
-	// }
+	/// Obtain the order account and price from the relaychain's validation.
+	///
+	/// Parameters:
+	/// - `relay_storage_proof`: The proof of relay chain storage.
+	///- `validation_data`: The validation data.
+	/// - `para_id`: ID of parachain.
+	fn get_author_from_proof(
+		relay_storage_proof: sp_trie::StorageProof,
+		validation_data: PersistedValidationData,
+		para_id: ParaId,
+	) -> Option<(T::AuthorityId, Balance)> {
+		let relay_storage_root = validation_data.relay_parent_storage_root;
+		let relay_storage_rooted_proof =
+			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
+				.expect("Invalid relay chain state proof");
+		let head_data = relay_storage_rooted_proof
+			.read_entry::<Vec<Box<EventRecord<polakdot_runtime::RuntimeEvent, T::Hash>>>>(
+				SYSTEM_EVENTS,
+				None,
+			)
+			.ok()?;
+		let v_price: Vec<u128> = head_data
+			.iter()
+			.filter_map(|item| {
+				if let polakdot_runtime::RuntimeEvent::OnDemandAssignmentProvider(
+					runtime_types::polkadot_runtime_parachains::assigner_on_demand::pallet::Event::OnDemandOrderPlaced{
+							para_id: pid,
+							spot_price: sprice,
+						}) = &item.event
+				{
+					if pid.encode() == para_id.encode() {
+						Some(*sprice)
+					} else {
+						None
+					}
+				} else {
+					None
+				}
+			})
+			.collect();
+		let orderer: Vec<(T::AuthorityId, u128)> = v_price
+			.iter()
+			.filter_map(|item| {
+				let mut orderer = None;
+				let _: Vec<_> = head_data
+					.iter()
+					.filter_map(|event| {
+						if let polakdot_runtime::RuntimeEvent::Balances(
+							runtime_types::pallet_balances::pallet::Event::Withdraw {
+								who: ref order,
+								amount: eprice,
+							},
+						) = event.event
+						{
+							if eprice == *item {
+								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
+									Ok(order) => Some((order, eprice)),
+									Err(_) => None,
+								};
+								Some(())
+							} else {
+								None
+							}
+						} else {
+							None
+						}
+					})
+					.collect();
+				orderer
+			})
+			.collect();
+		if orderer.len() > 0 {
+			Some(orderer[0].clone())
+		} else {
+			None
+		}
+	}
 
-	// /// Check whether the account is in the validation of relaychain.
-	// ///
-	// /// Parameters:
-	// /// - `relay_storage_proof`: The proof of relay chain storage.
-	// /// - `validation_data`: The validation data.
-	// /// - `author_pub`: Account.
-	// /// - `para_id`: ID of parachain.
-	// fn check_order_proof(
-	// 	relay_storage_proof: sp_trie::StorageProof,
-	// 	validation_data: PersistedValidationData,
-	// 	author_pub: Option<T::AuthorityId>,
-	// 	para_id: ParaId,
-	// ) -> Option<(T::AuthorityId, Balance)> {
-	// 	let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
-	// 	match op_author {
-	// 		Some((author, spot_price)) => {
-	// 			if author_pub == Some(author.clone()) {
-	// 				Some((author, spot_price))
-	// 			} else {
-	// 				None
-	// 			}
-	// 		},
-	// 		None => None,
-	// 	}
-	// }
+	/// Check whether the account is in the validation of relaychain.
+	///
+	/// Parameters:
+	/// - `relay_storage_proof`: The proof of relay chain storage.
+	/// - `validation_data`: The validation data.
+	/// - `author_pub`: Account.
+	/// - `para_id`: ID of parachain.
+	fn check_order_proof(
+		relay_storage_proof: sp_trie::StorageProof,
+		validation_data: PersistedValidationData,
+		author_pub: Option<T::AuthorityId>,
+		para_id: ParaId,
+	) -> Option<(T::AuthorityId, Balance)> {
+		let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
+		match op_author {
+			Some((author, spot_price)) => {
+				if author_pub == Some(author.clone()) {
+					Some((author, spot_price))
+				} else {
+					None
+				}
+			},
+			None => None,
+		}
+	}
 
-	// /// Check whether there is an order event in the validation of relaychain.
-	// ///
-	// /// Parameters:
-	// /// - `relay_storage_proof`: The proof of relay chain storage.
-	// /// - `validation_data`: The validation data.
-	// /// - `para_id`: ID of parachain.
-	// pub fn order_placed(
-	// 	relay_storage_proof: sp_trie::StorageProof,
-	// 	validation_data: PersistedValidationData,
-	// 	para_id: ParaId,
-	// ) -> Option<T::AuthorityId> {
-	// 	let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
-	// 	match op_author {
-	// 		Some((author, _)) => Some(author),
-	// 		None => None,
-	// 	}
-	// }
+	/// Check whether there is an order event in the validation of relaychain.
+	///
+	/// Parameters:
+	/// - `relay_storage_proof`: The proof of relay chain storage.
+	/// - `validation_data`: The validation data.
+	/// - `para_id`: ID of parachain.
+	pub fn order_placed(
+		relay_storage_proof: sp_trie::StorageProof,
+		validation_data: PersistedValidationData,
+		para_id: ParaId,
+	) -> Option<T::AuthorityId> {
+		let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
+		match op_author {
+			Some((author, _)) => Some(author),
+			None => None,
+		}
+	}
 
-	// /// Whether the gas threshold for placing an order has been reached.
-	// ///
-	// /// Parameters:
-	// /// - `gas_balance`: The total gas.
-	// pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>) -> bool {
-	// 	let txpool_threshold = TxPoolThreshold::<T>::get();
-	// 	gas_balance > txpool_threshold
-	// }
+	/// Whether the gas threshold for placing an order has been reached.
+	///
+	/// Parameters:
+	/// - `gas_balance`: The total gas.
+	pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>) -> bool {
+		let txpool_threshold = TxPoolThreshold::<T>::get();
+		gas_balance > txpool_threshold
+	}
 
-	// /// Whether the order with the specified sequence number is executed.
-	// ///
-	// /// Parameters:
-	// /// - `sequence_number`: The sequence number.
-	// pub fn order_executed(sequence_number: u64) -> bool {
-	// 	let order_map = OrderMap::<T>::get(sequence_number);
-	// 	match order_map {
-	// 		Some(order) => order.executed,
-	// 		None => false,
-	// 	}
-	// }
+	/// Whether the order with the specified sequence number is executed.
+	///
+	/// Parameters:
+	/// - `sequence_number`: The sequence number.
+	pub fn order_executed(sequence_number: u64) -> bool {
+		let order_map = OrderMap::<T>::get(sequence_number);
+		match order_map {
+			Some(order) => order.executed,
+			None => false,
+		}
+	}
 }
 
 pub trait OrderGasCost<T: frame_system::Config> {

@@ -49,12 +49,12 @@ use crate::eth::{
 	FrontierBlockImport as TFrontierBlockImport,
 	FrontierPartialComponents,
 };
-// use crate::on_demand_order::spawn_on_demand_order;
 use futures::lock::Mutex;
-// use magnet_primitives_order::{OrderRecord, OrderStatus};
 use mc_coretime_bulk::spawn_bulk_task;
+use mc_coretime_on_demand::spawn_on_demand_order;
 use mp_coretime_bulk::BulkMemRecord;
 use mp_coretime_bulk::BulkStatus;
+use mp_coretime_on_demand::{OrderRecord, OrderStatus};
 use sp_core::ByteArray;
 use sp_runtime::AccountId32;
 use sp_trie::StorageProof;
@@ -464,29 +464,29 @@ async fn start_node_impl(
 		sync_service: sync_service.clone(),
 	})?;
 	if validator {
-		// let order_record =
-		// 	Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
-		// 		relay_parent: None,
-		// 		relay_height: 0,
-		// 		relay_base: Default::default(),
-		// 		relay_base_height: 0,
-		// 		order_status: OrderStatus::Init,
-		// 		validation_data: None,
-		// 		para_id,
-		// 		sequence_number: 0,
-		// 		author_pub: None,
-		// 		txs: vec![],
-		// 	}));
-		// spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
-		// 	client.clone(),
-		// 	para_id,
-		// 	relay_chain_interface.clone(),
-		// 	transaction_pool.clone(),
-		// 	&task_manager,
-		// 	params.keystore_container.keystore(),
-		// 	order_record.clone(),
-		// 	rpc_address,
-		// )?;
+		let order_record =
+			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
+				relay_parent: None,
+				relay_height: 0,
+				relay_base: Default::default(),
+				relay_base_height: 0,
+				order_status: OrderStatus::Init,
+				validation_data: None,
+				para_id,
+				sequence_number: 0,
+				author_pub: None,
+				txs: vec![],
+			}));
+		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+			client.clone(),
+			para_id,
+			relay_chain_interface.clone(),
+			transaction_pool.clone(),
+			&task_manager,
+			params.keystore_container.keystore(),
+			order_record.clone(),
+			rpc_address,
+		)?;
 		let bulk_mem_record =
 			Arc::new(Mutex::new(BulkMemRecord { coretime_para_height: 0, items: Vec::new() }));
 		spawn_bulk_task::<_, _, _, sp_consensus_aura::sr25519::AuthorityPair>(
