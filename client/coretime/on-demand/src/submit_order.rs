@@ -18,6 +18,7 @@
 //!
 //! Subxt is used here to construct and submit the transaction.
 //!
+
 use crate::metadata;
 use cumulus_primitives_core::{
 	relay_chain::BlockId, relay_chain::BlockNumber as RelayBlockNumber, ParaId,
@@ -126,10 +127,7 @@ pub async fn build_rpc_for_submit_order(
 		.await
 		.map_err(|_e| SubmitOrderError::RPCConnectError)?;
 
-	let place_order = metadata::api::tx().on_demand_assignment_provider().place_order_allow_death(
-		max_amount,
-		metadata::api::runtime_types::polkadot_parachain_primitives::primitives::Id(para_id.into()),
-	);
+	let place_order = metadata::place_order_allow_death(max_amount, metadata::Id(para_id.into()));
 
 	let signer_keystore = SignerKeystore::<PolkadotConfig>::new(keystore.clone());
 

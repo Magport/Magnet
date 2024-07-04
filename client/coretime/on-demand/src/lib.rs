@@ -31,8 +31,7 @@ use cumulus_primitives_core::{
 };
 use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
-use metadata::api::runtime_types::pallet_broker::coretime_interface::CoreAssignment;
-use metadata::api::runtime_types::polkadot_runtime_parachains::assigner_coretime::CoreDescriptor;
+use metadata::{CoreAssignment, CoreDescriptor};
 use mp_coretime_common::well_known_keys::paras_para_lifecycles;
 use mp_coretime_on_demand::{
 	self,
@@ -50,7 +49,6 @@ use sc_transaction_pool_api::{InPoolTransaction, MaintainedTransactionPool};
 use sp_api::ProvideRuntimeApi;
 use sp_application_crypto::AppPublic;
 use sp_consensus_aura::AuraApi;
-use sp_core::ByteArray;
 use sp_core::{crypto::Pair, H256};
 use sp_keystore::KeystorePtr;
 use sp_runtime::{
