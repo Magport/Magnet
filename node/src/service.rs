@@ -512,7 +512,7 @@ async fn start_node_impl(
 			collator_key.expect("Command line arguments do not allow this. qed"),
 			overseer_handle,
 			announce_block,
-			// order_record,
+			order_record,
 			bulk_mem_record,
 		)?;
 	}
@@ -569,7 +569,7 @@ fn start_consensus(
 	collator_key: CollatorPair,
 	overseer_handle: OverseerHandle,
 	announce_block: Arc<dyn Fn(Hash, Option<Vec<u8>>) + Send + Sync>,
-	// order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
+	order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
 	bulk_mem_record: Arc<Mutex<BulkMemRecord>>,
 ) -> Result<(), sc_service::Error> {
 	use cumulus_client_consensus_aura::collators::lookahead::{self as aura, Params as AuraParams};
@@ -638,30 +638,11 @@ fn start_consensus(
 	// 			Ok(order_inherent)
 	// 		}
 	// 	},
-
-	// 	block_import,
-	// 	para_client: client.clone(),
-	// 	para_backend: backend.clone(),
-	// 	relay_client: relay_chain_interface_clone,
-	// 	code_hash_provider: move |block_hash| {
-	// 		client.code_at(block_hash).ok().map(|c| ValidationCode::from(c).hash())
-	// 	},
-	// 	sync_oracle,
-	// 	keystore,
-	// 	collator_key,
-	// 	para_id,
-	// 	overseer_handle,
-	// 	slot_duration,
-	// 	relay_chain_slot_duration,
-	// 	proposer,
-	// 	collator_service,
-	// 	// Very limited proposal time.
-	// 	authoring_duration: Duration::from_millis(1500),
-	// 	reinitialize: false,
-	// };
 	let params = AuraParams {
 		create_inherent_data_providers: move |_, ()| {
 			let bulk_mem_record_clone = bulk_mem_record.clone();
+			let relay_chain_interface = relay_chain_interface.clone();
+			let order_record_clone = order_record.clone();
 			async move {
 				let mut bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
 				let record_items = &mut bulk_mem_record_clone_local.items;
@@ -706,7 +687,35 @@ fn start_consensus(
 						"Failed to create bulk inherent",
 					)
 				})?;
-				Ok(bulk_inherent)
+				let parent_hash = relay_chain_interface.best_block_hash().await?;
+				let (relay_parent, validation_data, sequence_number, author_pub) = {
+					let order_record_local = order_record_clone.lock().await;
+					if order_record_local.validation_data.is_none() {
+						(parent_hash, None, order_record_local.sequence_number, None)
+					} else {
+						(
+							order_record_local.relay_parent.expect("can not get relay_parent hash"),
+							order_record_local.validation_data.clone(),
+							order_record_local.sequence_number,
+							order_record_local.author_pub.clone(),
+						)
+					}
+				};
+				let order_inherent = mp_coretime_on_demand::OrderInherentData::create_at(
+					relay_parent,
+					&relay_chain_interface,
+					&validation_data,
+					para_id,
+					sequence_number,
+					&author_pub,
+				)
+				.await;
+				let order_inherent = order_inherent.ok_or_else(|| {
+					Box::<dyn std::error::Error + Send + Sync>::from(
+						"Failed to create order inherent",
+					)
+				})?;
+				Ok((bulk_inherent, order_inherent))
 			}
 		},
 

@@ -191,53 +191,52 @@ pub mod pallet {
 		/// Called at the end of each block to check whether an order has been placed.
 		/// If so, modify the execution status and increase the sequencer number.
 		fn on_finalize(block_number: BlockNumberFor<T>) {
-			// let old_sequence_number = SequenceNumber::<T>::get();
-			// let order = OrderMap::<T>::get(old_sequence_number);
-			// if let Some(t_order) = order {
-			// 	let orderer = t_order.orderer;
-			// 	OrderMap::<T>::remove(old_sequence_number);
-			// 	OrderMap::<T>::insert(
-			// 		old_sequence_number,
-			// 		Order::<T::AuthorityId> {
-			// 			sequence_number: old_sequence_number,
-			// 			orderer: orderer.clone(),
-			// 			price: t_order.price,
-			// 			executed: true,
-			// 		},
-			// 	);
-			// 	SequenceNumber::<T>::set(old_sequence_number + 1);
-			// 	Block2Sequence::<T>::insert(block_number, old_sequence_number);
-			// 	Self::deposit_event(Event::OrderCreate {
-			// 		sequence_number: old_sequence_number,
-			// 		orderer,
-			// 	});
-			// }
+			let old_sequence_number = SequenceNumber::<T>::get();
+			let order = OrderMap::<T>::get(old_sequence_number);
+			if let Some(t_order) = order {
+				let orderer = t_order.orderer;
+				OrderMap::<T>::remove(old_sequence_number);
+				OrderMap::<T>::insert(
+					old_sequence_number,
+					Order::<T::AuthorityId> {
+						sequence_number: old_sequence_number,
+						orderer: orderer.clone(),
+						price: t_order.price,
+						executed: true,
+					},
+				);
+				SequenceNumber::<T>::set(old_sequence_number + 1);
+				Block2Sequence::<T>::insert(block_number, old_sequence_number);
+				Self::deposit_event(Event::OrderCreate {
+					sequence_number: old_sequence_number,
+					orderer,
+				});
+			}
 		}
 	}
 
-	// #[pallet::inherent]
-	// impl<T: Config> ProvideInherent for Pallet<T> {
-	// 	type Call = Call<T>;
-	// 	type Error = MakeFatalError<()>;
+	#[pallet::inherent]
+	impl<T: Config> ProvideInherent for Pallet<T> {
+		type Call = Call<T>;
+		type Error = MakeFatalError<()>;
 
-	// 	const INHERENT_IDENTIFIER: InherentIdentifier =
-	// 		magnet_primitives_order::INHERENT_IDENTIFIER;
-	// 	fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-	// 		let data: magnet_primitives_order::OrderInherentData<T::AuthorityId> = data
-	// 			.get_data(&magnet_primitives_order::INHERENT_IDENTIFIER)
-	// 			.ok()
-	// 			.flatten()
-	// 			.expect("there is not data to be posted; qed");
-	// 		if data.validation_data.is_some() {
-	// 			Some(Call::create_order { data })
-	// 		} else {
-	// 			None
-	// 		}
-	// 	}
-	// 	fn is_inherent(call: &Self::Call) -> bool {
-	// 		matches!(call, Call::create_order { .. })
-	// 	}
-	// }
+		const INHERENT_IDENTIFIER: InherentIdentifier = mp_coretime_on_demand::INHERENT_IDENTIFIER;
+		fn create_inherent(data: &InherentData) -> Option<Self::Call> {
+			let data: mp_coretime_on_demand::OrderInherentData<T::AuthorityId> = data
+				.get_data(&mp_coretime_on_demand::INHERENT_IDENTIFIER)
+				.ok()
+				.flatten()
+				.expect("there is not data to be posted; qed");
+			if data.validation_data.is_some() {
+				Some(Call::create_order { data })
+			} else {
+				None
+			}
+		}
+		fn is_inherent(call: &Self::Call) -> bool {
+			matches!(call, Call::create_order { .. })
+		}
+	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -472,14 +471,4 @@ impl<T: Config> Pallet<T> {
 			None => false,
 		}
 	}
-}
-
-pub trait OrderGasCost<T: frame_system::Config> {
-	/// Gas consumed by placing an order in a certain block.
-	///
-	/// Parameters:
-	/// - `block_number`: The block number of para chain.
-	fn gas_cost(
-		block_number: BlockNumberFor<T>,
-	) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
 }
