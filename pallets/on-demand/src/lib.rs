@@ -37,7 +37,7 @@ use frame_support::{
 use frame_system::pallet_prelude::*;
 use frame_system::{self, EventRecord};
 use mp_coretime_on_demand::{
-	metadata::api::{runtime_types, runtime_types::rococo_runtime as polakdot_runtime},
+	metadata::{BalancesEvent, OnDemandEvent, RelaychainRuntimeEvent},
 	well_known_keys::SYSTEM_EVENTS,
 };
 pub use pallet::*;
@@ -350,7 +350,7 @@ impl<T: Config> Pallet<T> {
 			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
 				.expect("Invalid relay chain state proof");
 		let head_data = relay_storage_rooted_proof
-			.read_entry::<Vec<Box<EventRecord<polakdot_runtime::RuntimeEvent, T::Hash>>>>(
+			.read_entry::<Vec<Box<EventRecord<RelaychainRuntimeEvent, T::Hash>>>>(
 				SYSTEM_EVENTS,
 				None,
 			)
@@ -358,11 +358,9 @@ impl<T: Config> Pallet<T> {
 		let v_price: Vec<u128> = head_data
 			.iter()
 			.filter_map(|item| {
-				if let polakdot_runtime::RuntimeEvent::OnDemandAssignmentProvider(
-					runtime_types::polkadot_runtime_parachains::assigner_on_demand::pallet::Event::OnDemandOrderPlaced{
-							para_id: pid,
-							spot_price: sprice,
-						}) = &item.event
+				if let RelaychainRuntimeEvent::OnDemandAssignmentProvider(
+					OnDemandEvent::OnDemandOrderPlaced { para_id: pid, spot_price: sprice },
+				) = &item.event
 				{
 					if pid.encode() == para_id.encode() {
 						Some(*sprice)
@@ -381,12 +379,10 @@ impl<T: Config> Pallet<T> {
 				let _: Vec<_> = head_data
 					.iter()
 					.filter_map(|event| {
-						if let polakdot_runtime::RuntimeEvent::Balances(
-							runtime_types::pallet_balances::pallet::Event::Withdraw {
-								who: ref order,
-								amount: eprice,
-							},
-						) = event.event
+						if let RelaychainRuntimeEvent::Balances(BalancesEvent::Withdraw {
+							who: ref order,
+							amount: eprice,
+						}) = event.event
 						{
 							if eprice == *item {
 								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {

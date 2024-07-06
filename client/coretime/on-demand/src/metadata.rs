@@ -140,7 +140,6 @@ pub struct PlaceOrderAllowDeath {
 	pub para_id: Id,
 }
 
-
 impl ::subxt::blocks::StaticExtrinsic for PlaceOrderAllowDeath {
 	const PALLET: &'static str = "OnDemandAssignmentProvider";
 	const CALL: &'static str = "place_order_allow_death";
@@ -177,12 +176,10 @@ pub struct PlaceOrderKeepAlive {
 	pub para_id: Id,
 }
 
-
 impl ::subxt::blocks::StaticExtrinsic for PlaceOrderKeepAlive {
 	const PALLET: &'static str = "OnDemandAssignmentProvider";
 	const CALL: &'static str = "place_order_keep_alive";
 }
-
 
 #[warn(dead_code)]
 pub fn place_order_keep_alive(
