@@ -12,7 +12,6 @@ pub mod xcm_config;
 pub mod xcms;
 
 use core::ops::Div;
-
 use codec::{Decode, Encode, MaxEncodedLen};
 
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
