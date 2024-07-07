@@ -11,8 +11,8 @@ mod weights;
 pub mod xcm_config;
 pub mod xcms;
 
-use core::ops::Div;
 use codec::{Decode, Encode, MaxEncodedLen};
+use core::ops::Div;
 
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
