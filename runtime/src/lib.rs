@@ -13,7 +13,7 @@ pub mod xcms;
 
 use core::ops::Div;
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
@@ -30,7 +30,7 @@ use sp_runtime::{
 		IdentifyAccount, PostDispatchInfoOf, Saturating, UniqueSaturatedInto, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
-	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent,
+	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent, RuntimeDebug,
 };
 
 use scale_info::prelude::string::String;
@@ -54,7 +54,8 @@ use frame_support::{
 	traits::{
 		fungible::HoldConsideration, AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32,
 		ConstU64, ConstU8, Currency, EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance,
-		LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp, TransformOrigin,
+		InstanceFilter, LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp,
+		TransformOrigin,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -1173,6 +1174,72 @@ impl pallet_move::Config for Runtime {
 	type WeightInfo = pallet_move::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_multisig::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type DepositBase = ConstU128<228_000_000_000_000>;
+	type DepositFactor = ConstU128<32_000_000_000_000>;
+	type MaxSignatories = ConstU32<20>;
+	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+}
+
+#[derive(
+	Copy,
+	Clone,
+	Eq,
+	PartialEq,
+	Ord,
+	PartialOrd,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	MaxEncodedLen,
+	scale_info::TypeInfo,
+)]
+pub enum ProxyType {
+	Any,
+	JustTransfer,
+	JustUtility,
+}
+impl Default for ProxyType {
+	fn default() -> Self {
+		Self::Any
+	}
+}
+impl InstanceFilter<RuntimeCall> for ProxyType {
+	fn filter(&self, c: &RuntimeCall) -> bool {
+		match self {
+			ProxyType::Any => true,
+			ProxyType::JustTransfer => {
+				matches!(
+					c,
+					RuntimeCall::Balances(pallet_balances::Call::transfer_allow_death { .. })
+				)
+			},
+			ProxyType::JustUtility => matches!(c, RuntimeCall::Utility { .. }),
+		}
+	}
+	fn is_superset(&self, o: &Self) -> bool {
+		self == &ProxyType::Any || self == o
+	}
+}
+
+impl pallet_proxy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type ProxyType = ProxyType;
+	type ProxyDepositBase = ConstU128<160_000_000_000_000>;
+	type ProxyDepositFactor = ConstU128<33_000_000_000_000>;
+	type MaxProxies = ConstU32<100>;
+	type CallHasher = BlakeTwo256;
+	type MaxPending = ConstU32<1000>;
+	type AnnouncementDepositBase = ConstU128<16_000_000_000_000>;
+	type AnnouncementDepositFactor = ConstU128<64_000_000_000_000>;
+	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -1237,14 +1304,17 @@ construct_runtime!(
 		Pot: pallet_pot = 61,
 		Assurance: pallet_assurance = 62,
 		Liquidation: pallet_liquidation = 63,
-
+		BulkPallet: pallet_bulk = 64,
 		//Contracts
 		RandomnessCollectiveFlip: pallet_insecure_randomness_collective_flip = 70,
 		Contracts: pallet_contracts = 71,
 
 		//Move-vm
 		MoveModule: pallet_move = 80,
-		BulkPallet: pallet_bulk = 72,
+
+		//call util
+		Multisig: pallet_multisig = 90,
+		Proxy: pallet_proxy = 91,
 	}
 );
 
@@ -1261,6 +1331,8 @@ mod benches {
 		[pallet_bulk, BulkPallet]
 		// [pallet_order, OrderPallet]
 		[pallet_move, MoveModule]
+		[pallet_multisig, Multisig]
+		[pallet_proxy, Proxy]
 	);
 }
 
