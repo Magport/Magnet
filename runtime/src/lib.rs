@@ -91,8 +91,8 @@ use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 // XCM Imports
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId, PersistedValidationData};
 pub use pallet_bulk::{self, BulkGasCost};
-pub use pallet_on_demand;
 use pallet_liquidation::OrderGasCost;
+pub use pallet_on_demand;
 use xcm::latest::prelude::{
 	Asset as MultiAsset, BodyId, InteriorLocation as InteriorMultiLocation,
 	Junction::PalletInstance, Location as MultiLocation,
