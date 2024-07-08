@@ -14,4 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod on_demand;
+//! Common Magnet Primitives
+//!
+//!
+#![cfg_attr(not(feature = "std"), no_std)]
+pub mod chain_state_snapshot;
+pub mod well_known_keys;

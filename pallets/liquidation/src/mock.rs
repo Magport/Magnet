@@ -19,8 +19,8 @@ use sp_runtime::{
 	AccountId32, BuildStorage, Perbill,
 };
 
+use crate::OrderGasCost;
 use frame_system::pallet_prelude::BlockNumberFor;
-use pallet_order::OrderGasCost;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_std::{cell::RefCell, collections::btree_map::BTreeMap};
 use xcm::latest::{Assets, Location, SendError, SendResult, SendXcm, Xcm, XcmHash};
@@ -43,7 +43,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
-		OrderPallet: pallet_order::{Pallet, Storage, Event<T>},
+		// OrderPallet: pallet_order::{Pallet, Storage, Event<T>},
 		Pot: pallet_pot::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
 		Liquidation: pallet_liquidation::{Pallet, Storage, Event<T>},
@@ -124,22 +124,22 @@ impl pallet_utility::Config for Test {
 	type WeightInfo = ();
 }
 
-parameter_types! {
-	pub const SlotWidth: u32 = 2;
-	pub const OrderMaxAmount:Balance = 200000000;
-	pub const TxPoolThreshold:Balance = 3000000000;
-}
+// parameter_types! {
+// 	pub const SlotWidth: u32 = 2;
+// 	pub const OrderMaxAmount:Balance = 200000000;
+// 	pub const TxPoolThreshold:Balance = 3000000000;
+// }
 
-impl pallet_order::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type AuthorityId = AuraId;
-	type Currency = Balances;
-	type UpdateOrigin = frame_system::EnsureRoot<Self::AccountId>;
-	type OrderMaxAmount = OrderMaxAmount;
-	type SlotWidth = SlotWidth;
-	type TxPoolThreshold = TxPoolThreshold;
-	type WeightInfo = ();
-}
+// impl pallet_order::Config for Test {
+// 	type RuntimeEvent = RuntimeEvent;
+// 	type AuthorityId = AuraId;
+// 	type Currency = Balances;
+// 	type UpdateOrigin = frame_system::EnsureRoot<Self::AccountId>;
+// 	type OrderMaxAmount = OrderMaxAmount;
+// 	type SlotWidth = SlotWidth;
+// 	type TxPoolThreshold = TxPoolThreshold;
+// 	type WeightInfo = ();
+// }
 
 use pallet_pot::PotNameBtreemap;
 use pallet_xcm::TestWeightInfo;
@@ -295,7 +295,7 @@ impl WeightToFeePolynomial for WeightToFee {
 pub struct MockOrderGasCostHandler;
 impl<T: pallet_liquidation::Config> OrderGasCost<T> for MockOrderGasCostHandler
 where
-	T: pallet_order::Config,
+	T: crate::Config,
 	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(
