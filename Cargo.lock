@@ -6278,76 +6278,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "magnet-client-consensus-aura"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "cumulus-client-collator",
- "cumulus-client-consensus-aura",
- "cumulus-client-consensus-common",
- "cumulus-client-consensus-proposer",
- "cumulus-client-parachain-inherent",
- "cumulus-primitives-aura",
- "cumulus-primitives-core",
- "cumulus-primitives-parachain-inherent",
- "cumulus-relay-chain-interface",
- "futures",
- "log",
- "magnet-primitives-order",
- "parity-scale-codec",
- "polkadot-node-primitives",
- "polkadot-node-subsystem",
- "polkadot-overseer",
- "polkadot-primitives",
- "sc-client-api",
- "sc-consensus",
- "sc-consensus-aura",
- "sc-consensus-babe",
- "sc-consensus-slots",
- "sc-telemetry",
- "schnellru",
- "sp-api",
- "sp-application-crypto 30.0.0",
- "sp-block-builder",
- "sp-blockchain",
- "sp-consensus",
- "sp-consensus-aura",
- "sp-core 28.0.0",
- "sp-inherents",
- "sp-keystore 0.34.0",
- "sp-runtime 31.0.1",
- "sp-state-machine 0.35.0",
- "sp-timestamp",
- "substrate-prometheus-endpoint",
- "tracing",
-]
-
-[[package]]
-name = "magnet-primitives-order"
-version = "0.2.0"
-dependencies = [
- "async-trait",
- "cumulus-primitives-core",
- "cumulus-relay-chain-interface",
- "hex-literal",
- "log",
- "parity-scale-codec",
- "scale-info",
- "sp-api",
- "sp-consensus-aura",
- "sp-consensus-grandpa",
- "sp-core 28.0.0",
- "sp-inherents",
- "sp-io 30.0.0",
- "sp-runtime 31.0.1",
- "sp-session",
- "sp-state-machine 0.35.0",
- "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
- "sp-trie 29.0.0",
- "sp-weights 27.0.0",
-]
-
-[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6391,6 +6321,107 @@ checksum = "7574c1cf36da4798ab73da5b215bbf444f50718207754cb522201d78d1cd0ff2"
 dependencies = [
  "autocfg",
  "rawpointer",
+]
+
+[[package]]
+name = "mc-coretime-bulk"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-client-collator",
+ "cumulus-client-consensus-aura",
+ "cumulus-client-consensus-common",
+ "cumulus-client-consensus-proposer",
+ "cumulus-client-parachain-inherent",
+ "cumulus-primitives-aura",
+ "cumulus-primitives-core",
+ "cumulus-primitives-parachain-inherent",
+ "cumulus-relay-chain-interface",
+ "futures",
+ "log",
+ "mc-coretime-common",
+ "mp-coretime-bulk",
+ "mp-coretime-common",
+ "pallet-broker",
+ "parity-scale-codec",
+ "polkadot-node-primitives",
+ "polkadot-node-subsystem",
+ "polkadot-overseer",
+ "polkadot-primitives",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-consensus-babe",
+ "sc-consensus-slots",
+ "sc-service",
+ "sc-telemetry",
+ "schnellru",
+ "sp-api",
+ "sp-application-crypto 30.0.0",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-consensus-aura",
+ "sp-core 28.0.0",
+ "sp-inherents",
+ "sp-keystore 0.34.0",
+ "sp-runtime 31.0.1",
+ "sp-state-machine 0.35.0",
+ "sp-storage 19.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "sp-timestamp",
+ "substrate-prometheus-endpoint",
+ "subxt",
+ "tracing",
+]
+
+[[package]]
+name = "mc-coretime-common"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-client-collator",
+ "cumulus-client-consensus-aura",
+ "cumulus-client-consensus-common",
+ "cumulus-client-consensus-proposer",
+ "cumulus-client-parachain-inherent",
+ "cumulus-primitives-aura",
+ "cumulus-primitives-core",
+ "cumulus-primitives-parachain-inherent",
+ "cumulus-relay-chain-interface",
+ "futures",
+ "log",
+ "mp-coretime-common",
+ "pallet-broker",
+ "parity-scale-codec",
+ "polkadot-node-primitives",
+ "polkadot-node-subsystem",
+ "polkadot-overseer",
+ "polkadot-primitives",
+ "polkadot-runtime-parachains",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-consensus-babe",
+ "sc-consensus-slots",
+ "sc-service",
+ "sc-telemetry",
+ "schnellru",
+ "sp-api",
+ "sp-application-crypto 30.0.0",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-consensus-aura",
+ "sp-core 28.0.0",
+ "sp-inherents",
+ "sp-keystore 0.34.0",
+ "sp-runtime 31.0.1",
+ "sp-state-machine 0.35.0",
+ "sp-storage 19.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "sp-timestamp",
+ "substrate-prometheus-endpoint",
+ "subxt",
+ "tracing",
 ]
 
 [[package]]
@@ -7093,6 +7124,57 @@ dependencies = [
  "move-core-types",
  "serde",
  "smallvec",
+]
+
+[[package]]
+name = "mp-coretime-bulk"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-primitives-core",
+ "cumulus-relay-chain-interface",
+ "hex-literal",
+ "log",
+ "pallet-broker",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-consensus-aura",
+ "sp-consensus-grandpa",
+ "sp-core 28.0.0",
+ "sp-inherents",
+ "sp-io 30.0.0",
+ "sp-runtime 31.0.1",
+ "sp-session",
+ "sp-state-machine 0.35.0",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "sp-trie 29.0.0",
+ "sp-weights 27.0.0",
+]
+
+[[package]]
+name = "mp-coretime-common"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-primitives-core",
+ "cumulus-relay-chain-interface",
+ "hex-literal",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-consensus-aura",
+ "sp-consensus-grandpa",
+ "sp-core 28.0.0",
+ "sp-inherents",
+ "sp-io 30.0.0",
+ "sp-runtime 31.0.1",
+ "sp-session",
+ "sp-state-machine 0.35.0",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "sp-trie 29.0.0",
+ "sp-weights 27.0.0",
 ]
 
 [[package]]
@@ -8060,6 +8142,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-bulk"
+version = "0.2.0"
+dependencies = [
+ "cumulus-pallet-parachain-system",
+ "cumulus-primitives-core",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "hex-literal",
+ "log",
+ "mp-coretime-bulk",
+ "mp-coretime-common",
+ "pallet-balances",
+ "pallet-broker",
+ "pallet-collective",
+ "pallet-society",
+ "pallet-xcm",
+ "parachains-common",
+ "parity-scale-codec",
+ "polkadot-primitives",
+ "polkadot-runtime-parachains",
+ "scale-info",
+ "serde",
+ "sp-consensus-aura",
+ "sp-core 28.0.0",
+ "sp-io 30.0.0",
+ "sp-runtime 31.0.1",
+ "sp-trie 29.0.0",
+ "staging-xcm-builder",
+]
+
+[[package]]
 name = "pallet-child-bounties"
 version = "27.0.0"
 source = "git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0#851c824dc7a8e7e6db2d0c9fb29d232f2f45198a"
@@ -8523,7 +8638,6 @@ dependencies = [
  "mp-system",
  "pallet-assets",
  "pallet-balances",
- "pallet-order",
  "pallet-pot",
  "pallet-transaction-payment",
  "pallet-utility",
@@ -8758,37 +8872,6 @@ dependencies = [
  "sp-runtime 31.0.1",
  "sp-staking",
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
-]
-
-[[package]]
-name = "pallet-order"
-version = "0.2.0"
-dependencies = [
- "cumulus-pallet-parachain-system",
- "cumulus-primitives-core",
- "frame-benchmarking",
- "frame-support",
- "frame-system",
- "hex",
- "hex-literal",
- "log",
- "magnet-primitives-order",
- "pallet-balances",
- "pallet-collective",
- "pallet-society",
- "pallet-xcm",
- "parachains-common",
- "parity-scale-codec",
- "polkadot-primitives",
- "polkadot-runtime-parachains",
- "scale-info",
- "serde",
- "sp-consensus-aura",
- "sp-core 28.0.0",
- "sp-io 30.0.0",
- "sp-runtime 31.0.1",
- "sp-trie 29.0.0",
- "staging-xcm-builder",
 ]
 
 [[package]]
@@ -9359,8 +9442,8 @@ dependencies = [
  "hex-literal",
  "jsonrpsee",
  "log",
- "magnet-client-consensus-aura",
- "magnet-primitives-order",
+ "mc-coretime-bulk",
+ "mp-coretime-bulk",
  "mp-system",
  "pallet-balances",
  "pallet-move-rpc",
@@ -9412,6 +9495,7 @@ dependencies = [
  "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
  "sp-timestamp",
  "sp-transaction-pool",
+ "sp-trie 29.0.0",
  "staging-xcm",
  "substrate-build-script-utils",
  "substrate-frame-rpc-system",
@@ -9449,7 +9533,7 @@ dependencies = [
  "frame-try-runtime",
  "hex-literal",
  "log",
- "magnet-primitives-order",
+ "mp-coretime-bulk",
  "mp-system",
  "pallet-assets",
  "pallet-assets-bridge",
@@ -9458,6 +9542,7 @@ dependencies = [
  "pallet-authorship",
  "pallet-balances",
  "pallet-base-fee",
+ "pallet-bulk",
  "pallet-collator-selection",
  "pallet-collective",
  "pallet-contracts",
@@ -9476,7 +9561,6 @@ dependencies = [
  "pallet-message-queue",
  "pallet-move",
  "pallet-multisig",
- "pallet-order",
  "pallet-pot",
  "pallet-pot-runtime-api",
  "pallet-precompile-substrate-utils",
