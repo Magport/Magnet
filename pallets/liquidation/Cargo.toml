@@ -19,7 +19,7 @@ log = {workspace = true, default-features = false}
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 smallvec = { workspace = true }
 
-pallet-order = {path = "../order", default-features = false}
+#pallet-order = {path = "../order", default-features = false}
 pallet-pot = {path = "../pot", default-features = false}
 mp-system = { path = "../../primitives/system", default-features = false }
 
@@ -58,7 +58,7 @@ std = [
     "frame-system/std",
     "pallet-balances/std",
     "pallet-assets/std",
-    "pallet-order/std",
+#    "pallet-order/std",
     "pallet-pot/std",
     "mp-system/std",
     "pallet-utility/std",

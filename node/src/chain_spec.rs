@@ -75,7 +75,7 @@ pub fn development_config() -> ChainSpec {
 		Extensions {
 			relay_chain: "rococo-local".into(),
 			// You MUST set this to the correct network!
-			para_id: 1000,
+			para_id: 2000,
 		},
 	)
 	.with_name("Development")
@@ -108,7 +108,7 @@ pub fn development_config() -> ChainSpec {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 		],
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		1000.into(),
+		2000.into(),
 	))
 	.build()
 }
@@ -126,7 +126,7 @@ pub fn local_testnet_config() -> ChainSpec {
 		Extensions {
 			relay_chain: "rococo-local".into(),
 			// You MUST set this to the correct network!
-			para_id: 1000,
+			para_id: 2000,
 		},
 	)
 	.with_name("Local Testnet")
@@ -159,7 +159,7 @@ pub fn local_testnet_config() -> ChainSpec {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 		],
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		1000.into(),
+		2000.into(),
 	))
 	.with_protocol_id("magnet-local")
 	.with_properties(properties)
@@ -286,6 +286,10 @@ fn testnet_genesis(
 		"moveModule": {
 			"changeDefaultMoveStdlibBundleTo": Option::<Vec<u8>>::None,
 			"changeDefaultSubstrateStdlibBundleTo": Option::<Vec<u8>>::None,
+		},
+		"bulkPallet":{
+			"rpcUrl": b"ws://127.0.0.1:8855".to_vec(),
+			"genesisHash": U256::from_str("0x4ea18c8f295ba903acbbed39c70ea0569cf1705fa954a537ffa3b8b7125eaf58").expect("internal U256 is valid; qed")
 		},
 		"liquidation":{
 			"adminKey": Some(root.clone()),

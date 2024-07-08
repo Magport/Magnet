@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{self as order_pallet, OrderGasCost};
-use codec::Encode;
+use crate::{self as bulk_pallet, BulkGasCost};
+use cumulus_pallet_parachain_system::{RelayChainState, RelaychainStateProvider};
 pub use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
 	traits::{Everything, Hooks},
+	BoundedVec,
 };
 use frame_system as system;
 use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
@@ -28,6 +29,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
 	BuildStorage, MultiSignature,
 };
+use std::str::FromStr;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 type Signature = MultiSignature;
@@ -39,7 +41,7 @@ construct_runtime!(
 	{
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Event<T>},
-		OrderPallet: order_pallet::{Pallet, Call, Storage, Event<T>},
+		BulkPallet: bulk_pallet::{Pallet, Call, Storage, Event<T>},
 		MockPallet: mock_pallet,
 	}
 );
@@ -93,44 +95,55 @@ impl pallet_balances::Config for Test {
 	type RuntimeHoldReason = ();
 	type RuntimeFreezeReason = ();
 }
-parameter_types! {
-	pub const SlotWidth: u32 = 2;
-	pub const OrderMaxAmount:Balance = 200000000;
-	pub const TxPoolThreshold:Balance = 3000000000;
+
+pub(crate) const MOCK_RELAY_ROOT_KEY: &[u8] = b"MOCK_RELAY_ROOT_KEY";
+
+pub struct MockRelayStateProvider;
+
+impl RelaychainStateProvider for MockRelayStateProvider {
+	fn current_relay_chain_state() -> RelayChainState {
+		let root = if let Some(root) = frame_support::storage::unhashed::get(MOCK_RELAY_ROOT_KEY) {
+			root
+		} else {
+			Default::default()
+		};
+
+		RelayChainState {
+			state_root: root,
+			number: 0, // block number is not relevant here
+		}
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn set_current_relay_chain_state(state: RelayChainState) {
+		frame_support::storage::unhashed::put(b"MOCK_RELAY_ROOT_KEY", &state.state_root);
+	}
 }
+
+parameter_types! {
+	pub const MaxUrlLength: u32 = 300;
+}
+
 impl crate::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type AuthorityId = AuraId;
 	type UpdateOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
-	type OrderMaxAmount = OrderMaxAmount;
-	type SlotWidth = SlotWidth;
-	type TxPoolThreshold = TxPoolThreshold;
+	type RelayChainStateProvider = MockRelayStateProvider;
+	type MaxUrlLength = MaxUrlLength;
 	type WeightInfo = ();
 }
-pub struct OrderGasCostHandler();
+pub struct BulkGasCostHandler();
 
-impl<T> OrderGasCost<T> for OrderGasCostHandler
+impl<T> BulkGasCost<T> for BulkGasCostHandler
 where
 	T: crate::Config,
 	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(
-		block_number: BlockNumberFor<T>,
+		_block_number: BlockNumberFor<T>,
 	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
-		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number);
-		if sequece_number.is_none() {
-			return Ok(None);
-		}
-		let order = <crate::Pallet<T>>::order_map(
-			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
-		)
-		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
-		let mut r = [0u8; 32];
-		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r)
-			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
-		Ok(Some((account, order.price)))
+		Ok(None)
 	}
 }
 
@@ -139,7 +152,7 @@ pub mod mock_pallet {
 	use super::*;
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type OrderGasCost: OrderGasCost<Self>;
+		type BulkGasCost: BulkGasCost<Self>;
 	}
 
 	#[pallet::call]
@@ -151,13 +164,13 @@ pub mod mock_pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub fn get_gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
-			T::OrderGasCost::gas_cost(block_number).unwrap()
+			T::BulkGasCost::gas_cost(block_number).unwrap()
 		}
 	}
 }
 
 impl mock_pallet::Config for Test {
-	type OrderGasCost = OrderGasCostHandler;
+	type BulkGasCost = BulkGasCostHandler;
 }
 pub struct ExtBuilder {
 	balances: Vec<(AccountId32, u128)>,
@@ -176,6 +189,16 @@ impl ExtBuilder {
 		pallet_balances::GenesisConfig::<Test> { balances: self.balances }
 			.assimilate_storage(&mut t)
 			.unwrap();
+		crate::GenesisConfig::<Test> {
+			rpc_url: BoundedVec::try_from("ws://127.0.0.1:8855".as_bytes().to_vec()).unwrap(),
+			genesis_hash: H256::from_str(
+				"0x4ea18c8f295ba903acbbed39c70ea0569cf1705fa954a537ffa3b8b7125eaf58",
+			)
+			.expect("internal U256 is valid; qed"),
+			_marker: Default::default(),
+		}
+		.assimilate_storage(&mut t)
+		.unwrap();
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext
