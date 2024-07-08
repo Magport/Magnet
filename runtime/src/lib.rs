@@ -371,13 +371,13 @@ const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
 /// We allow for 2 seconds of compute with a 6 second average block time.
 const MAXIMUM_BLOCK_WEIGHT: Weight = Weight::from_parts(
-	WEIGHT_REF_TIME_PER_SECOND.saturating_mul(2),
+	WEIGHT_REF_TIME_PER_SECOND.saturating_div(2),
 	cumulus_primitives_core::relay_chain::MAX_POV_SIZE as u64,
 );
 
 /// Maximum number of blocks simultaneously accepted by the Runtime, not yet included
 /// into the relay chain.
-const UNINCLUDED_SEGMENT_CAPACITY: u32 = 3;
+const UNINCLUDED_SEGMENT_CAPACITY: u32 = 1;
 /// How many parachain blocks are processed by the relay chain per parent. Limits the
 /// number of blocks authored per slot.
 const BLOCK_PROCESSING_VELOCITY: u32 = 1;
@@ -664,7 +664,7 @@ impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 	type DisabledValidators = ();
 	type MaxAuthorities = ConstU32<100_000>;
-	type AllowMultipleBlocksPerSlot = ConstBool<true>;
+	type AllowMultipleBlocksPerSlot = ConstBool<false>;
 	#[cfg(feature = "experimental")]
 	type SlotDuration = ConstU64<SLOT_DURATION>;
 }
@@ -973,15 +973,10 @@ impl pallet_liquidation::Config for Runtime {
 	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = OrderGasCostHandler;
-	type SystemRatio = SystemRatio;
-	type TreasuryRatio = TreasuryRatio;
-	type OperationRatio = OperationRatio;
 	type ExistentialDeposit = ExistDeposit;
-	type MinLiquidationThreshold = MinLiquidationThreshold;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
 	type OperationAccountName = OperationAccountName;
-	type ProfitDistributionCycle = ProfitDistributionCycle;
 }
 
 parameter_types! {
