@@ -13,12 +13,15 @@ use frame_support::{
 	weights::WeightToFeePolynomial,
 	Twox64Concat,
 };
-use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
+use frame_system::{
+	ensure_signed_or_root,
+	pallet_prelude::{BlockNumberFor, OriginFor},
+};
 use mp_system::BASE_ACCOUNT;
 pub use pallet::*;
 use sp_runtime::{
 	traits::{StaticLookup, Zero},
-	AccountId32, Perbill, Saturating,
+	AccountId32, Percent, Saturating,
 };
 use sp_std::{prelude::*, sync::Arc, vec};
 
@@ -35,6 +38,7 @@ type BalanceOf<T> =
 pub type Balance = u128;
 
 pub const PARACHAIN_TO_RELAYCHAIN_UNIT: u128 = 1_000_000;
+pub const PERCENT_UNIT: u128 = 1_000_0000;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -86,25 +90,9 @@ pub mod pallet {
 		///get real weight cost from coreTime placeOrder pallet
 		type OrderGasCost: OrderGasCost<Self>;
 
-		///profit distribute ratio to treasury account
-		#[pallet::constant]
-		type SystemRatio: Get<Perbill>;
-
-		///profit distribute ratio to treasury account
-		#[pallet::constant]
-		type TreasuryRatio: Get<Perbill>;
-
-		/// profit distribute ratio to operation account
-		#[pallet::constant]
-		type OperationRatio: Get<Perbill>;
-
 		/// ED necessitate the account to exist
 		#[pallet::constant]
 		type ExistentialDeposit: Get<Balance>;
-
-		///minimum liquidation threshold
-		#[pallet::constant]
-		type MinLiquidationThreshold: Get<Balance>;
 
 		/// system accountId
 		#[pallet::constant]
@@ -117,10 +105,6 @@ pub mod pallet {
 		/// operation accountId
 		#[pallet::constant]
 		type OperationAccountName: Get<&'static str>;
-
-		///how many blocks to distribute a profit distribution
-		#[pallet::constant]
-		type ProfitDistributionCycle: Get<BlockNumberFor<Self>>;
 	}
 
 	#[pallet::storage]
@@ -144,6 +128,80 @@ pub mod pallet {
 	#[pallet::getter(fn block_count)]
 	pub type DistributionBlockCount<T: Config> = StorageValue<_, BlockNumberFor<T>, ValueQuery>;
 
+	#[pallet::storage]
+	#[pallet::getter(fn system_ratio)]
+	pub type SystemRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn treasury_ratio)]
+	pub type TreasuryRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn operation_ratio)]
+	pub type OperationRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn collator_ratio)]
+	pub type CollatorRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn min_liquidation_threshold)]
+	pub type MinLiquidationThreshold<T: Config> = StorageValue<_, Balance, ValueQuery>;
+
+	#[pallet::storage]
+	#[pallet::getter(fn profit_distribution_cycle)]
+	pub type ProfitDistributionCycle<T: Config> = StorageValue<_, BlockNumberFor<T>, ValueQuery>;
+
+	/// The pallet admin key.
+	#[pallet::storage]
+	#[pallet::getter(fn admin_key)]
+	pub type Admin<T: Config> = StorageValue<_, T::AccountId>;
+
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		/// The `AccountId` of the admin key.
+		pub admin_key: Option<T::AccountId>,
+		pub system_ratio: u32,
+		pub treasury_ratio: u32,
+		pub operation_ratio: u32,
+		pub collator_ratio: u32,
+		pub min_liquidation_threshold: Balance,
+		pub profit_distribution_cycle: BlockNumberFor<T>,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			assert!(
+				self.system_ratio
+					+ self.treasury_ratio
+					+ self.operation_ratio
+					+ self.collator_ratio
+					<= 100 * (PERCENT_UNIT as u32),
+				"Ratio sum must be <= 100%"
+			);
+			assert!(
+				self.min_liquidation_threshold > <T as pallet::Config>::ExistentialDeposit::get(),
+				"MinLiquidationThreshold must be greater than ExistentialDeposit"
+			);
+			assert!(
+				self.profit_distribution_cycle > 1u32.into(),
+				"ProfitDistributionCycle must be greater than 1"
+			);
+
+			if let Some(key) = &self.admin_key {
+				<Admin<T>>::put(key.clone());
+			}
+			SystemRatio::<T>::put(self.system_ratio);
+			TreasuryRatio::<T>::put(self.treasury_ratio);
+			OperationRatio::<T>::put(self.operation_ratio);
+			CollatorRatio::<T>::put(self.collator_ratio);
+			MinLiquidationThreshold::<T>::put(self.min_liquidation_threshold);
+			ProfitDistributionCycle::<T>::put(self.profit_distribution_cycle);
+		}
+	}
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -166,6 +224,27 @@ pub mod pallet {
 		/// collators compensated
 		CollatorsCompensated(Balance, Balance),
 
+		/// set admin(account_id)
+		SetAdmin(T::AccountId),
+
+		/// Set system ratio
+		SystemRatioSet(u32),
+
+		/// Set treasury ratio
+		TreasuryRatioSet(u32),
+
+		/// Set operation ratio
+		OperationRatioSet(u32),
+
+		///Set collator ratio
+		CollatorRatioSet(u32),
+
+		/// Set min liquidation threshold
+		MinLiquidationThresholdSet(Balance),
+
+		/// Set profit distribution cycle
+		ProfitDistributionCycleSet(BlockNumberFor<T>),
+
 		/// error occurred
 		Error(Error<T>),
 	}
@@ -184,6 +263,18 @@ pub mod pallet {
 
 		///failed to process liquidation
 		ProcessLiquidationError,
+
+		/// Require admin authority
+		RequireAdmin,
+
+		/// Invalid ratio sum (must be <= 100%)
+		InvalidRatio,
+
+		/// MinLiquidationThreshold must be greater than ExistentialDeposit
+		InvalidMinLiquidationThreshold,
+
+		/// ProfitDistributionCycle must be greater than 1
+		InvalidProfitDistributionCycle,
 
 		///xcm error
 		XcmError,
@@ -264,13 +355,11 @@ pub mod pallet {
 			});
 
 			let min_liquidation_threshold: Balance =
-				<T as pallet::Config>::MinLiquidationThreshold::get()
-					.try_into()
-					.unwrap_or_else(|_| 0);
+				MinLiquidationThreshold::<T>::get().try_into().unwrap_or_else(|_| 0);
 			let profit = TotalIncome::<T>::get().saturating_sub(TotalCost::<T>::get());
 
 			if profit >= min_liquidation_threshold
-				&& count % T::ProfitDistributionCycle::get() == Zero::zero()
+				&& count % ProfitDistributionCycle::<T>::get() == Zero::zero()
 			{
 				DistributionBlockCount::<T>::put(BlockNumberFor::<T>::zero());
 				match Self::distribute_profit() {
@@ -394,13 +483,14 @@ pub mod pallet {
 				Error::<T>::GetPotAccountError
 			})?;
 
-			let system_ratio = T::SystemRatio::get();
-			let treasury_ratio = T::TreasuryRatio::get();
-			let operation_ratio = T::OperationRatio::get();
+			let system_ratio = SystemRatio::<T>::get();
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
 
-			let treasury_amount = treasury_ratio * total_profit / PARACHAIN_TO_RELAYCHAIN_UNIT;
-			let operation_amount = operation_ratio * total_profit;
-			let system_amount = system_ratio * total_profit;
+			let treasury_amount = (treasury_ratio as u128) / PERCENT_UNIT * total_profit
+				/ PARACHAIN_TO_RELAYCHAIN_UNIT;
+			let operation_amount = (operation_ratio as u128) / PERCENT_UNIT * total_profit;
+			let system_amount = (system_ratio as u128) / PERCENT_UNIT * total_profit;
 			let total_collators_profit =
 				total_profit.saturating_sub(treasury_amount + operation_amount + system_amount);
 
@@ -425,7 +515,7 @@ pub mod pallet {
 			transfers.push((operation_account, operation_account_profit));
 
 			for (collator, collator_cost) in CollatorRealGasCosts::<T>::iter() {
-				let collator_ratio = Perbill::from_rational(collator_cost, total_cost);
+				let collator_ratio = Percent::from_rational(collator_cost, total_cost);
 				let collator_profit = collator_ratio * total_collators_profit;
 
 				let collator_addr_profit =
@@ -489,6 +579,180 @@ pub mod pallet {
 			}
 			Ok(())
 		}
+	}
+
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
+		#[pallet::call_index(0)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_admin(
+			origin: OriginFor<T>,
+			new_admin: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResultWithPostInfo {
+			let require = match ensure_signed_or_root(origin) {
+				Ok(s) if s == Self::admin_key() => true,
+				Ok(None) => true,
+				_ => false,
+			};
+
+			ensure!(require, Error::<T>::RequireAdmin);
+
+			let new_admin = T::Lookup::lookup(new_admin)?;
+
+			Admin::<T>::mutate(|admin| *admin = Some(new_admin.clone()));
+
+			Self::deposit_event(Event::SetAdmin(new_admin));
+
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_system_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
+			let collator_ratio = CollatorRatio::<T>::get();
+
+			let total_ratio = treasury_ratio + ratio + operation_ratio + collator_ratio;
+			log::info!("1 +++++++++ set system ratio, total ratio:{:?}, treasury_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}, system_ratio:{:?}",
+            total_ratio, treasury_ratio, operation_ratio, collator_ratio, ratio);
+			ensure_total_ratio_not_exceed_one::<T>(
+				ratio,
+				treasury_ratio,
+				operation_ratio,
+				collator_ratio,
+			)?;
+
+			SystemRatio::<T>::put(ratio);
+			Self::deposit_event(Event::SystemRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_treasury_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			let system_ratio = SystemRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
+			let collator_ratio = CollatorRatio::<T>::get();
+
+			let total_ratio = system_ratio + ratio + operation_ratio + collator_ratio;
+			log::info!("2 =========== set treasury ratio, total ratio:{:?}, system_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}, treasury_ratio:{:?}",
+            total_ratio, system_ratio, operation_ratio, collator_ratio, ratio);
+
+			ensure_total_ratio_not_exceed_one::<T>(
+				system_ratio,
+				ratio,
+				operation_ratio,
+				collator_ratio,
+			)?;
+
+			TreasuryRatio::<T>::put(ratio);
+			Self::deposit_event(Event::TreasuryRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(3)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_operation_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			let system_ratio = SystemRatio::<T>::get();
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			let collator_ratio = CollatorRatio::<T>::get();
+
+			let total_ratio = system_ratio + treasury_ratio + ratio + collator_ratio;
+			log::info!("3 -+-+-+-+-+ set operation ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, collator_ratio:{:?}, operation_ratio:{:?}",
+            total_ratio, system_ratio, treasury_ratio, collator_ratio, ratio);
+			ensure_total_ratio_not_exceed_one::<T>(
+				system_ratio,
+				treasury_ratio,
+				ratio,
+				collator_ratio,
+			)?;
+
+			OperationRatio::<T>::put(ratio);
+			Self::deposit_event(Event::OperationRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(4)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_collator_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
+			crate::pallet::ensure_root_or_admin::<T>(origin)?;
+
+			let system_ratio = SystemRatio::<T>::get();
+			let treasury_ratio = TreasuryRatio::<T>::get();
+			let operation_ratio = OperationRatio::<T>::get();
+
+			let total_ratio = system_ratio + treasury_ratio + ratio + operation_ratio;
+			log::info!("4. *********** set collator ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}",
+            total_ratio, system_ratio, treasury_ratio, operation_ratio, ratio);
+			ensure_total_ratio_not_exceed_one::<T>(
+				system_ratio,
+				treasury_ratio,
+				operation_ratio,
+				ratio,
+			)?;
+
+			CollatorRatio::<T>::put(ratio);
+			Self::deposit_event(Event::CollatorRatioSet(ratio));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(5)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_min_liquidation_threshold(
+			origin: OriginFor<T>,
+			threshold: Balance,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			let existential_deposit = <T as pallet::Config>::ExistentialDeposit::get();
+			ensure!(threshold > existential_deposit, Error::<T>::InvalidMinLiquidationThreshold);
+
+			MinLiquidationThreshold::<T>::put(threshold);
+			Self::deposit_event(Event::MinLiquidationThresholdSet(threshold));
+			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(6)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn set_profit_distribution_cycle(
+			origin: OriginFor<T>,
+			cycle: BlockNumberFor<T>,
+		) -> DispatchResultWithPostInfo {
+			ensure_root_or_admin::<T>(origin)?;
+
+			ensure!(cycle > 1u32.into(), Error::<T>::InvalidProfitDistributionCycle);
+
+			ProfitDistributionCycle::<T>::put(cycle);
+			Self::deposit_event(Event::ProfitDistributionCycleSet(cycle));
+			Ok(Pays::No.into())
+		}
+	}
+
+	/// Ensure the origin is either root or admin.
+	fn ensure_root_or_admin<T: Config>(origin: OriginFor<T>) -> DispatchResult {
+		match ensure_signed_or_root(origin) {
+			Ok(s) if s == Pallet::<T>::admin_key() => Ok(()),
+			Ok(None) => Ok(()),
+			_ => Err(Error::<T>::RequireAdmin.into()),
+		}
+	}
+
+	fn ensure_total_ratio_not_exceed_one<T: Config>(
+		system_ratio: u32,
+		treasury_ratio: u32,
+		operation_ratio: u32,
+		collator_ratio: u32,
+	) -> DispatchResult {
+		let total_ratio = system_ratio + treasury_ratio + operation_ratio + collator_ratio;
+		ensure!((total_ratio as u128) <= 100 * PERCENT_UNIT, Error::<T>::InvalidRatio);
+		Ok(())
 	}
 }
 
