@@ -47,6 +47,7 @@ use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
 use sp_core::crypto::ByteArray;
+use sp_runtime::Perbill;
 use weights::WeightInfo;
 #[cfg(test)]
 mod mock;
@@ -77,6 +78,8 @@ pub struct Order<AuthorityId> {
 }
 #[frame_support::pallet]
 pub mod pallet {
+	use sp_runtime::Percent;
+
 	use super::*;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -97,17 +100,6 @@ pub mod pallet {
 		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		type WeightInfo: WeightInfo;
-		/// The default value of w.
-		#[pallet::constant]
-		type SlotWidth: Get<u32>;
-
-		/// The max value of place order.
-		#[pallet::constant]
-		type OrderMaxAmount: Get<BalanceOf<Self>>;
-
-		/// The gas threshold required to place an order.
-		#[pallet::constant]
-		type TxPoolThreshold: Get<BalanceOf<Self>>;
 	}
 
 	#[pallet::pallet]
@@ -123,35 +115,20 @@ pub mod pallet {
 	#[pallet::getter(fn current_relay_height)]
 	pub type CurrentRelayHeight<T> = StorageValue<_, u32, ValueQuery>;
 
-	#[pallet::type_value]
-	pub fn SlotWidthOnEmpty<T: Config>() -> u32 {
-		T::SlotWidth::get()
-	}
-	#[pallet::type_value]
-	pub fn OrderMaxAmountOnEmpty<T: Config>() -> BalanceOf<T> {
-		T::OrderMaxAmount::get()
-	}
-	#[pallet::type_value]
-	pub fn TxPoolThresholdOnEmpty<T: Config>() -> BalanceOf<T> {
-		T::TxPoolThreshold::get()
-	}
-
 	/// The order interval is 2^slotwidth.
 	#[pallet::storage]
 	#[pallet::getter(fn slot_width)]
-	pub(super) type SlotWidth<T: Config> = StorageValue<_, u32, ValueQuery, SlotWidthOnEmpty<T>>;
+	pub(super) type SlotWidth<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	/// The maximum price the user is willing to pay when placing an order.
 	#[pallet::storage]
 	#[pallet::getter(fn order_max_amount)]
-	pub(super) type OrderMaxAmount<T: Config> =
-		StorageValue<_, BalanceOf<T>, ValueQuery, OrderMaxAmountOnEmpty<T>>;
+	pub(super) type OrderMaxAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
 	/// Gas threshold that triggers order placement.
 	#[pallet::storage]
 	#[pallet::getter(fn txpool_threshold)]
-	pub(super) type TxPoolThreshold<T: Config> =
-		StorageValue<_, BalanceOf<T>, ValueQuery, TxPoolThresholdOnEmpty<T>>;
+	pub(super) type TxPoolThreshold<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
 	/// Order Information Map.
 	#[pallet::storage]
@@ -164,6 +141,23 @@ pub mod pallet {
 	#[pallet::getter(fn block_2_sequence)]
 	pub type Block2Sequence<T: Config> =
 		StorageMap<_, Twox64Concat, BlockNumberFor<T>, u64, OptionQuery>;
+
+	#[pallet::genesis_config]
+	#[derive(frame_support::DefaultNoBound)]
+	pub struct GenesisConfig<T: Config> {
+		pub slot_width: u32,
+		pub price_limit: BalanceOf<T>,
+		pub price_threshold: Perbill,
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+		fn build(&self) {
+			SlotWidth::<T>::put(&self.slot_width);
+			OrderMaxAmount::<T>::put(&self.price_limit);
+			TxPoolThreshold::<T>::put(&self.price_threshold);
+		}
+	}
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -314,7 +308,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			slot_width: Option<u32>,
 			order_max_amount: Option<BalanceOf<T>>,
-			tx_pool_threshold: Option<BalanceOf<T>>,
+			tx_pool_threshold: Option<Perbill>,
 		) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 
@@ -455,9 +449,9 @@ impl<T: Config> Pallet<T> {
 	///
 	/// Parameters:
 	/// - `gas_balance`: The total gas.
-	pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>) -> bool {
+	pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>, core_price: BalanceOf<T>) -> bool {
 		let txpool_threshold = TxPoolThreshold::<T>::get();
-		gas_balance > txpool_threshold
+		gas_balance > txpool_threshold * core_price
 	}
 
 	/// Whether the order with the specified sequence number is executed.

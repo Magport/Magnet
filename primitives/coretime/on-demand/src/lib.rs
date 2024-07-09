@@ -104,7 +104,7 @@ sp_api::decl_runtime_apis! {
 			para_id:ParaId,
 		)-> Option<AuthorityId>;
 
-		fn reach_txpool_threshold(gas_balance:Balance) -> bool;
+		fn reach_txpool_threshold(gas_balance:Balance, core_price:Balance) -> bool;
 
 		fn order_executed(sequence_number:u64) -> bool ;
 	}

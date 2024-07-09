@@ -727,12 +727,6 @@ where
 	}
 }
 
-parameter_types! {
-	pub const SlotWidth: u32 = 2;
-	pub const OrderMaxAmount:Balance = 200000000;
-	pub const TxPoolThreshold:Balance = 3000000000;
-}
-
 type EnsureRootOrHalf = EitherOfDiverse<
 	EnsureRoot<AccountId>,
 	pallet_collective::EnsureProportionMoreThan<AccountId, CouncilCollective, 1, 2>,
@@ -743,9 +737,6 @@ impl pallet_on_demand::Config for Runtime {
 	type AuthorityId = AuraId;
 	type Currency = Balances;
 	type UpdateOrigin = EnsureRootOrHalf;
-	type OrderMaxAmount = OrderMaxAmount;
-	type SlotWidth = SlotWidth;
-	type TxPoolThreshold = TxPoolThreshold;
 	type WeightInfo = pallet_on_demand::weights::SubstrateWeight<Runtime>;
 }
 pub struct BulkGasCostHandler();
@@ -1707,8 +1698,8 @@ impl_runtime_apis! {
 			OrderPallet::order_placed(relay_storage_proof, validation_data, para_id)
 		}
 
-		fn reach_txpool_threshold(gas_balance:Balance) -> bool {
-			OrderPallet::reach_txpool_threshold(gas_balance)
+		fn reach_txpool_threshold(gas_balance:Balance, core_price:Balance) -> bool {
+			OrderPallet::reach_txpool_threshold(gas_balance, core_price)
 		}
 
 

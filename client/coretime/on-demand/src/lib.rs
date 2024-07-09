@@ -31,6 +31,7 @@ use cumulus_primitives_core::{
 };
 use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
+use mc_coretime_common::is_parathread;
 use metadata::{CoreAssignment, CoreDescriptor};
 use mp_coretime_common::well_known_keys::paras_para_lifecycles;
 use mp_coretime_on_demand::{
@@ -188,6 +189,7 @@ async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
 	transaction_pool: Arc<ExPool>,
 	height: RelayBlockNumber,
 	snap_txs: Vec<H256>,
+	core_price: Balance,
 ) -> Option<(bool, OrderType)>
 where
 	Block: BlockT,
@@ -206,6 +208,7 @@ where
 	let mut all_gas_value = Balance::from(0u32);
 	let block_hash = parachain.usage_info().chain.best_hash;
 	let mut back_txs: Vec<H256> = vec![];
+
 	loop {
 		let pending_tx =
 			if let Some(pending_tx) = pending_iterator.next() { pending_tx } else { break };
@@ -217,8 +220,10 @@ where
 			.ok()?;
 		all_gas_value = query_fee.final_fee().add(all_gas_value);
 		if transaction_pool.status().ready != 0 {
-			is_place_order =
-				parachain.runtime_api().reach_txpool_threshold(block_hash, all_gas_value).ok()?;
+			is_place_order = parachain
+				.runtime_api()
+				.reach_txpool_threshold(block_hash, all_gas_value, core_price)
+				.ok()?;
 		}
 		log::info!(
 			"tx_fee:{:?},all_fee:{:?},can_order:{:?},status:{:?}",
@@ -313,21 +318,7 @@ where
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 {
-	let para_lifecycles_storage = relay_chain
-		.get_storage_by_key(p_hash, paras_para_lifecycles(para_id).as_slice())
-		.await?;
-	let para_lifecycles = para_lifecycles_storage
-		.map(|raw| <ParaLifecycle>::decode(&mut &raw[..]))
-		.transpose()?;
-	let is_parathread = match para_lifecycles {
-		Some(lifecycles) => matches!(
-			lifecycles,
-			ParaLifecycle::Parathread
-				| ParaLifecycle::UpgradingParathread
-				| ParaLifecycle::OffboardingParathread
-		),
-		None => false,
-	};
+	let is_parathread = is_parathread(&relay_chain, p_hash, para_id).await?;
 	if !is_parathread {
 		//parachain mode
 		let mut order_record_local = order_record.lock().await;
@@ -400,11 +391,21 @@ where
 			let mut order_record_local = order_record.lock().await;
 			if collator_public.is_some() {
 				//your turn
+				// get on demand core price
+				let max_amount = parachain.runtime_api().order_max_amount(hash)?;
+				let p_spot_price = get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
+				let spot_price;
+				if p_spot_price.is_some() {
+					spot_price = p_spot_price.unwrap();
+				} else {
+					spot_price = max_amount;
+				}
 				let reached = reach_txpool_threshold::<_, _, _, _, PB>(
 					parachain,
 					transaction_pool,
 					height,
 					order_record_local.txs.clone(),
+					spot_price,
 				)
 				.await;
 				let mut can_order = false;
@@ -442,15 +443,6 @@ where
 				if can_order {
 					if height - order_record_local.relay_height > slot_block {
 						if order_record_local.order_status == OrderStatus::Init {
-							let max_amount = parachain.runtime_api().order_max_amount(hash)?;
-							let p_spot_price =
-								get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
-							let spot_price;
-							if p_spot_price.is_some() {
-								spot_price = p_spot_price.unwrap();
-							} else {
-								spot_price = max_amount;
-							}
 							match order_type {
 								OrderType::Normal => {
 									log::info!(

@@ -573,12 +573,6 @@ fn start_consensus(
 	bulk_mem_record: Arc<Mutex<BulkMemRecord>>,
 ) -> Result<(), sc_service::Error> {
 	use cumulus_client_consensus_aura::collators::lookahead::{self as aura, Params as AuraParams};
-	// use cumulus_client_consensus_aura::collators::basic::{
-	// 	self as basic_aura, Params as BasicAuraParams,
-	// };
-	// use magnet_client_consensus_aura::collators::on_demand::{
-	// 	self as on_demand_aura, Params as BasicAuraParams,
-	// };
 
 	// NOTE: because we use Aura here explicitly, we can use `CollatorSybilResistance::Resistant`
 	// when starting the network.
@@ -602,42 +596,6 @@ fn start_consensus(
 		client.clone(),
 	);
 	let relay_chain_interface_clone = relay_chain_interface.clone();
-	// let params = AuraParams {
-	// 	create_inherent_data_providers: move |_, ()| {
-	// 		let relay_chain_interface = relay_chain_interface.clone();
-	// 		let order_record_clone = order_record.clone();
-	// 		async move {
-	// 			let parent_hash = relay_chain_interface.best_block_hash().await?;
-	// 			let (relay_parent, validation_data, sequence_number, author_pub) = {
-	// 				let order_record_local = order_record_clone.lock().await;
-	// 				if order_record_local.validation_data.is_none() {
-	// 					(parent_hash, None, order_record_local.sequence_number, None)
-	// 				} else {
-	// 					(
-	// 						order_record_local.relay_parent.expect("can not get relay_parent hash"),
-	// 						order_record_local.validation_data.clone(),
-	// 						order_record_local.sequence_number,
-	// 						order_record_local.author_pub.clone(),
-	// 					)
-	// 				}
-	// 			};
-	// 			let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
-	// 				relay_parent,
-	// 				&relay_chain_interface,
-	// 				&validation_data,
-	// 				para_id,
-	// 				sequence_number,
-	// 				&author_pub,
-	// 			)
-	// 			.await;
-	// 			let order_inherent = order_inherent.ok_or_else(|| {
-	// 				Box::<dyn std::error::Error + Send + Sync>::from(
-	// 					"Failed to create order inherent",
-	// 				)
-	// 			})?;
-	// 			Ok(order_inherent)
-	// 		}
-	// 	},
 	let params = AuraParams {
 		create_inherent_data_providers: move |_, ()| {
 			let bulk_mem_record_clone = bulk_mem_record.clone();
