@@ -310,7 +310,7 @@ pub struct ExtBuilder {
 	existential_deposit: u128,
 	system_ratio: u32,
 	treasury_ratio: u32,
-	operation_ratio: u32,
+	operation_ratios: Vec<(AccountId, u32)>,
 	collator_ratio: u32,
 	min_liquidation_threshold: Balance,
 	profit_distribution_cycle: u64,
@@ -322,7 +322,7 @@ impl Default for ExtBuilder {
 			existential_deposit: 1,
 			system_ratio: 20_000_0000,
 			treasury_ratio: 33_000_0000,
-			operation_ratio: 25_000_0000,
+			operation_ratios: vec![(AccountId32::new([1u8; 32]), 25_000_000)],
 			collator_ratio: 22_000_0000,
 			min_liquidation_threshold: MILLIUNIT * 20,
 			profit_distribution_cycle: 10,
@@ -346,8 +346,8 @@ impl ExtBuilder {
 		self
 	}
 
-	pub fn operation_ratio(mut self, ratio: u32) -> Self {
-		self.operation_ratio = ratio;
+	pub fn operation_ratio(mut self, ratio: Vec<(AccountId, u32)>) -> Self {
+		self.operation_ratios = ratio;
 		self
 	}
 
@@ -378,7 +378,7 @@ impl ExtBuilder {
 			admin_key: Some(SYSTEM_ACCOUNT),
 			system_ratio: self.system_ratio,
 			treasury_ratio: self.treasury_ratio,
-			operation_ratio: self.operation_ratio,
+			operation_ratio: self.operation_ratios.clone(),
 			collator_ratio: self.collator_ratio,
 			min_liquidation_threshold: self.min_liquidation_threshold,
 			profit_distribution_cycle: self.profit_distribution_cycle,
