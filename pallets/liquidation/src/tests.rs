@@ -43,11 +43,12 @@ fn distribute_profit_should_work() {
 fn set_operation_ratios_should_work() {
 	ExtBuilder::default().build().execute_with(|| {
 		let new_ratios = vec![
-			(AccountId32::new([3u8; 32]), 30_000_0000),
-			(AccountId32::new([4u8; 32]), 10_000_0000),
+			(AccountId32::new([1u8; 32]), 15_000_0000),
+			(AccountId32::new([2u8; 32]), 10_000_0000),
 		];
-		assert_ok!(Liquidation::set_operation_ratios(RuntimeOrigin::root(), new_ratios.clone()));
-		for (account, ratio) in new_ratios {
+
+		for (account, ratio) in new_ratios.clone() {
+			assert_ok!(Liquidation::set_operation_ratio(RuntimeOrigin::root(), account.clone(), ratio));
 			assert_eq!(OperationRatios::<Test>::get(account), ratio);
 		}
 
