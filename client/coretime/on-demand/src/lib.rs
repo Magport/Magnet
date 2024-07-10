@@ -351,9 +351,12 @@ where
 	let authorities = parachain.runtime_api().authorities(hash).map_err(Box::new)?;
 	let slot_width = parachain.runtime_api().slot_width(hash)?;
 	let auth_len = authorities.len() as u32;
+	// The larger the slot width, the longer the rotation time.
 	let idx = (height >> slot_width) % auth_len;
+	// Randomly select a collator to place an order.
 	let collator_public = mc_coretime_common::order_slot::<PB>(idx, &authorities, &keystore).await;
 	let base = 2 as u32;
+	// Minimum interval for placing an order,calculated in one relaychain block time.
 	let slot_block = base.pow(slot_width);
 	if height % slot_block == 0 {
 		let mut order_record_local = order_record.lock().await;

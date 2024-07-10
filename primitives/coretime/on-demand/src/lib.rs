@@ -95,7 +95,7 @@ impl<AuthorityId> OrderRecord<AuthorityId> {
 			para_id,
 			sequence_number: 0,
 			author_pub: None,
-			txs: vec![],
+			txs: Vec::new(),
 		}
 	}
 	pub fn reset(&mut self) {
@@ -107,7 +107,7 @@ impl<AuthorityId> OrderRecord<AuthorityId> {
 		self.validation_data = None;
 		self.sequence_number = 0;
 		self.author_pub = None;
-		self.txs = vec![];
+		self.txs = Vec::new();
 	}
 }
 
