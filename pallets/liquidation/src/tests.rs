@@ -48,7 +48,11 @@ fn set_operation_ratios_should_work() {
 		];
 
 		for (account, ratio) in new_ratios.clone() {
-			assert_ok!(Liquidation::set_operation_ratio(RuntimeOrigin::root(), account.clone(), ratio));
+			assert_ok!(Liquidation::set_operation_ratio(
+				RuntimeOrigin::root(),
+				account.clone(),
+				ratio
+			));
 			assert_eq!(OperationRatios::<Test>::get(account), ratio);
 		}
 
