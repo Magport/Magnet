@@ -11,7 +11,7 @@ mod weights;
 pub mod xcm_config;
 pub mod xcms;
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
@@ -28,7 +28,7 @@ use sp_runtime::{
 		IdentifyAccount, PostDispatchInfoOf, UniqueSaturatedInto, Verify,
 	},
 	transaction_validity::{TransactionSource, TransactionValidity, TransactionValidityError},
-	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent,
+	ApplyExtrinsicResult, ConsensusEngineId, DispatchError, MultiSignature, Percent, RuntimeDebug,
 };
 
 use scale_info::prelude::string::String;
@@ -52,7 +52,8 @@ use frame_support::{
 	traits::{
 		fungible::HoldConsideration, AsEnsureOriginWithArg, ConstBool, ConstU128, ConstU32,
 		ConstU64, ConstU8, Currency, EitherOf, EitherOfDiverse, Everything, FindAuthor, Imbalance,
-		LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp, TransformOrigin,
+		InstanceFilter, LinearStoragePrice, OnFinalize, OnUnbalanced, PrivilegeCmp,
+		TransformOrigin,
 	},
 	weights::{
 		constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
@@ -370,13 +371,13 @@ const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
 /// We allow for 2 seconds of compute with a 6 second average block time.
 const MAXIMUM_BLOCK_WEIGHT: Weight = Weight::from_parts(
-	WEIGHT_REF_TIME_PER_SECOND.saturating_mul(2),
+	WEIGHT_REF_TIME_PER_SECOND.saturating_div(2),
 	cumulus_primitives_core::relay_chain::MAX_POV_SIZE as u64,
 );
 
 /// Maximum number of blocks simultaneously accepted by the Runtime, not yet included
 /// into the relay chain.
-const UNINCLUDED_SEGMENT_CAPACITY: u32 = 3;
+const UNINCLUDED_SEGMENT_CAPACITY: u32 = 1;
 /// How many parachain blocks are processed by the relay chain per parent. Limits the
 /// number of blocks authored per slot.
 const BLOCK_PROCESSING_VELOCITY: u32 = 1;
@@ -663,7 +664,7 @@ impl pallet_aura::Config for Runtime {
 	type AuthorityId = AuraId;
 	type DisabledValidators = ();
 	type MaxAuthorities = ConstU32<100_000>;
-	type AllowMultipleBlocksPerSlot = ConstBool<true>;
+	type AllowMultipleBlocksPerSlot = ConstBool<false>;
 	#[cfg(feature = "experimental")]
 	type SlotDuration = ConstU64<SLOT_DURATION>;
 }
@@ -972,15 +973,10 @@ impl pallet_liquidation::Config for Runtime {
 	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
 	type OrderGasCost = OrderGasCostHandler;
-	type SystemRatio = SystemRatio;
-	type TreasuryRatio = TreasuryRatio;
-	type OperationRatio = OperationRatio;
 	type ExistentialDeposit = ExistDeposit;
-	type MinLiquidationThreshold = MinLiquidationThreshold;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
 	type OperationAccountName = OperationAccountName;
-	type ProfitDistributionCycle = ProfitDistributionCycle;
 }
 
 parameter_types! {
@@ -1123,6 +1119,72 @@ impl pallet_move::Config for Runtime {
 	type WeightInfo = pallet_move::weights::SubstrateWeight<Runtime>;
 }
 
+impl pallet_multisig::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type DepositBase = ConstU128<228_000_000_000_000>;
+	type DepositFactor = ConstU128<32_000_000_000_000>;
+	type MaxSignatories = ConstU32<20>;
+	type WeightInfo = pallet_multisig::weights::SubstrateWeight<Runtime>;
+}
+
+#[derive(
+	Copy,
+	Clone,
+	Eq,
+	PartialEq,
+	Ord,
+	PartialOrd,
+	Encode,
+	Decode,
+	RuntimeDebug,
+	MaxEncodedLen,
+	scale_info::TypeInfo,
+)]
+pub enum ProxyType {
+	Any,
+	JustTransfer,
+	JustUtility,
+}
+impl Default for ProxyType {
+	fn default() -> Self {
+		Self::Any
+	}
+}
+impl InstanceFilter<RuntimeCall> for ProxyType {
+	fn filter(&self, c: &RuntimeCall) -> bool {
+		match self {
+			ProxyType::Any => true,
+			ProxyType::JustTransfer => {
+				matches!(
+					c,
+					RuntimeCall::Balances(pallet_balances::Call::transfer_allow_death { .. })
+				)
+			},
+			ProxyType::JustUtility => matches!(c, RuntimeCall::Utility { .. }),
+		}
+	}
+	fn is_superset(&self, o: &Self) -> bool {
+		self == &ProxyType::Any || self == o
+	}
+}
+
+impl pallet_proxy::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeCall = RuntimeCall;
+	type Currency = Balances;
+	type ProxyType = ProxyType;
+	type ProxyDepositBase = ConstU128<160_000_000_000_000>;
+	type ProxyDepositFactor = ConstU128<33_000_000_000_000>;
+	type MaxProxies = ConstU32<100>;
+	type CallHasher = BlakeTwo256;
+	type MaxPending = ConstU32<1000>;
+	type AnnouncementDepositBase = ConstU128<16_000_000_000_000>;
+	type AnnouncementDepositFactor = ConstU128<64_000_000_000_000>;
+	type WeightInfo = pallet_proxy::weights::SubstrateWeight<Runtime>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime
@@ -1194,6 +1256,10 @@ construct_runtime!(
 
 		//Move-vm
 		MoveModule: pallet_move = 80,
+
+		//call util
+		Multisig: pallet_multisig = 90,
+		Proxy: pallet_proxy = 91,
 	}
 );
 
@@ -1209,6 +1275,8 @@ mod benches {
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_order, OrderPallet]
 		[pallet_move, MoveModule]
+		[pallet_multisig, Multisig]
+		[pallet_proxy, Proxy]
 	);
 }
 

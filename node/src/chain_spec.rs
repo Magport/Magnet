@@ -286,6 +286,15 @@ fn testnet_genesis(
 		"moveModule": {
 			"changeDefaultMoveStdlibBundleTo": Option::<Vec<u8>>::None,
 			"changeDefaultSubstrateStdlibBundleTo": Option::<Vec<u8>>::None,
+		},
+		"liquidation":{
+			"adminKey": Some(root.clone()),
+			"systemRatio": 20_000_0000,
+			"treasuryRatio": 33_000_0000,
+			"operationRatio": 25_000_0000,
+			"collatorRatio": 22_000_0000,
+			"minLiquidationThreshold": 20_000_000_000_000_000u128,
+			"profitDistributionCycle": 10,
 		}
 	})
 }
