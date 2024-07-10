@@ -70,7 +70,7 @@ struct EnqueuedOrder {
 }
 
 /// Order type
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum OrderType {
 	/// The mem pool gas reaches the threshold.
 	Normal,
@@ -336,10 +336,10 @@ where
 				return Ok(());
 			}
 		}
-		let order_record_local = order_record.lock().await;
-		if order_record_local.relay_height == height {
-			return Ok(());
-		}
+		// let order_record_local = order_record.lock().await;
+		// if order_record_local.relay_height == height {
+		// 	return Ok(());
+		// }
 	}
 	let head = validation_data.clone().parent_head.0;
 	let parachain_head = match <<Block as BlockT>::Header>::decode(&mut &head[..]) {
@@ -374,119 +374,98 @@ where
 		validation_data.clone(),
 		para_id,
 	)?;
-	match order_placed {
-		Some(author) => {
-			let mut order_record_local = order_record.lock().await;
-			order_record_local.relay_parent = Some(p_hash);
-			order_record_local.relay_height = height;
-			order_record_local.validation_data = Some(validation_data);
-			order_record_local.author_pub = Some(author);
-			order_record_local.para_id = para_id;
-			let sequence_number = parachain.runtime_api().sequence_number(hash)?;
-			order_record_local.sequence_number = sequence_number;
-			order_record_local.txs = get_txs(transaction_pool.clone()).await;
-		},
-		None => {
-			let sequence_number = parachain.runtime_api().sequence_number(hash)?;
-			let order_executed = parachain.runtime_api().order_executed(hash, sequence_number)?;
-			if order_executed {
-				return Ok(());
+	let sequence_number = parachain.runtime_api().sequence_number(hash)?;
+	// Get information about the OnDemandOrderPlaced event.
+	if let Some(author) = order_placed {
+		// Get the event and the account who placed the order
+		let mut order_record_local = order_record.lock().await;
+		order_record_local.relay_parent = Some(p_hash);
+		order_record_local.relay_height = height;
+		order_record_local.validation_data = Some(validation_data);
+		order_record_local.author_pub = Some(author);
+		order_record_local.para_id = para_id;
+		order_record_local.sequence_number = sequence_number;
+		order_record_local.txs = get_txs(transaction_pool.clone()).await;
+		return Ok(());
+	}
+	// Check whether the conditions for placing an order are met, and if so, place the order
+
+	// Check if it is in the ondemand queue, if so, do not place a order.
+	// key = OnDemandAssignmentProvider OnDemandQueue
+	let mut exist_order = false;
+	let on_demand_queue_storage = relay_chain.get_storage_by_key(p_hash, ON_DEMAND_QUEUE).await?;
+	let on_demand_queue = on_demand_queue_storage
+		.map(|raw| <Vec<EnqueuedOrder>>::decode(&mut &raw[..]))
+		.transpose()?;
+	if let Some(vvs) = on_demand_queue.clone() {
+		for vv in vvs.into_iter() {
+			if vv.para_id == para_id {
+				exist_order = true;
+				break;
 			}
-			let mut order_record_local = order_record.lock().await;
-			if collator_public.is_some() {
-				//your turn
-				// get on demand core price
-				let max_amount = parachain.runtime_api().order_max_amount(hash)?;
-				let p_spot_price = get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
-				let spot_price;
-				if p_spot_price.is_some() {
-					spot_price = p_spot_price.unwrap();
-				} else {
-					spot_price = max_amount;
-				}
-				let reached = reach_txpool_threshold::<_, _, _, _, PB>(
-					parachain,
-					transaction_pool,
-					height,
-					order_record_local.txs.clone(),
-					spot_price,
-				)
-				.await;
-				let mut can_order = false;
-				let mut order_type = OrderType::Normal;
-				if let Some((reach, o_t)) = reached {
-					if reach {
-						order_type = o_t;
-						let mut exist_order = false;
-						// key = OnDemandAssignmentProvider OnDemandQueue
-						let on_demand_queue_storage =
-							relay_chain.get_storage_by_key(p_hash, ON_DEMAND_QUEUE).await?;
-						let on_demand_queue = on_demand_queue_storage
-							.map(|raw| <Vec<EnqueuedOrder>>::decode(&mut &raw[..]))
-							.transpose()?;
-						if let Some(vvs) = on_demand_queue.clone() {
-							for vv in vvs.into_iter() {
-								if vv.para_id == para_id {
-									exist_order = true;
-									break;
-								}
-							}
-						}
-						if !exist_order {
-							can_order = true;
-						}
-					} else {
-						let trig_xcm_event =
-							relay_chain_xcm_event(relay_chain.clone(), para_id, p_hash).await;
-						if let Some((trig_flag, o_t)) = trig_xcm_event {
-							can_order = trig_flag;
-							order_type = o_t;
-						}
-					}
-				}
-				if can_order {
-					if height - order_record_local.relay_height > slot_block {
-						if order_record_local.order_status == OrderStatus::Init {
-							match order_type {
-								OrderType::Normal => {
-									log::info!(
-										"============normal place order======================"
-									);
-								},
-								OrderType::Force => {
-									log::info!(
-										"============force place order======================"
-									);
-								},
-								OrderType::XCMEvent => {
-									log::info!("============xcm place order======================");
-								},
-							}
-							let order_result = try_place_order::<Balance>(
-								order_record_local.relay_base,
-								keystore,
-								para_id,
-								url,
-								spot_price,
-								slot_block,
-								height,
-								relay_chain.clone(),
-								order_record_local.relay_base_height,
-							)
-							.await;
-							log::info!("===========place order completed==============",);
-							order_record_local.order_status = OrderStatus::Order;
-							if order_result.is_err() {
-								log::info!(
-									"===========place_order error:=============={:?}",
-									order_result
-								);
-							}
-						}
+		}
+	}
+	if exist_order {
+		return Ok(());
+	}
+	// get on demand core price
+	let max_amount = parachain.runtime_api().order_max_amount(hash)?;
+	let p_spot_price = get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
+	let spot_price = if let Some(pot_price) = p_spot_price { pot_price } else { max_amount };
+	// Check whether the gas of the transaction pool has reached the spot price threshold.
+	let mut order_record_local = order_record.lock().await;
+
+	let reached = reach_txpool_threshold::<_, _, _, _, PB>(
+		parachain,
+		transaction_pool,
+		height,
+		order_record_local.txs.clone(),
+		spot_price,
+	)
+	.await;
+	let mut can_order = false;
+	let mut order_type = OrderType::Normal;
+	if let Some((reach, o_t)) = reached {
+		if reach {
+			order_type = o_t;
+			can_order = true;
+		} else {
+			let trig_xcm_event = relay_chain_xcm_event(relay_chain.clone(), para_id, p_hash).await;
+			if let Some((trig_flag, o_t)) = trig_xcm_event {
+				can_order = trig_flag;
+				order_type = o_t;
+			}
+		}
+	}
+	if collator_public.is_some() {
+		//your turn
+		if can_order {
+			if height - order_record_local.relay_height > slot_block {
+				if order_record_local.order_status == OrderStatus::Init {
+					log::info!(
+						"============place order, type:{:?}======================",
+						order_type
+					);
+					let order_result = try_place_order::<Balance>(
+						order_record_local.relay_base,
+						keystore,
+						para_id,
+						url,
+						spot_price,
+						slot_block,
+						height,
+						relay_chain.clone(),
+						order_record_local.relay_base_height,
+					)
+					.await;
+					log::info!("===========place order completed==============",);
+					order_record_local.order_status = OrderStatus::Order;
+					if order_result.is_err() {
+						log::info!("===========place_order error:=============={:?}", order_result);
 					}
 				}
 			}
-		},
+		}
 	}
 	Ok(())
 }
