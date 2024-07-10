@@ -304,7 +304,7 @@ fn testnet_genesis(
 			"adminKey": Some(root.clone()),
 			"systemRatio": 20_000_0000,
 			"treasuryRatio": 33_000_0000,
-			"operationRatio": vec![
+			"operationRatios": vec![
 				(op_account1.clone(), 15_000_0000),
 				(op_account2.clone(), 10_000_0000)
 			],

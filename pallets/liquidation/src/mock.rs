@@ -378,7 +378,7 @@ impl ExtBuilder {
 			admin_key: Some(SYSTEM_ACCOUNT),
 			system_ratio: self.system_ratio,
 			treasury_ratio: self.treasury_ratio,
-			operation_ratio: self.operation_ratios.clone(),
+			operation_ratios: self.operation_ratios.clone(),
 			collator_ratio: self.collator_ratio,
 			min_liquidation_threshold: self.min_liquidation_threshold,
 			profit_distribution_cycle: self.profit_distribution_cycle,
