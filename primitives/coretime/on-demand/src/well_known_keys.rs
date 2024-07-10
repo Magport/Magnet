@@ -18,12 +18,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use cumulus_primitives_core::relay_chain::CoreIndex;
-use {
-	cumulus_primitives_core::ParaId,
-	sp_core::Encode,
-	sp_io::hashing::{twox_256, twox_64},
-	sp_std::vec::Vec,
-};
+use {sp_core::Encode, sp_io::hashing::twox_256, sp_std::vec::Vec};
 
 pub const SYSTEM_ACCOUNT: &[u8] =
 	&hex_literal::hex!["26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9"];
@@ -52,3 +47,7 @@ pub fn paras_core_descriptors(core_index: CoreIndex) -> Vec<u8> {
 		CORE_DESCRIPTORS.iter().chain(twox_256(core_index).iter()).cloned().collect()
 	})
 }
+
+// ParaScheduler AvailabilityCores
+pub const AVAILABILITY_CORES: &[u8] =
+	&hex_literal::hex!["94eadf0156a8ad5156507773d0471e4ab8ebad86f546c7e0b135a4212aace339"];

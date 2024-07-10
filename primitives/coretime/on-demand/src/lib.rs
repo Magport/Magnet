@@ -83,6 +83,34 @@ pub struct OrderRecord<AuthorityId> {
 	pub txs: Vec<H256>,
 }
 
+impl<AuthorityId> OrderRecord<AuthorityId> {
+	pub fn new(para_id: ParaId) -> OrderRecord<AuthorityId> {
+		OrderRecord {
+			relay_parent: None,
+			relay_height: 0,
+			relay_base: Default::default(),
+			relay_base_height: 0,
+			order_status: OrderStatus::Init,
+			validation_data: None,
+			para_id,
+			sequence_number: 0,
+			author_pub: None,
+			txs: vec![],
+		}
+	}
+	pub fn reset(&mut self) {
+		self.relay_parent = None;
+		self.relay_height = 0;
+		self.relay_base = Default::default();
+		self.relay_base_height = 0;
+		self.order_status = OrderStatus::Init;
+		self.validation_data = None;
+		self.sequence_number = 0;
+		self.author_pub = None;
+		self.txs = vec![];
+	}
+}
+
 sp_api::decl_runtime_apis! {
 	#[api_version(2)]
 	pub trait OrderRuntimeApi<Balance, AuthorityId> where

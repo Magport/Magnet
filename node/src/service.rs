@@ -243,13 +243,8 @@ async fn start_node_impl(
 	let client = params.client.clone();
 	let backend = params.backend.clone();
 	let mut task_manager = params.task_manager;
-	let mut rpc_address = String::from("ws://");
-	rpc_address.push_str(
-		&polkadot_config
-			.rpc_addr
-			.expect("Should set rpc address for submit order extrinic")
-			.to_string(),
-	);
+	let relay_rpc = polkadot_config.rpc_addr;
+
 	let (relay_chain_interface, collator_key) = build_relay_chain_interface(
 		polkadot_config,
 		&parachain_config,
@@ -464,19 +459,9 @@ async fn start_node_impl(
 		sync_service: sync_service.clone(),
 	})?;
 	if validator {
-		let order_record =
-			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
-				relay_parent: None,
-				relay_height: 0,
-				relay_base: Default::default(),
-				relay_base_height: 0,
-				order_status: OrderStatus::Init,
-				validation_data: None,
-				para_id,
-				sequence_number: 0,
-				author_pub: None,
-				txs: vec![],
-			}));
+		let order_record = Arc::new(Mutex::new(OrderRecord::<
+			sp_consensus_aura::sr25519::AuthorityId,
+		>::new(para_id)));
 		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
 			client.clone(),
 			para_id,
@@ -485,7 +470,7 @@ async fn start_node_impl(
 			&task_manager,
 			params.keystore_container.keystore(),
 			order_record.clone(),
-			rpc_address,
+			relay_rpc,
 		)?;
 		let bulk_mem_record =
 			Arc::new(Mutex::new(BulkMemRecord { coretime_para_height: 0, items: Vec::new() }));

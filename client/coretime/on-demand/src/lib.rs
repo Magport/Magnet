@@ -33,7 +33,6 @@ use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
 use mc_coretime_common::is_parathread;
 use metadata::{CoreAssignment, CoreDescriptor};
-use mp_coretime_common::well_known_keys::paras_para_lifecycles;
 use mp_coretime_on_demand::{
 	self,
 	well_known_keys::paras_core_descriptors,
@@ -43,7 +42,7 @@ use mp_coretime_on_demand::{
 use mp_system::OnRelayChainApi;
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
-use runtime_parachains::{configuration::HostConfiguration, paras::ParaLifecycle};
+use runtime_parachains::configuration::HostConfiguration;
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
 use sc_transaction_pool_api::{InPoolTransaction, MaintainedTransactionPool};
@@ -60,7 +59,7 @@ use sp_runtime::{
 	},
 	FixedPointNumber, FixedU128,
 };
-use std::cmp::Ordering;
+use std::{cmp::Ordering, net::SocketAddr};
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
 use submit_order::{build_rpc_for_submit_order, SubmitOrderError};
 
@@ -117,13 +116,15 @@ async fn start_on_demand(
 	para_id: ParaId,
 ) -> Option<bool> {
 	let active_config_storage = relay_chain.get_storage_by_key(hash, ACTIVE_CONFIG).await.ok()?;
+	// Get config
 	let p_active_config = active_config_storage
 		.map(|raw| <HostConfiguration<u32>>::decode(&mut &raw[..]))
 		.transpose()
 		.ok()?;
-	if p_active_config.is_some() {
+	if let Some(active_config) = p_active_config {
 		let mut result = false;
-		let cores = p_active_config.unwrap().coretime_cores;
+		// Get the number of cores.
+		let cores = active_config.coretime_cores;
 		for core in 0..cores {
 			let key = paras_core_descriptors(polkadot_primitives::CoreIndex(core));
 			let core_descriptors_storage =
@@ -132,14 +133,14 @@ async fn start_on_demand(
 				.map(|raw| <CoreDescriptor<u32>>::decode(&mut &raw[..]))
 				.transpose()
 				.ok()?;
-			if p_core_descriptors.is_some() {
-				let p_current_work = p_core_descriptors?.current_work;
-				if p_current_work.is_some() {
-					let current_work = p_current_work?;
+			if let Some(core_descriptors) = p_core_descriptors {
+				let p_current_work = core_descriptors.current_work;
+				if let Some(current_work) = p_current_work {
 					for (assign, _) in current_work.assignments {
 						if assign == CoreAssignment::Task(para_id.into()) {
-							return Some(false);
+							return Some(false); // para chain bulk mode.
 						} else if assign == CoreAssignment::Pool {
+							// find on demand core
 							result = true
 						}
 					}
@@ -148,7 +149,8 @@ async fn start_on_demand(
 		}
 		Some(result)
 	} else {
-		None
+		// get config failed
+		Some(false)
 	}
 }
 
@@ -286,7 +288,7 @@ where
 }
 
 /// The main processing logic of purchasing core.
-async fn handle_new_best_parachain_head<P, Block, PB, ExPool, Balance>(
+async fn handle_relaychain_stream<P, Block, PB, ExPool, Balance>(
 	validation_data: PersistedValidationData,
 	height: RelayBlockNumber,
 	parachain: &P,
@@ -319,19 +321,18 @@ where
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 {
 	let is_parathread = is_parathread(&relay_chain, p_hash, para_id).await?;
+
 	if !is_parathread {
-		//parachain mode
+		//parachain mode, clear all data.
 		let mut order_record_local = order_record.lock().await;
-		order_record_local.validation_data = None;
-		order_record_local.author_pub = None;
-		order_record_local.relay_parent = None;
+		order_record_local.reset();
 		return Ok(());
 	} else {
 		//parathread
 		let p_on_demand = start_on_demand(relay_chain.clone(), p_hash, para_id).await;
-		if p_on_demand.is_some() {
-			let on_demand = p_on_demand.unwrap();
+		if let Some(on_demand) = p_on_demand {
 			if !on_demand {
+				// bulk mode
 				return Ok(());
 			}
 		}
@@ -345,7 +346,7 @@ where
 		Ok(header) => header,
 		Err(err) => return Err(format!("get parachain head error:{:?}", err).into()),
 	};
-
+	// parachain hash
 	let hash = parachain_head.hash();
 	let authorities = parachain.runtime_api().authorities(hash).map_err(Box::new)?;
 	let slot_width = parachain.runtime_api().slot_width(hash)?;
@@ -548,7 +549,7 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 			h = new_best_heads.next() => {
 				match h {
 					Some((height, head, hash)) => {
-						let _ = handle_new_best_parachain_head::<_,_,PB,_,_>(head,height, &*parachain,keystore.clone(), relay_chain.clone(), hash, para_id, order_record.clone(),transaction_pool.clone(), url.clone()).await;
+						let _ = handle_relaychain_stream::<_,_,PB,_,_>(head,height, &*parachain,keystore.clone(), relay_chain.clone(), hash, para_id, order_record.clone(),transaction_pool.clone(), url.clone()).await;
 					},
 					None => {
 						return;
@@ -610,7 +611,7 @@ pub fn spawn_on_demand_order<T, R, ExPool, Block, PB, Balance>(
 	task_manager: &TaskManager,
 	keystore: KeystorePtr,
 	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
-	url: String,
+	relay_rpc: Option<SocketAddr>,
 ) -> sc_service::error::Result<()>
 where
 	Block: BlockT,
@@ -634,6 +635,9 @@ where
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
+	let mut url = String::from("ws://");
+	url.push_str(&relay_rpc.expect("Should set rpc address for submit order extrinic").to_string());
+
 	let on_demand_order_task = run_on_demand_task::<_, _, _, PB, _, _>(
 		para_id,
 		parachain.clone(),
