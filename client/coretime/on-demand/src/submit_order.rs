@@ -20,33 +20,20 @@
 //!
 
 use crate::metadata;
-use cumulus_primitives_core::{
-	relay_chain::BlockId, relay_chain::BlockNumber as RelayBlockNumber, ParaId,
-};
-use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
+use cumulus_primitives_core::ParaId;
 use sp_application_crypto::AppCrypto;
 use sp_core::ByteArray;
-use sp_core::H256;
 use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	traits::{IdentifyAccount, Verify},
 	MultiSignature as SpMultiSignature,
 };
-use subxt::client::OfflineClientT;
-use subxt::{
-	config::polkadot::PolkadotExtrinsicParamsBuilder as Params, tx::Signer, utils::MultiSignature,
-	Config, OnlineClient, PolkadotConfig,
-};
+use subxt::{tx::Signer, utils::MultiSignature, Config, OnlineClient, PolkadotConfig};
 
 #[derive(Debug)]
 pub enum SubmitOrderError {
-	RPCUrlError,
 	RPCConnectError,
 	RPCCallException,
-	NonceGetError,
-	StorageGetError,
-	GetBlockError,
-	GetHeadError,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -116,12 +103,7 @@ pub async fn build_rpc_for_submit_order(
 	url: &str,
 	para_id: ParaId,
 	max_amount: u128,
-	hash: H256,
 	keystore: KeystorePtr,
-	slot_block: u32,
-	height: RelayBlockNumber,
-	relay_chain: impl RelayChainInterface + Clone,
-	number: u32,
 ) -> Result<(), SubmitOrderError> {
 	let client = OnlineClient::<PolkadotConfig>::from_url(url)
 		.await
@@ -131,10 +113,8 @@ pub async fn build_rpc_for_submit_order(
 
 	let signer_keystore = SignerKeystore::<PolkadotConfig>::new(keystore.clone());
 
-	// let tx_params = Params::new().mortal_unchecked(number.into(), hash , slot_block.into()).build();
-
 	let submit_result = client.tx().sign_and_submit_default(&place_order, &signer_keystore).await;
-	log::info!("submit_result:{:?},{:?},{:?}", submit_result, height, hash);
+	log::info!("submit_result:{:?}", submit_result);
 	submit_result.map_err(|_e| SubmitOrderError::RPCCallException)?;
 
 	Ok(())

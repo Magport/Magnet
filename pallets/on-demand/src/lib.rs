@@ -27,9 +27,7 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 use codec::{Decode, MaxEncodedLen};
-use cumulus_pallet_parachain_system::{
-	relay_state_snapshot::Error as Relay_Error, RelayChainStateProof,
-};
+use cumulus_pallet_parachain_system::RelayChainStateProof;
 use frame_support::{
 	dispatch::DispatchResultWithPostInfo, dispatch::PostDispatchInfo, pallet_prelude::*,
 	traits::Currency,
@@ -39,6 +37,7 @@ use frame_system::{self, EventRecord};
 use mp_coretime_on_demand::{
 	metadata::{BalancesEvent, OnDemandEvent, RelaychainRuntimeEvent},
 	well_known_keys::SYSTEM_EVENTS,
+	MyEventRecord,
 };
 pub use pallet::*;
 use primitives::Balance;
@@ -342,63 +341,66 @@ impl<T: Config> Pallet<T> {
 		let relay_storage_rooted_proof =
 			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
 				.expect("Invalid relay chain state proof");
-		let head_data = relay_storage_rooted_proof
-			.read_entry::<Vec<Box<EventRecord<RelaychainRuntimeEvent, T::Hash>>>>(
-				SYSTEM_EVENTS,
-				None,
-			)
-			.ok()?;
-		let v_price: Vec<u128> = head_data
-			.iter()
-			.filter_map(|item| {
-				if let RelaychainRuntimeEvent::OnDemandAssignmentProvider(
-					OnDemandEvent::OnDemandOrderPlaced { para_id: pid, spot_price: sprice },
-				) = &item.event
-				{
-					if pid.encode() == para_id.encode() {
-						Some(*sprice)
-					} else {
-						None
-					}
-				} else {
-					None
-				}
-			})
-			.collect();
-		let orderer: Vec<(T::AuthorityId, u128)> = v_price
-			.iter()
-			.filter_map(|item| {
-				let mut orderer = None;
-				let _: Vec<_> = head_data
-					.iter()
-					.filter_map(|event| {
-						if let RelaychainRuntimeEvent::Balances(BalancesEvent::Withdraw {
-							who: ref order,
-							amount: eprice,
-						}) = event.event
-						{
-							if eprice == *item {
-								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
-									Ok(order) => Some((order, eprice)),
-									Err(_) => None,
-								};
-								Some(())
-							} else {
-								None
-							}
-						} else {
-							None
-						}
-					})
-					.collect();
-				orderer
-			})
-			.collect();
-		if orderer.len() > 0 {
-			Some(orderer[0].clone())
-		} else {
-			None
+		let r_head_data = relay_storage_rooted_proof.read_entry::<Vec<
+			Box<MyEventRecord<RelaychainRuntimeEvent, T::Hash>>,
+		>>(SYSTEM_EVENTS, None);
+		log::info!("head_data:{:?}", r_head_data);
+		let head_data = r_head_data.ok()?;
+		for hdata in head_data.iter() {
+			log::info!("hdata:{:?}", hdata);
 		}
+		// let v_price: Vec<u128> = head_data
+		// 	.iter()
+		// 	.filter_map(|item| {
+		// 		if let RelaychainRuntimeEvent::OnDemandAssignmentProvider(
+		// 			OnDemandEvent::OnDemandOrderPlaced { para_id: pid, spot_price: sprice },
+		// 		) = &item.event
+		// 		{
+		// 			if pid.encode() == para_id.encode() {
+		// 				Some(*sprice)
+		// 			} else {
+		// 				None
+		// 			}
+		// 		} else {
+		// 			None
+		// 		}
+		// 	})
+		// 	.collect();
+		// let orderer: Vec<(T::AuthorityId, u128)> = v_price
+		// 	.iter()
+		// 	.filter_map(|item| {
+		// 		let mut orderer = None;
+		// 		let _: Vec<_> = head_data
+		// 			.iter()
+		// 			.filter_map(|event| {
+		// 				if let RelaychainRuntimeEvent::Balances(BalancesEvent::Withdraw {
+		// 					who: ref order,
+		// 					amount: eprice,
+		// 				}) = event.event
+		// 				{
+		// 					if eprice == *item {
+		// 						orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
+		// 							Ok(order) => Some((order, eprice)),
+		// 							Err(_) => None,
+		// 						};
+		// 						Some(())
+		// 					} else {
+		// 						None
+		// 					}
+		// 				} else {
+		// 					None
+		// 				}
+		// 			})
+		// 			.collect();
+		// 		orderer
+		// 	})
+		// 	.collect();
+		// if orderer.len() > 0 {
+		// 	Some(orderer[0].clone())
+		// } else {
+		// 	None
+		// }
+		None
 	}
 
 	/// Check whether the account is in the validation of relaychain.

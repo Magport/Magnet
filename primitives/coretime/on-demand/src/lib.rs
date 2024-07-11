@@ -65,16 +65,10 @@ pub struct OrderRecord<AuthorityId> {
 	pub relay_parent: Option<PHash>,
 	/// Relaychain block height.
 	pub relay_height: RelayBlockNumber,
-	/// Hash of relaychain block,block number is special.
-	pub relay_base: PHash,
-	/// Relaychain block height,block number is special.
-	pub relay_base_height: RelayBlockNumber,
 	/// Order status
 	pub order_status: OrderStatus,
 	/// Validation data.
 	pub validation_data: Option<PersistedValidationData>,
-	/// Parachain ID.
-	pub para_id: ParaId,
 	/// Sequence number of order.
 	pub sequence_number: u64,
 	/// Author of order.
@@ -84,15 +78,12 @@ pub struct OrderRecord<AuthorityId> {
 }
 
 impl<AuthorityId> OrderRecord<AuthorityId> {
-	pub fn new(para_id: ParaId) -> OrderRecord<AuthorityId> {
+	pub fn new() -> OrderRecord<AuthorityId> {
 		OrderRecord {
 			relay_parent: None,
 			relay_height: 0,
-			relay_base: Default::default(),
-			relay_base_height: 0,
 			order_status: OrderStatus::Init,
 			validation_data: None,
-			para_id,
 			sequence_number: 0,
 			author_pub: None,
 			txs: Vec::new(),
@@ -101,8 +92,6 @@ impl<AuthorityId> OrderRecord<AuthorityId> {
 	pub fn reset(&mut self) {
 		self.relay_parent = None;
 		self.relay_height = 0;
-		self.relay_base = Default::default();
-		self.relay_base_height = 0;
 		self.order_status = OrderStatus::Init;
 		self.validation_data = None;
 		self.sequence_number = 0;
@@ -135,5 +124,49 @@ sp_api::decl_runtime_apis! {
 		fn reach_txpool_threshold(gas_balance:Balance, core_price:Balance) -> bool;
 
 		fn order_executed(sequence_number:u64) -> bool ;
+	}
+}
+
+use crate::metadata::MyPhase as Phase;
+use crate::metadata::OnDemandEvent;
+use crate::metadata::RelaychainRuntimeEvent;
+use codec::Error;
+use codec::Input;
+use frame_support::dispatch::Parameter;
+use sp_runtime::traits::Member;
+#[derive(Encode, TypeInfo, Debug)]
+pub struct MyEventRecord<E: Parameter + Member + Default, T> {
+	/// The phase of the block it happened in.
+	pub phase: Phase,
+	/// The event itself.
+	pub event: E,
+	/// The list of the topics this event has.
+	pub topics: Vec<T>,
+}
+
+impl<E: Parameter + Member + Default, T: Decode> Decode for MyEventRecord<E, T> {
+	fn decode<I: Input>(input: &mut I) -> Result<Self, Error> {
+		log::info!("==============begin===============");
+		let p_phase = Phase::decode(input);
+		let phase = if let Ok(phase) = p_phase {
+			log::info!("=============================phase:{:?}", phase);
+			phase
+		} else {
+			Default::default()
+		};
+		let p_event = E::decode(input);
+		let t_event = if let Ok(event) = p_event {
+			log::info!("=============================type_info:{:?}", event);
+			event
+		} else {
+			E::default()
+		};
+
+		let p_topics = Vec::<T>::decode(input);
+		let topics = if let Ok(topics) = p_topics { topics } else { Vec::new() };
+		log::info!("==============end===============");
+		// Add your custom logic here if needed
+
+		Ok(MyEventRecord { phase, event: t_event, topics })
 	}
 }

@@ -28,7 +28,8 @@ sp-std = { workspace = true, default-features = false }
 sp-weights = { workspace = true, default-features = false }
 sp-session = { workspace = true, default-features = false }
 sp-consensus-grandpa = { workspace = true, default-features = false }
-
+frame-support = { workspace = true, default-features = false }
+frame-system = { workspace = true, default-features = false }
 [features]
 default = [ "std" ]
 std = [
@@ -49,4 +50,6 @@ std = [
 	"sp-weights/std",
 	"sp-session/std",
 	"sp-consensus-grandpa/std",
+	"frame-support/std",
+	"frame-system/std",
 ]

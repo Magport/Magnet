@@ -54,10 +54,8 @@ use mc_coretime_bulk::spawn_bulk_task;
 use mc_coretime_on_demand::spawn_on_demand_order;
 use mp_coretime_bulk::BulkMemRecord;
 use mp_coretime_bulk::BulkStatus;
-use mp_coretime_on_demand::{OrderRecord, OrderStatus};
-use sp_core::ByteArray;
-use sp_runtime::AccountId32;
-use sp_trie::StorageProof;
+use mp_coretime_on_demand::OrderRecord;
+
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 
@@ -459,9 +457,8 @@ async fn start_node_impl(
 		sync_service: sync_service.clone(),
 	})?;
 	if validator {
-		let order_record = Arc::new(Mutex::new(OrderRecord::<
-			sp_consensus_aura::sr25519::AuthorityId,
-		>::new(para_id)));
+		let order_record =
+			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId>::new()));
 		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
 			client.clone(),
 			para_id,
@@ -630,7 +627,7 @@ fn start_consensus(
 						"Failed to create bulk inherent",
 					)
 				})?;
-				let parent_hash = relay_chain_interface.best_block_hash().await?;
+				let parent_hash = relay_chain_interface.finalized_block_hash().await?;
 				let (relay_parent, validation_data, sequence_number, author_pub) = {
 					let order_record_local = order_record_clone.lock().await;
 					if order_record_local.validation_data.is_none() {
