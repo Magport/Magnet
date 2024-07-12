@@ -344,13 +344,3 @@ impl<T: Config> Pallet<T> {
 		relay_chain_state.number
 	}
 }
-
-pub trait BulkGasCost<T: frame_system::Config> {
-	/// In Bulk mode, the average gas consumed by a block.
-	///
-	/// Parameters:
-	/// - `block_number`: The block number of para chain.
-	fn gas_cost(
-		block_number: BlockNumberFor<T>,
-	) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
-}

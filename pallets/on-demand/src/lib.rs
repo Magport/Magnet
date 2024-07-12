@@ -35,9 +35,8 @@ use frame_support::{
 use frame_system::pallet_prelude::*;
 use frame_system::{self, EventRecord};
 use mp_coretime_on_demand::{
-	metadata::{BalancesEvent, OnDemandEvent, RelaychainRuntimeEvent},
+	metadata::api::{runtime_types, runtime_types::rococo_runtime as polakdot_runtime},
 	well_known_keys::SYSTEM_EVENTS,
-	MyEventRecord,
 };
 pub use pallet::*;
 use primitives::Balance;
@@ -77,7 +76,6 @@ pub struct Order<AuthorityId> {
 }
 #[frame_support::pallet]
 pub mod pallet {
-	use sp_runtime::Percent;
 
 	use super::*;
 
@@ -295,31 +293,52 @@ pub mod pallet {
 		}
 
 		/// Order pallet parameter settings.
+		/// Set slot width
 		/// It can only be called by accounts with sudo privileges or authorized organization members.
 		///
 		/// Parameters:
 		/// - `slot_width`: The order interval is 2^slotwidth..
-		/// - `order_max_amount`: The maximum price the user is willing to pay when placing an order.
-		/// - `tx_pool_threshold`: Gas threshold that triggers order placement.
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::set_parameter(*slot_width))]
-		pub fn set_parameter(
+		#[pallet::weight(0)]
+		pub fn set_slot_width(origin: OriginFor<T>, slot_width: u32) -> DispatchResultWithPostInfo {
+			T::UpdateOrigin::ensure_origin(origin)?;
+
+			<SlotWidth<T>>::put(slot_width);
+			Ok(().into())
+		}
+
+		/// Order pallet parameter settings.
+		/// Set price limit
+		/// It can only be called by accounts with sudo privileges or authorized organization members.
+		///
+		/// Parameters:
+		/// - `price_limit`: The maximum price the user is willing to pay when placing an order.
+		#[pallet::call_index(2)]
+		#[pallet::weight(0)]
+		pub fn set_price_limit(
 			origin: OriginFor<T>,
-			slot_width: Option<u32>,
-			order_max_amount: Option<BalanceOf<T>>,
-			tx_pool_threshold: Option<Perbill>,
+			price_limit: BalanceOf<T>,
 		) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 
-			if let Some(t_slot_width) = slot_width {
-				<SlotWidth<T>>::put(t_slot_width);
-			}
-			if let Some(t_order_max_amount) = order_max_amount {
-				<OrderMaxAmount<T>>::put(t_order_max_amount);
-			}
-			if let Some(t_tx_pool_threshold) = tx_pool_threshold {
-				<TxPoolThreshold<T>>::put(t_tx_pool_threshold);
-			}
+			<OrderMaxAmount<T>>::put(price_limit);
+			Ok(().into())
+		}
+		/// Order pallet parameter settings.
+		/// Set gas threshold
+		/// It can only be called by accounts with sudo privileges or authorized organization members.
+		///
+		/// Parameters:
+		/// - `threshold`: Gas threshold that triggers order placement.
+		#[pallet::call_index(3)]
+		#[pallet::weight(0)]
+		pub fn set_gas_threshold(
+			origin: OriginFor<T>,
+			threshold: Perbill,
+		) -> DispatchResultWithPostInfo {
+			T::UpdateOrigin::ensure_origin(origin)?;
+
+			<TxPoolThreshold<T>>::put(threshold);
 			Ok(().into())
 		}
 	}
@@ -341,66 +360,67 @@ impl<T: Config> Pallet<T> {
 		let relay_storage_rooted_proof =
 			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
 				.expect("Invalid relay chain state proof");
-		let r_head_data = relay_storage_rooted_proof.read_entry::<Vec<
-			Box<MyEventRecord<RelaychainRuntimeEvent, T::Hash>>,
-		>>(SYSTEM_EVENTS, None);
-		log::info!("head_data:{:?}", r_head_data);
-		let head_data = r_head_data.ok()?;
-		for hdata in head_data.iter() {
-			log::info!("hdata:{:?}", hdata);
+		let head_data = relay_storage_rooted_proof
+			.read_entry::<Vec<Box<EventRecord<polakdot_runtime::RuntimeEvent, T::Hash>>>>(
+				SYSTEM_EVENTS,
+				None,
+			)
+			.ok()?;
+		let v_price: Vec<u128> = head_data
+			.iter()
+			.filter_map(|item| {
+				if let polakdot_runtime::RuntimeEvent::OnDemandAssignmentProvider(
+					runtime_types::polkadot_runtime_parachains::assigner_on_demand::pallet::Event::OnDemandOrderPlaced{
+							para_id: pid,
+							spot_price: sprice,
+						}) = &item.event
+				{
+					if pid.encode() == para_id.encode() {
+						Some(*sprice)
+					} else {
+						None
+					}
+				} else {
+					None
+				}
+			})
+			.collect();
+		let orderer: Vec<(T::AuthorityId, u128)> = v_price
+			.iter()
+			.filter_map(|item| {
+				let mut orderer = None;
+				let _: Vec<_> = head_data
+					.iter()
+					.filter_map(|event| {
+						if let polakdot_runtime::RuntimeEvent::Balances(
+							runtime_types::pallet_balances::pallet::Event::Withdraw {
+								who: ref order,
+								amount: eprice,
+							},
+						) = event.event
+						{
+							if eprice == *item {
+								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
+									Ok(order) => Some((order, eprice)),
+									Err(_) => None,
+								};
+								Some(())
+							} else {
+								None
+							}
+						} else {
+							None
+						}
+					})
+					.collect();
+				orderer
+			})
+			.collect();
+		if orderer.len() > 0 {
+			Some(orderer[0].clone())
+		} else {
+			None
 		}
-		// let v_price: Vec<u128> = head_data
-		// 	.iter()
-		// 	.filter_map(|item| {
-		// 		if let RelaychainRuntimeEvent::OnDemandAssignmentProvider(
-		// 			OnDemandEvent::OnDemandOrderPlaced { para_id: pid, spot_price: sprice },
-		// 		) = &item.event
-		// 		{
-		// 			if pid.encode() == para_id.encode() {
-		// 				Some(*sprice)
-		// 			} else {
-		// 				None
-		// 			}
-		// 		} else {
-		// 			None
-		// 		}
-		// 	})
-		// 	.collect();
-		// let orderer: Vec<(T::AuthorityId, u128)> = v_price
-		// 	.iter()
-		// 	.filter_map(|item| {
-		// 		let mut orderer = None;
-		// 		let _: Vec<_> = head_data
-		// 			.iter()
-		// 			.filter_map(|event| {
-		// 				if let RelaychainRuntimeEvent::Balances(BalancesEvent::Withdraw {
-		// 					who: ref order,
-		// 					amount: eprice,
-		// 				}) = event.event
-		// 				{
-		// 					if eprice == *item {
-		// 						orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
-		// 							Ok(order) => Some((order, eprice)),
-		// 							Err(_) => None,
-		// 						};
-		// 						Some(())
-		// 					} else {
-		// 						None
-		// 					}
-		// 				} else {
-		// 					None
-		// 				}
-		// 			})
-		// 			.collect();
-		// 		orderer
-		// 	})
-		// 	.collect();
-		// if orderer.len() > 0 {
-		// 	Some(orderer[0].clone())
-		// } else {
-		// 	None
-		// }
-		None
 	}
 
 	/// Check whether the account is in the validation of relaychain.

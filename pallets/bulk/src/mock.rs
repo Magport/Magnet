@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{self as bulk_pallet, BulkGasCost};
+use crate::{self as bulk_pallet};
 use cumulus_pallet_parachain_system::{RelayChainState, RelaychainStateProvider};
 pub use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
@@ -134,6 +134,16 @@ impl crate::Config for Test {
 	type WeightInfo = ();
 }
 pub struct BulkGasCostHandler();
+
+pub trait BulkGasCost<T: frame_system::Config> {
+	/// In Bulk mode, the average gas consumed by a block.
+	///
+	/// Parameters:
+	/// - `block_number`: The block number of para chain.
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError>;
+}
 
 impl<T> BulkGasCost<T> for BulkGasCostHandler
 where

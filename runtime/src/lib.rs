@@ -90,8 +90,8 @@ use sp_runtime::SaturatedConversion;
 use weights::{BlockExecutionWeight, ExtrinsicBaseWeight};
 // XCM Imports
 use cumulus_primitives_core::{AggregateMessageOrigin, ParaId, PersistedValidationData};
-pub use pallet_bulk::{self, BulkGasCost};
-use pallet_liquidation::OrderGasCost;
+pub use pallet_bulk;
+use pallet_liquidation::{BulkGasCost, OrderGasCost};
 pub use pallet_on_demand;
 use xcm::latest::prelude::{
 	Asset as MultiAsset, BodyId, InteriorLocation as InteriorMultiLocation,
@@ -1013,7 +1013,7 @@ impl pallet_liquidation::Config for Runtime {
 	type Currency = Balances;
 	type XcmSender = xcm_config::XcmRouter;
 	type WeightToFee = WeightToFee;
-	type OrderGasCost = ();
+	type OrderGasCost = OrderGasCostHandler;
 	type ExistentialDeposit = ExistDeposit;
 	type SystemAccountName = SystemAccountName;
 	type TreasuryAccountName = TreasuryAccountName;
