@@ -225,7 +225,7 @@ where
 	if !is_place_order {
 		//check is need force bid coretime
 		let force_bid = parachain.runtime_api().on_relaychain(block_hash, height).ok()?;
-		if all_gas_value.cmp(&Balance::from(0u32)) == Ordering::Greater && force_bid == 1 {
+		if all_gas_value.cmp(&Balance::from(0u32)) == Ordering::Greater && force_bid {
 			is_place_order = true;
 			order_type = OrderType::Force;
 		}

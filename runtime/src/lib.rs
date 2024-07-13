@@ -983,10 +983,7 @@ parameter_types! {
 
 impl pallet_assurance::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type SystemPotName = SystemPotName;
-	type Liquidate = ();
 	type DefaultBidThreshold = ConstU32<8>;
-	type DefaultLiquidateThreshold = ConstU128<0>;
 }
 
 impl pallet_utility::Config for Runtime {
@@ -1719,7 +1716,7 @@ impl_runtime_apis! {
 	}
 
 	impl mp_system::OnRelayChainApi<Block> for Runtime {
-		fn on_relaychain(block_number: u32) -> i32 {
+		fn on_relaychain(block_number: u32) -> bool {
 			Assurance::on_relaychain(block_number)
 		}
 	}

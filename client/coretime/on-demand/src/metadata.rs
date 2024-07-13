@@ -181,7 +181,7 @@ impl ::subxt::blocks::StaticExtrinsic for PlaceOrderKeepAlive {
 	const CALL: &'static str = "place_order_keep_alive";
 }
 
-#[warn(dead_code)]
+#[allow(dead_code)]
 pub fn place_order_keep_alive(
 	max_amount: u128,
 	para_id: Id,
