@@ -12,7 +12,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub use crate as assets_bridge;
-pub use assets_bridge::{Config, Error, Event as AssetsBridgeEvent};
+pub use assets_bridge::{Error, Event as AssetsBridgeEvent};
 
 use frame_support::{
 	derive_impl,
@@ -25,7 +25,6 @@ use frame_system::EnsureSigned;
 
 use sp_core::{H160, H256};
 pub use sp_runtime::{
-	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 	AccountId32, BuildStorage,
 };
@@ -127,7 +126,6 @@ parameter_types! {
 	// 0x1111111111111111111111111111111111111111
 	pub EvmCaller: H160 = H160::from_slice(&[17u8;20][..]);
 	pub ClaimBond: u128 = 2;
-
 	pub const WeightPerGas: Weight = Weight::from_parts(20_000, 0);
 
 	pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE);
