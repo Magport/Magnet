@@ -1,12 +1,14 @@
 
 ## What is the MAGNET?
 
-
-**MAGNET serves as Polkadot's Smart Contract Docking Station, operating on the PAYG Model. It is in the process of developing a scalable smart contract platform, utilizing DOT as the gas fee within this model.**
+**Magnet has evolved! Our project now contains two parts, Magnet Network and Magnet Stack.**
 
 🔎 For more about Magnet Network, head to our [website](https://magnet.magport.io/)<br>
 📢 Follow our latest updates on [Twitter](https://twitter.com/Magnet20239)<br>
+
 🤝 Engage with fellow developers on our [Telegram server](https://t.me/+aep298N0KXUwZTM1)<br>
+
+**MAGNET serves as Polkadot's Smart Contract Docking Station, operating on the PAYG Model. It is in the process of developing a scalable smart contract platform, utilizing DOT as the gas fee within this model.**
 
 ### Business Model Introduction
 
