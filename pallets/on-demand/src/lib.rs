@@ -26,7 +26,7 @@
 //! whether the order has been executed, whether the order threshold has been reached, etc.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-use codec::{Decode, MaxEncodedLen};
+use codec::{Decode, EncodeLike, MaxEncodedLen};
 use cumulus_pallet_parachain_system::RelayChainStateProof;
 use frame_support::{
 	dispatch::DispatchResultWithPostInfo, dispatch::PostDispatchInfo, pallet_prelude::*,
@@ -34,28 +34,31 @@ use frame_support::{
 };
 use frame_system::pallet_prelude::*;
 use frame_system::{self, EventRecord};
-use mp_coretime_on_demand::{
-	metadata::api::{runtime_types, runtime_types::rococo_runtime as polakdot_runtime},
-	well_known_keys::SYSTEM_EVENTS,
-};
 pub use pallet::*;
 use primitives::Balance;
 use primitives::{Id as ParaId, PersistedValidationData};
 use sp_runtime::sp_std::{prelude::*, vec};
 use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
+use cumulus_pallet_parachain_system::RelaychainStateProvider;
+use frame_system::AccountInfo;
+use mp_coretime_on_demand::well_known_keys::{acount_balance, EnqueuedOrder, ON_DEMAND_QUEUE};
+use pallet_balances::AccountData;
 use sp_core::crypto::ByteArray;
+use sp_core::crypto::UncheckedFrom;
+use sp_runtime::traits::AccountIdConversion;
 use sp_runtime::Perbill;
+use sp_runtime::{self, AccountId32};
 use weights::WeightInfo;
+
 #[cfg(test)]
 mod mock;
 
 #[cfg(test)]
 mod tests;
 
-#[cfg(any(test, feature = "runtime-benchmarks"))]
+#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
-mod proof_data;
 
 type BalanceOf<T> =
 	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -65,14 +68,14 @@ type BalanceOf<T> =
 pub struct Order<AuthorityId> {
 	/// The number used to record the order, incremented each time.
 	pub sequence_number: u64,
-	// relaychain_block_hash:Hash,
-	// relaychain_block_height:u32,
+	/// The height of the relay chain block that created the record.
+	pub relay_chian_height: u32,
+	/// The height of the relay chain block that place this order.
+	pub place_order_height: u32,
 	/// Account for placing order.
 	pub orderer: AuthorityId,
 	/// Order price.
 	pub price: Balance,
-	/// Whether the order was executed.
-	pub executed: bool,
 }
 #[frame_support::pallet]
 pub mod pallet {
@@ -81,7 +84,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config {
+	pub trait Config: frame_system::Config + pallet_aura::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -92,11 +95,14 @@ pub mod pallet {
 			+ RuntimeAppPublic
 			+ MaybeSerializeDeserialize
 			+ MaxEncodedLen
-			+ for<'a> TryFrom<&'a [u8]>;
+			+ UncheckedFrom<[u8; 32]>;
+		// + for<'a> TryFrom<&'a [u8]>;
 
 		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		type WeightInfo: WeightInfo;
+
+		type RelayChainStateProvider: cumulus_pallet_parachain_system::RelaychainStateProvider;
 	}
 
 	#[pallet::pallet]
@@ -107,11 +113,6 @@ pub mod pallet {
 	#[pallet::getter(fn sequence_number)]
 	pub type SequenceNumber<T> = StorageValue<_, u64, ValueQuery>;
 
-	/// Record the relaychain block height of the latest order
-	#[pallet::storage]
-	#[pallet::getter(fn current_relay_height)]
-	pub type CurrentRelayHeight<T> = StorageValue<_, u32, ValueQuery>;
-
 	/// The order interval is 2^slotwidth.
 	#[pallet::storage]
 	#[pallet::getter(fn slot_width)]
@@ -119,19 +120,19 @@ pub mod pallet {
 
 	/// The maximum price the user is willing to pay when placing an order.
 	#[pallet::storage]
-	#[pallet::getter(fn order_max_amount)]
-	pub(super) type OrderMaxAmount<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
+	#[pallet::getter(fn price_limit)]
+	pub(super) type PriceLimit<T: Config> = StorageValue<_, BalanceOf<T>, ValueQuery>;
 
 	/// Gas threshold that triggers order placement.
 	#[pallet::storage]
-	#[pallet::getter(fn txpool_threshold)]
-	pub(super) type TxPoolThreshold<T: Config> = StorageValue<_, Perbill, ValueQuery>;
+	#[pallet::getter(fn gas_threshold)]
+	pub(super) type GasThreshold<T: Config> = StorageValue<_, Perbill, ValueQuery>;
 
 	/// Order Information Map.
 	#[pallet::storage]
 	#[pallet::getter(fn order_map)]
 	pub type OrderMap<T: Config> =
-		StorageMap<_, Twox64Concat, u64, Order<T::AuthorityId>, OptionQuery>;
+		StorageMap<_, Twox64Concat, u64, Order<<T as pallet::Config>::AuthorityId>, OptionQuery>;
 
 	/// Convert block height to sequence number.
 	#[pallet::storage]
@@ -144,15 +145,15 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		pub slot_width: u32,
 		pub price_limit: BalanceOf<T>,
-		pub price_threshold: Perbill,
+		pub gas_threshold: Perbill,
 	}
 
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			SlotWidth::<T>::put(&self.slot_width);
-			OrderMaxAmount::<T>::put(&self.price_limit);
-			TxPoolThreshold::<T>::put(&self.price_threshold);
+			PriceLimit::<T>::put(&self.price_limit);
+			GasThreshold::<T>::put(&self.gas_threshold);
 		}
 	}
 
@@ -160,7 +161,7 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Create order event.
-		OrderCreate { sequence_number: u64, orderer: T::AuthorityId },
+		OrderCreate { sequence_number: u64, orderer: <T as pallet::Config>::AuthorityId },
 	}
 
 	#[pallet::error]
@@ -175,36 +176,14 @@ pub mod pallet {
 		InvalidValidation,
 		/// Incorrect sequence number
 		WrongSequenceNumber,
+		/// Create root proof failed.
+		FailedCreateProof,
+		/// Slot author incorrect
+		SlotAuthorError,
 	}
 
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		/// Called at the end of each block to check whether an order has been placed.
-		/// If so, modify the execution status and increase the sequencer number.
-		fn on_finalize(block_number: BlockNumberFor<T>) {
-			let old_sequence_number = SequenceNumber::<T>::get();
-			let order = OrderMap::<T>::get(old_sequence_number);
-			if let Some(t_order) = order {
-				let orderer = t_order.orderer;
-				OrderMap::<T>::remove(old_sequence_number);
-				OrderMap::<T>::insert(
-					old_sequence_number,
-					Order::<T::AuthorityId> {
-						sequence_number: old_sequence_number,
-						orderer: orderer.clone(),
-						price: t_order.price,
-						executed: true,
-					},
-				);
-				SequenceNumber::<T>::set(old_sequence_number + 1);
-				Block2Sequence::<T>::insert(block_number, old_sequence_number);
-				Self::deposit_event(Event::OrderCreate {
-					sequence_number: old_sequence_number,
-					orderer,
-				});
-			}
-		}
-	}
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 	#[pallet::inherent]
 	impl<T: Config> ProvideInherent for Pallet<T> {
@@ -213,15 +192,15 @@ pub mod pallet {
 
 		const INHERENT_IDENTIFIER: InherentIdentifier = mp_coretime_on_demand::INHERENT_IDENTIFIER;
 		fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-			let data: mp_coretime_on_demand::OrderInherentData<T::AuthorityId> = data
-				.get_data(&mp_coretime_on_demand::INHERENT_IDENTIFIER)
-				.ok()
-				.flatten()
-				.expect("there is not data to be posted; qed");
-			if data.validation_data.is_some() {
-				Some(Call::create_order { data })
-			} else {
+			let data: mp_coretime_on_demand::OrderInherentData<<T as pallet::Config>::AuthorityId> =
+				data.get_data(&mp_coretime_on_demand::INHERENT_IDENTIFIER)
+					.ok()
+					.flatten()
+					.expect("there is not data to be posted; qed");
+			if data.author_pub.is_none() {
 				None
+			} else {
+				Some(Call::create_order { data })
 			}
 		}
 		fn is_inherent(call: &Self::Call) -> bool {
@@ -238,57 +217,49 @@ pub mod pallet {
 		/// Parameters:
 		/// - `data`: The inherent data.
 		#[pallet::call_index(0)]
-		#[pallet::weight((0, DispatchClass::Mandatory))]
+		#[pallet::weight((<T as pallet::Config>::WeightInfo::create_order(), DispatchClass::Mandatory))]
 		pub fn create_order(
 			origin: OriginFor<T>,
-			data: mp_coretime_on_demand::OrderInherentData<T::AuthorityId>,
+			data: mp_coretime_on_demand::OrderInherentData<<T as pallet::Config>::AuthorityId>,
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
 
 			let mp_coretime_on_demand::OrderInherentData {
-				relay_storage_proof,
-				validation_data,
-				sequence_number,
-				para_id,
+				relay_chian_number: place_order_height,
 				author_pub,
+				price,
 			} = data;
-			let total_weight = match validation_data {
-				Some(validation_data) => {
-					let (_, price) = Self::check_order_proof(
-						relay_storage_proof,
-						validation_data.clone(),
-						author_pub.clone(),
-						para_id,
-					)
-					.ok_or(Error::<T>::CreateOrderFail)?;
-					let old_sequence_number = SequenceNumber::<T>::get();
-					let order = OrderMap::<T>::get(old_sequence_number);
-					if sequence_number != old_sequence_number {
-						// In the worst-case scenario, if there are multiple orders at the same
-						// time,  it may be due to system issues or it may be due to human
-						// intervention.   Currently, we only support running one order at the same
-						// time Err(Error::<T>::WrongSequenceNumber)?;
-						// Continuing to produce blocks, recording errors
-						log::info!("========WrongSequenceNumber:{:?}========", sequence_number);
-					}
-					if order.is_none() {
-						OrderMap::<T>::insert(
-							old_sequence_number,
-							Order::<T::AuthorityId> {
-								sequence_number: old_sequence_number,
-								orderer: author_pub.unwrap(),
-								price,
-								executed: false,
-							},
-						);
-						CurrentRelayHeight::<T>::set(validation_data.relay_parent_number);
-					} else {
-						Err(Error::<T>::OrderExist)?;
-					}
-					T::DbWeight::get().reads_writes(2, 1)
-				},
-				None => T::DbWeight::get().reads_writes(0, 0),
-			};
+			let old_sequence_number = SequenceNumber::<T>::get();
+			let order = OrderMap::<T>::get(old_sequence_number);
+			// relay chian block number
+			let relay_chian_height = T::RelayChainStateProvider::current_relay_chain_state().number;
+			let block_number = frame_system::Pallet::<T>::block_number();
+			let orderer = author_pub.expect("author must exist");
+			// Check if the order is in author slot
+			if !Self::check_slot_author(place_order_height, orderer.clone()) {
+				Err(Error::<T>::SlotAuthorError)?;
+			}
+			if order.is_none() {
+				OrderMap::<T>::insert(
+					old_sequence_number,
+					Order::<<T as pallet::Config>::AuthorityId> {
+						sequence_number: old_sequence_number,
+						relay_chian_height,
+						place_order_height,
+						orderer: orderer.clone(),
+						price,
+					},
+				);
+				SequenceNumber::<T>::set(old_sequence_number + 1);
+				Block2Sequence::<T>::insert(block_number, old_sequence_number);
+				Self::deposit_event(Event::OrderCreate {
+					sequence_number: old_sequence_number,
+					orderer,
+				});
+			} else {
+				Err(Error::<T>::OrderExist)?;
+			}
+			let total_weight = T::DbWeight::get().reads_writes(2, 1);
 			Ok(PostDispatchInfo { actual_weight: Some(total_weight), pays_fee: Pays::No })
 		}
 
@@ -299,7 +270,7 @@ pub mod pallet {
 		/// Parameters:
 		/// - `slot_width`: The order interval is 2^slotwidth..
 		#[pallet::call_index(1)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_slot_width())]
 		pub fn set_slot_width(origin: OriginFor<T>, slot_width: u32) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 
@@ -314,14 +285,14 @@ pub mod pallet {
 		/// Parameters:
 		/// - `price_limit`: The maximum price the user is willing to pay when placing an order.
 		#[pallet::call_index(2)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_price_limit())]
 		pub fn set_price_limit(
 			origin: OriginFor<T>,
 			price_limit: BalanceOf<T>,
 		) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 
-			<OrderMaxAmount<T>>::put(price_limit);
+			<PriceLimit<T>>::put(price_limit);
 			Ok(().into())
 		}
 		/// Order pallet parameter settings.
@@ -331,160 +302,48 @@ pub mod pallet {
 		/// Parameters:
 		/// - `threshold`: Gas threshold that triggers order placement.
 		#[pallet::call_index(3)]
-		#[pallet::weight(0)]
+		#[pallet::weight(<T as pallet::Config>::WeightInfo::set_gas_threshold())]
 		pub fn set_gas_threshold(
 			origin: OriginFor<T>,
 			threshold: Perbill,
 		) -> DispatchResultWithPostInfo {
 			T::UpdateOrigin::ensure_origin(origin)?;
 
-			<TxPoolThreshold<T>>::put(threshold);
+			<GasThreshold<T>>::put(threshold);
 			Ok(().into())
 		}
 	}
 }
 
 impl<T: Config> Pallet<T> {
-	/// Obtain the order account and price from the relaychain's validation.
-	///
-	/// Parameters:
-	/// - `relay_storage_proof`: The proof of relay chain storage.
-	///- `validation_data`: The validation data.
-	/// - `para_id`: ID of parachain.
-	fn get_author_from_proof(
-		relay_storage_proof: sp_trie::StorageProof,
-		validation_data: PersistedValidationData,
-		para_id: ParaId,
-	) -> Option<(T::AuthorityId, Balance)> {
-		let relay_storage_root = validation_data.relay_parent_storage_root;
-		let relay_storage_rooted_proof =
-			RelayChainStateProof::new(para_id, relay_storage_root, relay_storage_proof)
-				.expect("Invalid relay chain state proof");
-		let head_data = relay_storage_rooted_proof
-			.read_entry::<Vec<Box<EventRecord<polakdot_runtime::RuntimeEvent, T::Hash>>>>(
-				SYSTEM_EVENTS,
-				None,
-			)
-			.ok()?;
-		let v_price: Vec<u128> = head_data
-			.iter()
-			.filter_map(|item| {
-				if let polakdot_runtime::RuntimeEvent::OnDemandAssignmentProvider(
-					runtime_types::polkadot_runtime_parachains::assigner_on_demand::pallet::Event::OnDemandOrderPlaced{
-							para_id: pid,
-							spot_price: sprice,
-						}) = &item.event
-				{
-					if pid.encode() == para_id.encode() {
-						Some(*sprice)
-					} else {
-						None
-					}
-				} else {
-					None
-				}
-			})
-			.collect();
-		let orderer: Vec<(T::AuthorityId, u128)> = v_price
-			.iter()
-			.filter_map(|item| {
-				let mut orderer = None;
-				let _: Vec<_> = head_data
-					.iter()
-					.filter_map(|event| {
-						if let polakdot_runtime::RuntimeEvent::Balances(
-							runtime_types::pallet_balances::pallet::Event::Withdraw {
-								who: ref order,
-								amount: eprice,
-							},
-						) = event.event
-						{
-							if eprice == *item {
-								orderer = match T::AuthorityId::try_from(order.clone().as_slice()) {
-									Ok(order) => Some((order, eprice)),
-									Err(_) => None,
-								};
-								Some(())
-							} else {
-								None
-							}
-						} else {
-							None
-						}
-					})
-					.collect();
-				orderer
-			})
-			.collect();
-		if orderer.len() > 0 {
-			Some(orderer[0].clone())
-		} else {
-			None
-		}
-	}
-
-	/// Check whether the account is in the validation of relaychain.
-	///
-	/// Parameters:
-	/// - `relay_storage_proof`: The proof of relay chain storage.
-	/// - `validation_data`: The validation data.
-	/// - `author_pub`: Account.
-	/// - `para_id`: ID of parachain.
-	fn check_order_proof(
-		relay_storage_proof: sp_trie::StorageProof,
-		validation_data: PersistedValidationData,
-		author_pub: Option<T::AuthorityId>,
-		para_id: ParaId,
-	) -> Option<(T::AuthorityId, Balance)> {
-		let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
-		match op_author {
-			Some((author, spot_price)) => {
-				if author_pub == Some(author.clone()) {
-					Some((author, spot_price))
-				} else {
-					None
-				}
-			},
-			None => None,
-		}
-	}
-
-	/// Check whether there is an order event in the validation of relaychain.
-	///
-	/// Parameters:
-	/// - `relay_storage_proof`: The proof of relay chain storage.
-	/// - `validation_data`: The validation data.
-	/// - `para_id`: ID of parachain.
-	pub fn order_placed(
-		relay_storage_proof: sp_trie::StorageProof,
-		validation_data: PersistedValidationData,
-		para_id: ParaId,
-	) -> Option<T::AuthorityId> {
-		let op_author = Self::get_author_from_proof(relay_storage_proof, validation_data, para_id);
-		match op_author {
-			Some((author, _)) => Some(author),
-			None => None,
-		}
-	}
-
 	/// Whether the gas threshold for placing an order has been reached.
 	///
 	/// Parameters:
 	/// - `gas_balance`: The total gas.
 	pub fn reach_txpool_threshold(gas_balance: BalanceOf<T>, core_price: BalanceOf<T>) -> bool {
-		let txpool_threshold = TxPoolThreshold::<T>::get();
+		let txpool_threshold = GasThreshold::<T>::get();
 		gas_balance > txpool_threshold * core_price
 	}
 
-	/// Whether the order with the specified sequence number is executed.
-	///
-	/// Parameters:
-	/// - `sequence_number`: The sequence number.
-	pub fn order_executed(sequence_number: u64) -> bool {
-		let order_map = OrderMap::<T>::get(sequence_number);
-		match order_map {
-			Some(order) => order.executed,
-			None => false,
+	fn check_slot_author(
+		relaychian_number: u32,
+		author: <T as pallet::Config>::AuthorityId,
+	) -> bool {
+		let authorities = pallet_aura::Pallet::<T>::authorities();
+		let slot_width = Self::slot_width();
+		let auth_len = authorities.len() as u32;
+		// The larger the slot width, the longer the rotation time.
+		let idx = (relaychian_number >> slot_width) % auth_len;
+		let expected_author = authorities.get(idx as usize);
+		log::info!("idx:{:?}, expected_author:{:?}", idx, expected_author);
+		if let Some(exp_author) = expected_author {
+			if *exp_author.encode() == author.encode() {
+				true
+			} else {
+				false
+			}
+		} else {
+			false
 		}
 	}
 }

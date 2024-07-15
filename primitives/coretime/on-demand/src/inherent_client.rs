@@ -14,58 +14,28 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
+// use sp_consensus_aura::sr25519::AuthorityId;
+use crate::well_known_keys::{acount_balance, ON_DEMAND_QUEUE};
+use crate::Codec;
 use sp_consensus_aura::sr25519::AuthorityId;
+use sp_core::{crypto::UncheckedFrom, ByteArray};
+use sp_runtime::AccountId32;
 use {
 	crate::OrderInherentData,
 	cumulus_primitives_core::{ParaId, PersistedValidationData},
 	cumulus_relay_chain_interface::{PHash, RelayChainInterface},
 };
 
-/// Collect the relevant relay chain state in form of a proof
-/// for putting it into the on demand order inherent.
-async fn collect_relay_storage_proof(
-	relay_chain_interface: &impl RelayChainInterface,
-	relay_parent: PHash,
-) -> Option<sp_state_machine::StorageProof> {
-	let mut relevant_keys = Vec::new();
-	//System Events
-	relevant_keys.push(
-		hex_literal::hex!["26aa394eea5630e07c48ae0c9558cef780d41e5e16056765bc8461851072c9d7"]
-			.to_vec(),
-	);
-
-	let relay_storage_proof = relay_chain_interface.prove_read(relay_parent, &relevant_keys).await;
-	match relay_storage_proof {
-		Ok(proof) => Some(proof),
-		Err(err) => {
-			log::info!("RelayChainError:{:?}", err);
-			None
-		},
-	}
-}
-
 impl OrderInherentData<AuthorityId> {
 	/// Create the [`OrderInherentData`] at the given `relay_parent`.
 	///
 	/// Returns `None` if the creation failed.
 	pub async fn create_at(
-		relay_parent: PHash,
-		relay_chain_interface: &impl RelayChainInterface,
-		validation_data: &Option<PersistedValidationData>,
-		para_id: ParaId,
-		sequence_number: u64,
+		relay_chian_number: u32,
 		author_pub: &Option<AuthorityId>,
+		price: u128,
 	) -> Option<OrderInherentData<AuthorityId>> {
-		let relay_storage_proof =
-			collect_relay_storage_proof(relay_chain_interface, relay_parent).await?;
-
-		Some(OrderInherentData {
-			relay_storage_proof: relay_storage_proof.clone(),
-			validation_data: validation_data.clone(),
-			para_id,
-			sequence_number,
-			author_pub: author_pub.clone(),
-		})
+		Some(OrderInherentData { relay_chian_number, author_pub: author_pub.clone(), price })
 	}
 }
 

@@ -243,7 +243,7 @@ pub async fn run_coretime_bulk_task<P, R, Block, PB>(
 	PB::Public: AppPublic + Member + Codec,
 	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
-	let relay_chain_notification = async move {
+	let bulk_task = async move {
 		loop {
 			let _ = coretime_bulk_task::<_, _, _, PB>(
 				&*parachain,
@@ -255,7 +255,7 @@ pub async fn run_coretime_bulk_task<P, R, Block, PB>(
 		}
 	};
 	select! {
-		_ = relay_chain_notification.fuse() =>  {},
+		_ = bulk_task.fuse() =>  {},
 	}
 }
 
@@ -284,6 +284,6 @@ where
 	);
 	task_manager
 		.spawn_essential_handle()
-		.spawn("bulk task", "magport", coretime_bulk_task);
+		.spawn("bulk task", "coretime", coretime_bulk_task);
 	Ok(())
 }

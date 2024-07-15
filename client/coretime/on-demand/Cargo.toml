@@ -49,7 +49,8 @@ sc-service = { workspace = true }
 pallet-broker = { workspace = true}
 sp-storage = {  workspace = true }
 pallet-transaction-payment-rpc-runtime-api = { workspace = true}
-
+sp-keyring = {  workspace = true }
+pallet-balances = { workspace = true}
 # Cumulus
 cumulus-client-consensus-common = {  workspace = true }
 cumulus-client-parachain-inherent = {  workspace = true }

@@ -738,6 +738,7 @@ impl pallet_on_demand::Config for Runtime {
 	type Currency = Balances;
 	type UpdateOrigin = EnsureRootOrHalf;
 	type WeightInfo = pallet_on_demand::weights::SubstrateWeight<Runtime>;
+	type RelayChainStateProvider = cumulus_pallet_parachain_system::RelaychainDataProvider<Self>;
 }
 pub struct BulkGasCostHandler();
 
@@ -1312,7 +1313,7 @@ mod benches {
 		[pallet_collator_selection, CollatorSelection]
 		[cumulus_pallet_xcmp_queue, XcmpQueue]
 		[pallet_bulk, BulkPallet]
-		// [pallet_order, OrderPallet]
+		[pallet_on_demand, OrderPallet]
 		[pallet_move, MoveModule]
 		[pallet_multisig, Multisig]
 		[pallet_proxy, Proxy]
@@ -1677,31 +1678,11 @@ impl_runtime_apis! {
 			OrderPallet::slot_width()
 		}
 		fn order_max_amount() -> Balance {
-			OrderPallet::order_max_amount()
-		}
-		fn sequence_number()-> u64 {
-			OrderPallet::sequence_number()
-		}
-
-		fn current_relay_height()-> u32 {
-			OrderPallet::current_relay_height()
-		}
-
-		fn order_placed(
-			relay_storage_proof: sp_trie::StorageProof,
-			validation_data: PersistedValidationData,
-			para_id:ParaId,
-		)-> Option<AuraId> {
-			OrderPallet::order_placed(relay_storage_proof, validation_data, para_id)
+			OrderPallet::price_limit()
 		}
 
 		fn reach_txpool_threshold(gas_balance:Balance, core_price:Balance) -> bool {
 			OrderPallet::reach_txpool_threshold(gas_balance, core_price)
-		}
-
-
-		fn order_executed(sequence_number:u64) -> bool {
-			OrderPallet::order_executed(sequence_number)
 		}
 	}
 	impl mp_coretime_bulk::BulkRuntimeApi<Block> for Runtime {

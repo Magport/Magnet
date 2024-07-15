@@ -246,7 +246,7 @@ runtime-benchmarks = [
 	"pallet-evm-utils/runtime-benchmarks",
 	"pallet-precompile-substrate-utils/runtime-benchmarks",
 	"pallet-precompile-transfer-to-magnet/runtime-benchmarks",
-#	"pallet-order/runtime-benchmarks",
+	"pallet-on-demand/runtime-benchmarks",
 	"pallet-collective/runtime-benchmarks",
 	"pallet-society/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",

@@ -35,11 +35,12 @@ use mc_coretime_common::is_parathread;
 use metadata::{CoreAssignment, CoreDescriptor};
 use mp_coretime_on_demand::{
 	self,
-	well_known_keys::paras_core_descriptors,
-	well_known_keys::{ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_EVENTS},
+	well_known_keys::{acount_balance, paras_core_descriptors},
+	well_known_keys::{EnqueuedOrder, ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_EVENTS},
 	OrderRecord, OrderRuntimeApi, OrderStatus,
 };
 use mp_system::OnRelayChainApi;
+use pallet_balances::AccountData;
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
 use runtime_parachains::configuration::HostConfiguration;
@@ -51,6 +52,7 @@ use sp_application_crypto::AppPublic;
 use sp_consensus_aura::AuraApi;
 use sp_core::{crypto::Pair, H256};
 use sp_keystore::KeystorePtr;
+use sp_runtime::AccountId32;
 use sp_runtime::{
 	codec::Encode,
 	traits::{
@@ -62,12 +64,10 @@ use sp_runtime::{
 use std::{cmp::Ordering, net::SocketAddr};
 use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
 use submit_order::{build_rpc_for_submit_order, SubmitOrderError};
-
-#[derive(Encode, Decode, Debug, PartialEq, Clone)]
-struct EnqueuedOrder {
-	/// Parachain ID
-	pub para_id: ParaId,
-}
+use subxt::{
+	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
+	OnlineClient, PolkadotConfig,
+};
 
 /// Order type
 #[derive(Clone, PartialEq, Debug)]
@@ -206,9 +206,14 @@ where
 			.ok()?;
 		all_gas_value = query_fee.final_fee().add(all_gas_value);
 		if transaction_pool.status().ready != 0 {
+			// Converted to a precision of 18
 			is_place_order = parachain
 				.runtime_api()
-				.reach_txpool_threshold(block_hash, all_gas_value, core_price)
+				.reach_txpool_threshold(
+					block_hash,
+					all_gas_value,
+					core_price.saturating_mul(1_000_000u32.into()),
+				)
 				.ok()?;
 		}
 		log::info!(
@@ -341,32 +346,11 @@ where
 	let slot_block = base.pow(slot_width);
 	if height % slot_block == 0 {
 		let mut order_record_local = order_record.lock().await;
-		order_record_local.order_status = OrderStatus::Init;
+		order_record_local.reset();
 	}
-	let mut relevant_keys = Vec::new();
-	//System Events
-	relevant_keys.push(SYSTEM_EVENTS.to_vec());
-	let storage_proof = relay_chain.prove_read(p_hash, &relevant_keys).await?;
-	let order_placed = parachain.runtime_api().order_placed(
-		hash,
-		storage_proof,
-		validation_data.clone(),
-		para_id,
-	)?;
-	let sequence_number = parachain.runtime_api().sequence_number(hash)?;
-	// Get information about the OnDemandOrderPlaced event.
-	if let Some(author) = order_placed {
-		log::info!("============find order=============");
-		// Get the event and the account who placed the order
-		let mut order_record_local = order_record.lock().await;
-		order_record_local.relay_parent = Some(p_hash);
-		order_record_local.relay_height = height;
-		order_record_local.validation_data = Some(validation_data);
-		order_record_local.author_pub = Some(author);
-		order_record_local.sequence_number = sequence_number;
-		order_record_local.txs = get_txs(transaction_pool.clone()).await;
-		return Ok(());
-	}
+	let order_period = height & (slot_block - 1) < slot_block / 2;
+	log::info!("===============relaychain height:{:?},is order period:{:?}", height, order_period);
+
 	// Check whether the conditions for placing an order are met, and if so, place the order
 
 	// Check if it is in the ondemand queue, if so, do not place a order.
@@ -385,6 +369,8 @@ where
 		}
 	}
 	if exist_order {
+		let mut order_record_local = order_record.lock().await;
+		order_record_local.order_status = OrderStatus::Complete;
 		return Ok(());
 	}
 	// get on demand core price
@@ -396,7 +382,7 @@ where
 
 	let reached = reach_txpool_threshold::<_, _, _, _, PB>(
 		parachain,
-		transaction_pool,
+		transaction_pool.clone(),
 		height,
 		order_record_local.txs.clone(),
 		spot_price,
@@ -416,12 +402,16 @@ where
 			}
 		}
 	}
-	if collator_public.is_some() {
+	if let Some(author) = collator_public {
 		//your turn
 		if can_order {
-			if height - order_record_local.relay_height > slot_block {
+			if order_period {
 				if order_record_local.order_status == OrderStatus::Init {
 					log::info!("============place order, type:{:?}", order_type);
+					order_record_local.relay_parent = p_hash;
+					order_record_local.relay_height = height;
+					order_record_local.author_pub = Some(author);
+					order_record_local.txs = get_txs(transaction_pool).await;
 					let order_result =
 						try_place_order::<Balance>(keystore, para_id, url, spot_price).await;
 					order_record_local.order_status = OrderStatus::Order;
@@ -509,6 +499,89 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 	}
 }
 
+pub async fn ondemand_event_task<P, R, Block, PB>(
+	parachain: &P,
+	relay_chain: R,
+	para_id: ParaId,
+	rpc_url: String,
+	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
+) -> Result<(), Box<dyn Error>>
+where
+	Block: BlockT,
+	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
+	R: RelayChainInterface + Clone,
+	PB: Pair,
+	PB::Public: AppPublic + Member + Codec,
+	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
+{
+	let relay_chain_clone = relay_chain.clone();
+
+	let hash = parachain.usage_info().chain.finalized_hash;
+
+	// Get the final block of the relaychain through subxt.
+
+	let api = OnlineClient::<PolkadotConfig>::from_url(rpc_url).await?;
+
+	let mut blocks_sub = api.blocks().subscribe_best().await?;
+
+	// For each block, print a bunch of information about it:
+	while let Some(block) = blocks_sub.next().await {
+		let block = block?;
+
+		let block_number = block.header().number;
+
+		let events = block.events().await?;
+		for event in events.iter() {
+			let event = event?;
+			// Query Broker Assigned Event
+			let ev_order_placed = event.as_event::<metadata::OnDemandOrderPlaced>();
+			if let Ok(order_placed_event) = ev_order_placed {
+				if let Some(ev) = order_placed_event {
+					log::info!(
+						"=====================Find OnDemandOrderPlaced event:{:?},{:?}================",
+						ev.para_id,
+						ev.spot_price,
+					);
+					let exp_id: u32 = para_id.into();
+					if ev.para_id.0 == exp_id {
+						// The orderer gets it from the slot by default.
+						let mut order_record_local = order_record.lock().await;
+						order_record_local.price = ev.spot_price;
+						order_record_local.order_status = OrderStatus::Execute;
+					}
+				}
+			}
+		}
+	}
+	Ok(())
+}
+
+async fn event_notification<P, R, Block, PB>(
+	parachain: Arc<P>,
+	relay_chain: R,
+	para_id: ParaId,
+	url: String,
+	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
+) where
+	R: RelayChainInterface + Clone,
+	Block: BlockT,
+	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
+	PB: Pair,
+	PB::Public: AppPublic + Member + Codec,
+	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
+{
+	loop {
+		let _ = ondemand_event_task::<_, _, _, PB>(
+			&*parachain,
+			relay_chain.clone(),
+			para_id,
+			url.clone(),
+			order_record.clone(),
+		)
+		.await;
+	}
+}
+
 pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
 	para_id: ParaId,
 	parachain: Arc<P>,
@@ -541,17 +614,25 @@ pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
 	let relay_chain_notification = relay_chain_notification::<_, _, _, PB, _, _>(
 		para_id,
 		parachain.clone(),
-		relay_chain,
+		relay_chain.clone(),
 		keystore,
-		order_record,
+		order_record.clone(),
 		transaction_pool,
+		url.clone(),
+	);
+	let event_notification = event_notification::<_, _, _, PB>(
+		parachain.clone(),
+		relay_chain.clone(),
+		para_id,
 		url,
+		order_record,
 	);
 	select! {
 		_ = relay_chain_notification.fuse() => {},
+		_ = event_notification.fuse() => {},
 	}
 }
-
+use sp_keyring::Sr25519Keyring::Alice;
 pub fn spawn_on_demand_order<T, R, ExPool, Block, PB, Balance>(
 	parachain: Arc<T>,
 	para_id: ParaId,
@@ -597,8 +678,8 @@ where
 		url,
 	);
 	task_manager.spawn_essential_handle().spawn_blocking(
-		"on_demand_order_task",
-		None,
+		"on demand order task",
+		"coretime",
 		on_demand_order_task,
 	);
 	Ok(())

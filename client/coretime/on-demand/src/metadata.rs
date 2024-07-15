@@ -197,3 +197,23 @@ pub fn place_order_keep_alive(
 		],
 	)
 }
+
+#[derive(
+	:: subxt :: ext :: codec :: Decode,
+	:: subxt :: ext :: codec :: Encode,
+	:: subxt :: ext :: scale_decode :: DecodeAsType,
+	:: subxt :: ext :: scale_encode :: EncodeAsType,
+	Debug,
+)]
+# [codec (crate = :: subxt :: ext :: codec)]
+#[decode_as_type(crate_path = ":: subxt :: ext :: scale_decode")]
+#[encode_as_type(crate_path = ":: subxt :: ext :: scale_encode")]
+pub struct OnDemandOrderPlaced {
+	pub para_id: Id,
+	pub spot_price: u128,
+}
+
+impl ::subxt::events::StaticEvent for OnDemandOrderPlaced {
+	const PALLET: &'static str = "OnDemandAssignmentProvider";
+	const EVENT: &'static str = "OnDemandOrderPlaced";
+}

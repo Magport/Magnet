@@ -49,13 +49,14 @@ use crate::eth::{
 	FrontierBlockImport as TFrontierBlockImport,
 	FrontierPartialComponents,
 };
+use cumulus_relay_chain_interface::OccupiedCoreAssumption;
+use cumulus_relay_chain_interface::PersistedValidationData;
 use futures::lock::Mutex;
 use mc_coretime_bulk::spawn_bulk_task;
 use mc_coretime_on_demand::spawn_on_demand_order;
 use mp_coretime_bulk::BulkMemRecord;
 use mp_coretime_bulk::BulkStatus;
 use mp_coretime_on_demand::OrderRecord;
-
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 
@@ -627,27 +628,19 @@ fn start_consensus(
 						"Failed to create bulk inherent",
 					)
 				})?;
-				let parent_hash = relay_chain_interface.finalized_block_hash().await?;
-				let (relay_parent, validation_data, sequence_number, author_pub) = {
+
+				let (author_pub, relay_chian_number, price) = {
 					let order_record_local = order_record_clone.lock().await;
-					if order_record_local.validation_data.is_none() {
-						(parent_hash, None, order_record_local.sequence_number, None)
-					} else {
-						(
-							order_record_local.relay_parent.expect("can not get relay_parent hash"),
-							order_record_local.validation_data.clone(),
-							order_record_local.sequence_number,
-							order_record_local.author_pub.clone(),
-						)
-					}
+					(
+						order_record_local.author_pub.clone(),
+						order_record_local.relay_height,
+						order_record_local.price,
+					)
 				};
 				let order_inherent = mp_coretime_on_demand::OrderInherentData::create_at(
-					relay_parent,
-					&relay_chain_interface,
-					&validation_data,
-					para_id,
-					sequence_number,
+					relay_chian_number,
 					&author_pub,
+					price,
 				)
 				.await;
 				let order_inherent = order_inherent.ok_or_else(|| {
