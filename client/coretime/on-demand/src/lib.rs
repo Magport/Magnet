@@ -35,12 +35,12 @@ use mc_coretime_common::is_parathread;
 use metadata::{CoreAssignment, CoreDescriptor};
 use mp_coretime_on_demand::{
 	self,
-	well_known_keys::{acount_balance, paras_core_descriptors},
-	well_known_keys::{EnqueuedOrder, ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC, SYSTEM_EVENTS},
+	well_known_keys::{
+		paras_core_descriptors, EnqueuedOrder, ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC,
+	},
 	OrderRecord, OrderRuntimeApi, OrderStatus,
 };
 use mp_system::OnRelayChainApi;
-use pallet_balances::AccountData;
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
 use runtime_parachains::configuration::HostConfiguration;
@@ -48,26 +48,22 @@ use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
 use sc_transaction_pool_api::{InPoolTransaction, MaintainedTransactionPool};
 use sp_api::ProvideRuntimeApi;
-use sp_application_crypto::AppPublic;
+use sp_consensus_aura::sr25519::AuthorityId;
+use sp_consensus_aura::sr25519::AuthorityPair;
 use sp_consensus_aura::AuraApi;
-use sp_core::{crypto::Pair, H256};
+use sp_core::H256;
 use sp_keystore::KeystorePtr;
-use sp_runtime::AccountId32;
 use sp_runtime::{
 	codec::Encode,
 	traits::{
-		AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, Member,
-		SaturatedConversion,
+		AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, SaturatedConversion,
 	},
 	FixedPointNumber, FixedU128,
 };
 use std::{cmp::Ordering, net::SocketAddr};
-use std::{convert::TryFrom, error::Error, fmt::Debug, sync::Arc};
+use std::{error::Error, fmt::Debug, sync::Arc};
 use submit_order::{build_rpc_for_submit_order, SubmitOrderError};
-use subxt::{
-	backend::{legacy::LegacyRpcMethods, rpc::RpcClient},
-	OnlineClient, PolkadotConfig,
-};
+use subxt::{OnlineClient, PolkadotConfig};
 
 /// Order type
 #[derive(Clone, PartialEq, Debug)]
@@ -170,7 +166,7 @@ where
 }
 
 /// Whether the mem pool reaches the threshold for purchasing cores.
-async fn reach_txpool_threshold<P, Block, ExPool, Balance, PB>(
+async fn reach_txpool_threshold<P, Block, ExPool, Balance>(
 	parachain: &P,
 	transaction_pool: Arc<ExPool>,
 	height: RelayBlockNumber,
@@ -182,12 +178,9 @@ where
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	Balance: Codec + MaybeDisplay + 'static + Debug + AtLeast32BitUnsigned + Copy,
 	P::Api: TransactionPaymentApi<Block, Balance>
-		+ OrderRuntimeApi<Block, Balance, PB::Public>
+		+ OrderRuntimeApi<Block, Balance>
 		+ OnRelayChainApi<Block>,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
-	PB: Pair,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
 	let mut pending_iterator = transaction_pool.ready();
 	let mut is_place_order = false;
@@ -278,7 +271,7 @@ where
 }
 
 /// The main processing logic of purchasing core.
-async fn handle_relaychain_stream<P, Block, PB, ExPool, Balance>(
+async fn handle_relaychain_stream<P, Block, ExPool, Balance>(
 	validation_data: PersistedValidationData,
 	height: RelayBlockNumber,
 	parachain: &P,
@@ -286,7 +279,7 @@ async fn handle_relaychain_stream<P, Block, PB, ExPool, Balance>(
 	relay_chain: impl RelayChainInterface + Clone,
 	p_hash: H256,
 	para_id: ParaId,
-	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
+	order_record: Arc<Mutex<OrderRecord>>,
 	transaction_pool: Arc<ExPool>,
 	url: String,
 ) -> Result<(), Box<dyn Error>>
@@ -301,13 +294,10 @@ where
 		+ AtLeast32BitUnsigned
 		+ Copy
 		+ From<u128>,
-	P::Api: AuraApi<Block, PB::Public>
-		+ OrderRuntimeApi<Block, Balance, PB::Public>
+	P::Api: AuraApi<Block, AuthorityId>
+		+ OrderRuntimeApi<Block, Balance>
 		+ TransactionPaymentApi<Block, Balance>
 		+ OnRelayChainApi<Block>,
-	PB: Pair,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 {
 	let is_parathread = is_parathread(&relay_chain, p_hash, para_id).await?;
@@ -340,7 +330,8 @@ where
 	// The larger the slot width, the longer the rotation time.
 	let idx = (height >> slot_width) % auth_len;
 	// Randomly select a collator to place an order.
-	let collator_public = mc_coretime_common::order_slot::<PB>(idx, &authorities, &keystore).await;
+	let collator_public =
+		mc_coretime_common::order_slot::<AuthorityPair>(idx, &authorities, &keystore).await;
 	let base = 2 as u32;
 	// Minimum interval for placing an order,calculated in one relaychain block time.
 	let slot_block = base.pow(slot_width);
@@ -349,7 +340,12 @@ where
 		order_record_local.reset();
 	}
 	let order_period = height & (slot_block - 1) < slot_block / 2;
-	log::info!("===============relaychain height:{:?},is order period:{:?}", height, order_period);
+	log::info!(
+		"relaychain height:{:?},order period:{:?}, can place order:{:?}",
+		height,
+		order_period,
+		collator_public.clone().is_some()
+	);
 
 	// Check whether the conditions for placing an order are met, and if so, place the order
 
@@ -380,7 +376,7 @@ where
 	// Check whether the gas of the transaction pool has reached the spot price threshold.
 	let mut order_record_local = order_record.lock().await;
 
-	let reached = reach_txpool_threshold::<_, _, _, _, PB>(
+	let reached = reach_txpool_threshold(
 		parachain,
 		transaction_pool.clone(),
 		height,
@@ -447,12 +443,12 @@ async fn new_best_heads(
 
 	Ok(new_best_notification_stream)
 }
-async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
+async fn relay_chain_notification<P, R, Block, ExPool, Balance>(
 	para_id: ParaId,
 	parachain: Arc<P>,
 	relay_chain: R,
 	keystore: KeystorePtr,
-	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
+	order_record: Arc<Mutex<OrderRecord>>,
 	transaction_pool: Arc<ExPool>,
 	url: String,
 ) where
@@ -467,13 +463,10 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 		+ Copy
 		+ From<u128>,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	P::Api: AuraApi<Block, PB::Public>
-		+ OrderRuntimeApi<Block, Balance, PB::Public>
+	P::Api: AuraApi<Block, AuthorityId>
+		+ OrderRuntimeApi<Block, Balance>
 		+ TransactionPaymentApi<Block, Balance>
 		+ OnRelayChainApi<Block>,
-	PB: Pair,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 {
 	let new_best_heads = match new_best_heads(relay_chain.clone(), para_id).await {
@@ -488,7 +481,7 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 			h = new_best_heads.next() => {
 				match h {
 					Some((height, head, hash)) => {
-						let _ = handle_relaychain_stream::<_,_,PB,_,_>(head,height, &*parachain,keystore.clone(), relay_chain.clone(), hash, para_id, order_record.clone(),transaction_pool.clone(), url.clone()).await;
+						let _ = handle_relaychain_stream(head,height, &*parachain,keystore.clone(), relay_chain.clone(), hash, para_id, order_record.clone(),transaction_pool.clone(), url.clone()).await;
 					},
 					None => {
 						return;
@@ -499,25 +492,11 @@ async fn relay_chain_notification<P, R, Block, PB, ExPool, Balance>(
 	}
 }
 
-pub async fn ondemand_event_task<P, R, Block, PB>(
-	parachain: &P,
-	relay_chain: R,
+pub async fn ondemand_event_task(
 	para_id: ParaId,
 	rpc_url: String,
-	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
-) -> Result<(), Box<dyn Error>>
-where
-	Block: BlockT,
-	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	R: RelayChainInterface + Clone,
-	PB: Pair,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
-{
-	let relay_chain_clone = relay_chain.clone();
-
-	let hash = parachain.usage_info().chain.finalized_hash;
-
+	order_record: Arc<Mutex<OrderRecord>>,
+) -> Result<(), Box<dyn Error>> {
 	// Get the final block of the relaychain through subxt.
 
 	let api = OnlineClient::<PolkadotConfig>::from_url(rpc_url).await?;
@@ -527,8 +506,6 @@ where
 	// For each block, print a bunch of information about it:
 	while let Some(block) = blocks_sub.next().await {
 		let block = block?;
-
-		let block_number = block.header().number;
 
 		let events = block.events().await?;
 		for event in events.iter() {
@@ -556,38 +533,18 @@ where
 	Ok(())
 }
 
-async fn event_notification<P, R, Block, PB>(
-	parachain: Arc<P>,
-	relay_chain: R,
-	para_id: ParaId,
-	url: String,
-	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
-) where
-	R: RelayChainInterface + Clone,
-	Block: BlockT,
-	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	PB: Pair,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
-{
+async fn event_notification(para_id: ParaId, url: String, order_record: Arc<Mutex<OrderRecord>>) {
 	loop {
-		let _ = ondemand_event_task::<_, _, _, PB>(
-			&*parachain,
-			relay_chain.clone(),
-			para_id,
-			url.clone(),
-			order_record.clone(),
-		)
-		.await;
+		let _ = ondemand_event_task(para_id, url.clone(), order_record.clone()).await;
 	}
 }
 
-pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
+pub async fn run_on_demand_task<P, R, Block, ExPool, Balance>(
 	para_id: ParaId,
 	parachain: Arc<P>,
 	relay_chain: R,
 	keystore: KeystorePtr,
-	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
+	order_record: Arc<Mutex<OrderRecord>>,
 	transaction_pool: Arc<ExPool>,
 	url: String,
 ) where
@@ -602,16 +559,13 @@ pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
 		+ AtLeast32BitUnsigned
 		+ Copy
 		+ From<u128>,
-	P::Api: AuraApi<Block, PB::Public>
-		+ OrderRuntimeApi<Block, Balance, PB::Public>
+	P::Api: AuraApi<Block, AuthorityId>
+		+ OrderRuntimeApi<Block, Balance>
 		+ TransactionPaymentApi<Block, Balance>
 		+ OnRelayChainApi<Block>,
-	PB: Pair,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
 {
-	let relay_chain_notification = relay_chain_notification::<_, _, _, PB, _, _>(
+	let relay_chain_notification = relay_chain_notification(
 		para_id,
 		parachain.clone(),
 		relay_chain.clone(),
@@ -620,27 +574,21 @@ pub async fn run_on_demand_task<P, R, Block, PB, ExPool, Balance>(
 		transaction_pool,
 		url.clone(),
 	);
-	let event_notification = event_notification::<_, _, _, PB>(
-		parachain.clone(),
-		relay_chain.clone(),
-		para_id,
-		url,
-		order_record,
-	);
+	let event_notification = event_notification(para_id, url, order_record);
 	select! {
 		_ = relay_chain_notification.fuse() => {},
 		_ = event_notification.fuse() => {},
 	}
 }
-use sp_keyring::Sr25519Keyring::Alice;
-pub fn spawn_on_demand_order<T, R, ExPool, Block, PB, Balance>(
+
+pub fn spawn_on_demand_order<T, R, ExPool, Block, Balance>(
 	parachain: Arc<T>,
 	para_id: ParaId,
 	relay_chain: R,
 	transaction_pool: Arc<ExPool>,
 	task_manager: &TaskManager,
 	keystore: KeystorePtr,
-	order_record: Arc<Mutex<OrderRecord<PB::Public>>>,
+	order_record: Arc<Mutex<OrderRecord>>,
 	relay_rpc: Option<SocketAddr>,
 ) -> sc_service::error::Result<()>
 where
@@ -657,18 +605,15 @@ where
 		+ From<u128>,
 	T: Send + Sync + 'static + ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	ExPool: MaintainedTransactionPool<Block = Block, Hash = <Block as BlockT>::Hash> + 'static,
-	T::Api: AuraApi<Block, PB::Public>
-		+ OrderRuntimeApi<Block, Balance, PB::Public>
+	T::Api: AuraApi<Block, AuthorityId>
+		+ OrderRuntimeApi<Block, Balance>
 		+ TransactionPaymentApi<Block, Balance>
 		+ OnRelayChainApi<Block>,
-	PB: Pair + 'static,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
 {
 	let mut url = String::from("ws://");
 	url.push_str(&relay_rpc.expect("Should set rpc address for submit order extrinic").to_string());
 
-	let on_demand_order_task = run_on_demand_task::<_, _, _, PB, _, _>(
+	let on_demand_order_task = run_on_demand_task(
 		para_id,
 		parachain.clone(),
 		relay_chain.clone(),

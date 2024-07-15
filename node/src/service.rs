@@ -458,9 +458,8 @@ async fn start_node_impl(
 		sync_service: sync_service.clone(),
 	})?;
 	if validator {
-		let order_record =
-			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId>::new()));
-		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+		let order_record = Arc::new(Mutex::new(OrderRecord::new()));
+		spawn_on_demand_order(
 			client.clone(),
 			para_id,
 			relay_chain_interface.clone(),
@@ -472,7 +471,7 @@ async fn start_node_impl(
 		)?;
 		let bulk_mem_record =
 			Arc::new(Mutex::new(BulkMemRecord { coretime_para_height: 0, items: Vec::new() }));
-		spawn_bulk_task::<_, _, _, sp_consensus_aura::sr25519::AuthorityPair>(
+		spawn_bulk_task(
 			client.clone(),
 			para_id,
 			relay_chain_interface.clone(),
@@ -552,7 +551,7 @@ fn start_consensus(
 	collator_key: CollatorPair,
 	overseer_handle: OverseerHandle,
 	announce_block: Arc<dyn Fn(Hash, Option<Vec<u8>>) + Send + Sync>,
-	order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
+	order_record: Arc<Mutex<OrderRecord>>,
 	bulk_mem_record: Arc<Mutex<BulkMemRecord>>,
 ) -> Result<(), sc_service::Error> {
 	use cumulus_client_consensus_aura::collators::lookahead::{self as aura, Params as AuraParams};

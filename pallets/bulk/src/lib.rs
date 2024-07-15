@@ -34,12 +34,7 @@ use mp_coretime_common::{
 };
 pub use pallet::*;
 use pallet_broker::RegionRecord;
-use primitives::Balance;
-use sp_runtime::{
-	sp_std::{prelude::*, vec},
-	traits::Member,
-	RuntimeAppPublic,
-};
+use sp_runtime::sp_std::{prelude::*, vec};
 use weights::WeightInfo;
 
 #[cfg(test)]
@@ -88,13 +83,6 @@ pub mod pallet {
 
 		type RelayChainStateProvider: cumulus_pallet_parachain_system::RelaychainStateProvider;
 
-		type AuthorityId: Member
-			+ Parameter
-			+ RuntimeAppPublic
-			+ MaybeSerializeDeserialize
-			+ MaxEncodedLen
-			+ for<'a> TryFrom<&'a [u8]>;
-
 		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		type WeightInfo: WeightInfo;
@@ -131,7 +119,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn bulk_records)]
 	pub type BulkRecords<T: Config> =
-		StorageMap<_, Twox64Concat, u32, BulkRecord<BalanceOf<T>, T::AuthorityId>, OptionQuery>;
+		StorageMap<_, Twox64Concat, u32, BulkRecord<BalanceOf<T>, T::AccountId>, OptionQuery>;
 
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
@@ -164,7 +152,7 @@ pub mod pallet {
 		/// Create record event.
 		RecordCreated {
 			/// Account for purchase.
-			purchaser: T::AuthorityId,
+			purchaser: T::AccountId,
 			/// Purchase price.
 			price: BalanceOf<T>,
 			/// Purchase duration.
@@ -258,10 +246,7 @@ pub mod pallet {
 			let region_key = broker_regions(region_id);
 			// Read RegionRecord from proof.
 			let region_record = storage_rooted_proof
-				.read_entry::<RegionRecord<T::AuthorityId, BalanceOf<T>>>(
-					region_key.as_slice(),
-					None,
-				)
+				.read_entry::<RegionRecord<T::AccountId, BalanceOf<T>>>(region_key.as_slice(), None)
 				.ok()
 				.ok_or(Error::<T>::FailedReading)?;
 
@@ -283,7 +268,7 @@ pub mod pallet {
 			// Create record of purchase coretime.
 			BulkRecords::<T>::insert(
 				old_record_index,
-				BulkRecord::<BalanceOf<T>, T::AuthorityId> {
+				BulkRecord::<BalanceOf<T>, T::AccountId> {
 					purchaser: purchaser.clone(),
 					price: balance,
 					duration,

@@ -26,15 +26,6 @@ use frame_system::RawOrigin;
 use sp_core::crypto::UncheckedFrom;
 use sp_runtime::Perbill;
 
-// mod test_mod {
-// 	use scale_info::prelude::format;
-// 	use sp_core::{Pair, Public, H160, U256};
-// 	pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
-// 		TPublic::Pair::from_string(&format!("//{}", seed), None)
-// 			.expect("static values are valid; qed")
-// 			.public()
-// 	}
-// }
 benchmarks! {
 	set_slot_width {
 		let s in 0 .. 100;
@@ -65,11 +56,8 @@ benchmarks! {
 
 	create_order {
 		let s in 0..100;
-		// let author = test_mod::get_from_seed::<sp_core::sr25519::Public>("Alice");
-		// let mut r = [0u8; 32];
-		// r.copy_from_slice(author.encode().as_slice());
 		let r = [0xd4,0x35,0x93,0xc7,0x15,0xfd,0xd3,0x1c,0x61,0x14,0x1a,0xbd,0x04,0xa9,0x9f,0xd6,0x82,0x2c,0x85,0x58,0x85,0x4c,0xcd,0xe3,0x9a,0x56,0x84,0xe7,0xa5,0x6d,0xa2,0x7d];
-		let author_pub = <T as pallet::Config>::AuthorityId::unchecked_from(r);
+		let author_pub = T::AccountId::try_from(r).unwrap();
 		let bulk_inherent_data = mp_coretime_on_demand::OrderInherentData {
 			relay_chian_number: 40,
 			author_pub: Some(author_pub),

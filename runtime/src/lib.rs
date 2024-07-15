@@ -719,11 +719,7 @@ where
 			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
 		)
 		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
-		let mut r = [0u8; 32];
-		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r)
-			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
-		Ok(Some((account, order.price)))
+		Ok(Some((order.orderer, order.price)))
 	}
 }
 
@@ -734,7 +730,6 @@ type EnsureRootOrHalf = EitherOfDiverse<
 
 impl pallet_on_demand::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type AuthorityId = AuraId;
 	type Currency = Balances;
 	type UpdateOrigin = EnsureRootOrHalf;
 	type WeightInfo = pallet_on_demand::weights::SubstrateWeight<Runtime>;
@@ -745,7 +740,6 @@ pub struct BulkGasCostHandler();
 impl<T> BulkGasCost<T> for BulkGasCostHandler
 where
 	T: pallet_bulk::Config,
-	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(
 		block_number: BlockNumberFor<T>,
@@ -763,24 +757,20 @@ where
 					let balance = price
 						.checked_div(duration)
 						.ok_or(sp_runtime::DispatchError::Other("duration error"))?;
-					let mut r = [0u8; 32];
-					r.copy_from_slice(record.purchaser.encode().as_slice());
-					let account = T::AccountId::try_from(r)
-						.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
-					result = Some((account, balance));
+					result = Some((record.purchaser, balance));
 				}
 			}
 		}
 		Ok(result)
 	}
 }
+
 parameter_types! {
 	pub const MaxUrlLength: u32 = 300;
 }
 
 impl pallet_bulk::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
-	type AuthorityId = AuraId;
 	type Currency = Balances;
 	type RelayChainStateProvider = cumulus_pallet_parachain_system::RelaychainDataProvider<Self>;
 	type UpdateOrigin = EnsureRootOrHalf;
@@ -1672,7 +1662,7 @@ impl_runtime_apis! {
 			ConsensusHook::can_build_upon(included_hash, slot)
 		}
 	}
-	impl mp_coretime_on_demand::OrderRuntimeApi<Block, Balance, AuraId> for Runtime {
+	impl mp_coretime_on_demand::OrderRuntimeApi<Block, Balance> for Runtime {
 
 		fn slot_width()-> u32{
 			OrderPallet::slot_width()

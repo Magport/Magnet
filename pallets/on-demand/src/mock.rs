@@ -15,7 +15,6 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::{self as order_pallet};
-use codec::Encode;
 use cumulus_pallet_parachain_system::RelayChainState;
 use cumulus_pallet_parachain_system::RelaychainStateProvider;
 pub use frame_support::{
@@ -26,8 +25,6 @@ use frame_system as system;
 use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::AccountId32, ConstBool, ConstU32, ConstU64, H256};
-use sp_core::{Pair, Public, H160, U256};
-use sp_keyring::sr25519;
 use sp_keyring::Sr25519Keyring::Alice;
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
@@ -150,7 +147,6 @@ impl pallet_aura::Config for Test {
 
 impl crate::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type AuthorityId = AuraId;
 	type UpdateOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type WeightInfo = ();
@@ -184,11 +180,7 @@ where
 			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
 		)
 		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
-		let mut r = [0u8; 32];
-		r.copy_from_slice(order.orderer.encode().as_slice());
-		let account = T::AccountId::try_from(r)
-			.map_err(|_| sp_runtime::DispatchError::Other("Account error"))?;
-		Ok(Some((account, order.price)))
+		Ok(Some((order.orderer, order.price)))
 	}
 }
 
@@ -227,11 +219,6 @@ impl Default for ExtBuilder {
 	}
 }
 
-pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
-	TPublic::Pair::from_string(&format!("//{}", seed), None)
-		.expect("static values are valid; qed")
-		.public()
-}
 impl ExtBuilder {
 	pub fn build(self) -> sp_io::TestExternalities {
 		// Build genesis storage according to the mock runtime.
@@ -246,11 +233,9 @@ impl ExtBuilder {
 		}
 		.assimilate_storage(&mut t)
 		.unwrap();
-		pallet_aura::GenesisConfig::<Test> {
-			authorities: vec![get_from_seed::<sp_core::sr25519::Public>("Alice").into()],
-		}
-		.assimilate_storage(&mut t)
-		.unwrap();
+		pallet_aura::GenesisConfig::<Test> { authorities: vec![Alice.public().into()] }
+			.assimilate_storage(&mut t)
+			.unwrap();
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext

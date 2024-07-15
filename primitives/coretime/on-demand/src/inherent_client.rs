@@ -14,19 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-// use sp_consensus_aura::sr25519::AuthorityId;
-use crate::well_known_keys::{acount_balance, ON_DEMAND_QUEUE};
-use crate::Codec;
+use crate::OrderInherentData;
 use sp_consensus_aura::sr25519::AuthorityId;
-use sp_core::{crypto::UncheckedFrom, ByteArray};
-use sp_runtime::AccountId32;
-use {
-	crate::OrderInherentData,
-	cumulus_primitives_core::{ParaId, PersistedValidationData},
-	cumulus_relay_chain_interface::{PHash, RelayChainInterface},
-};
 
-impl OrderInherentData<AuthorityId> {
+impl OrderInherentData {
 	/// Create the [`OrderInherentData`] at the given `relay_parent`.
 	///
 	/// Returns `None` if the creation failed.
@@ -34,14 +25,14 @@ impl OrderInherentData<AuthorityId> {
 		relay_chian_number: u32,
 		author_pub: &Option<AuthorityId>,
 		price: u128,
-	) -> Option<OrderInherentData<AuthorityId>> {
+	) -> Option<OrderInherentData> {
 		Some(OrderInherentData { relay_chian_number, author_pub: author_pub.clone(), price })
 	}
 }
 
 // Implementation of InherentDataProvider
 #[async_trait::async_trait]
-impl sp_inherents::InherentDataProvider for OrderInherentData<AuthorityId> {
+impl sp_inherents::InherentDataProvider for OrderInherentData {
 	async fn provide_inherent_data(
 		&self,
 		inherent_data: &mut sp_inherents::InherentData,

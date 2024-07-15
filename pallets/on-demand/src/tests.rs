@@ -15,17 +15,13 @@
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
 use crate::mock::*;
-use codec::Decode;
-use cumulus_primitives_core::{ParaId, PersistedValidationData};
 use frame_support::{
 	inherent::{InherentData, ProvideInherent},
 	traits::UnfilteredDispatchable,
 };
 use frame_system::RawOrigin;
 use parachains_common::AccountId;
-use primitives::HeadData;
-use sp_consensus_aura::sr25519::AuthorityId;
-use sp_trie::StorageProof;
+use sp_keyring::Sr25519Keyring::Alice;
 
 #[test]
 fn order_default_value() {
@@ -40,12 +36,11 @@ fn order_normal_test() {
 		System::set_block_number(1);
 
 		let mut inherent_data = InherentData::default();
-		let order_inherent_data: mp_coretime_on_demand::OrderInherentData<AuthorityId> =
-			mp_coretime_on_demand::OrderInherentData {
-				relay_chian_number: 40,
-				author_pub: Some(get_from_seed::<sp_core::sr25519::Public>("Alice").into()),
-				price: 10000000,
-			};
+		let order_inherent_data = mp_coretime_on_demand::OrderInherentData {
+			relay_chian_number: 40,
+			author_pub: Some(Alice.public().into()),
+			price: 10000000,
+		};
 		inherent_data
 			.put_data(mp_coretime_on_demand::INHERENT_IDENTIFIER, &order_inherent_data)
 			.expect("failed to put VFP inherent");

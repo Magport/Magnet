@@ -23,7 +23,6 @@ pub use frame_support::{
 };
 use frame_system as system;
 use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
-pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
@@ -126,7 +125,6 @@ parameter_types! {
 
 impl crate::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type AuthorityId = AuraId;
 	type UpdateOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type RelayChainStateProvider = MockRelayStateProvider;
@@ -148,7 +146,6 @@ pub trait BulkGasCost<T: frame_system::Config> {
 impl<T> BulkGasCost<T> for BulkGasCostHandler
 where
 	T: crate::Config,
-	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(
 		_block_number: BlockNumberFor<T>,

@@ -20,11 +20,9 @@
 //! the on demand order pallet inherent
 //!
 #![cfg_attr(not(feature = "std"), no_std)]
-use core::default;
 
 use cumulus_primitives_core::{
 	relay_chain::BlockNumber as RelayBlockNumber, relay_chain::Hash as PHash, ParaId,
-	PersistedValidationData,
 };
 use sp_core::H256;
 use sp_runtime::sp_std::vec::Vec;
@@ -33,10 +31,11 @@ use sp_runtime::traits::MaybeDisplay;
 pub mod inherent_client;
 pub mod well_known_keys;
 use codec::{Codec, Decode, Encode};
+use sp_consensus_aura::sr25519::AuthorityId;
 use {scale_info::TypeInfo, sp_inherents::InherentIdentifier};
 
 #[derive(Encode, Decode, sp_core::RuntimeDebug, Clone, PartialEq, TypeInfo)]
-pub struct OrderInherentData<AuthorityId> {
+pub struct OrderInherentData {
 	/// Relaychain block height, for check.
 	pub relay_chian_number: RelayBlockNumber,
 	/// Author of order.
@@ -57,7 +56,7 @@ pub enum OrderStatus {
 }
 
 #[derive(Clone)]
-pub struct OrderRecord<AuthorityId> {
+pub struct OrderRecord {
 	/// Hash of relaychain block.
 	pub relay_parent: PHash,
 	/// Relaychain block height.
@@ -72,8 +71,8 @@ pub struct OrderRecord<AuthorityId> {
 	pub txs: Vec<H256>,
 }
 
-impl<AuthorityId> OrderRecord<AuthorityId> {
-	pub fn new() -> OrderRecord<AuthorityId> {
+impl OrderRecord {
+	pub fn new() -> OrderRecord {
 		OrderRecord {
 			relay_parent: Default::default(),
 			relay_height: 0,
@@ -95,9 +94,8 @@ impl<AuthorityId> OrderRecord<AuthorityId> {
 
 sp_api::decl_runtime_apis! {
 	#[api_version(2)]
-	pub trait OrderRuntimeApi<Balance, AuthorityId> where
+	pub trait OrderRuntimeApi<Balance> where
 		Balance: Codec + MaybeDisplay,
-		AuthorityId:Codec
 	{
 
 		fn slot_width()-> u32;

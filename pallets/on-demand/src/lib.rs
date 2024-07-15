@@ -26,29 +26,18 @@
 //! whether the order has been executed, whether the order threshold has been reached, etc.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-use codec::{Decode, EncodeLike, MaxEncodedLen};
-use cumulus_pallet_parachain_system::RelayChainStateProof;
+use codec::{Decode, MaxEncodedLen};
 use frame_support::{
 	dispatch::DispatchResultWithPostInfo, dispatch::PostDispatchInfo, pallet_prelude::*,
 	traits::Currency,
 };
 use frame_system::pallet_prelude::*;
-use frame_system::{self, EventRecord};
 pub use pallet::*;
 use primitives::Balance;
-use primitives::{Id as ParaId, PersistedValidationData};
 use sp_runtime::sp_std::{prelude::*, vec};
-use sp_runtime::{traits::Member, RuntimeAppPublic};
 pub mod weights;
 use cumulus_pallet_parachain_system::RelaychainStateProvider;
-use frame_system::AccountInfo;
-use mp_coretime_on_demand::well_known_keys::{acount_balance, EnqueuedOrder, ON_DEMAND_QUEUE};
-use pallet_balances::AccountData;
-use sp_core::crypto::ByteArray;
-use sp_core::crypto::UncheckedFrom;
-use sp_runtime::traits::AccountIdConversion;
 use sp_runtime::Perbill;
-use sp_runtime::{self, AccountId32};
 use weights::WeightInfo;
 
 #[cfg(test)]
@@ -84,19 +73,14 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_aura::Config {
+	pub trait Config: frame_system::Config + pallet_aura::Config
+	where
+		<Self as frame_system::Config>::AccountId: From<[u8; 32]>,
+	{
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
 		type Currency: Currency<Self::AccountId>;
-
-		type AuthorityId: Member
-			+ Parameter
-			+ RuntimeAppPublic
-			+ MaybeSerializeDeserialize
-			+ MaxEncodedLen
-			+ UncheckedFrom<[u8; 32]>;
-		// + for<'a> TryFrom<&'a [u8]>;
 
 		type UpdateOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
@@ -132,7 +116,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn order_map)]
 	pub type OrderMap<T: Config> =
-		StorageMap<_, Twox64Concat, u64, Order<<T as pallet::Config>::AuthorityId>, OptionQuery>;
+		StorageMap<_, Twox64Concat, u64, Order<T::AccountId>, OptionQuery>;
 
 	/// Convert block height to sequence number.
 	#[pallet::storage]
@@ -142,14 +126,20 @@ pub mod pallet {
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
-	pub struct GenesisConfig<T: Config> {
+	pub struct GenesisConfig<T: Config>
+	where
+		T::AccountId: From<[u8; 32]>,
+	{
 		pub slot_width: u32,
 		pub price_limit: BalanceOf<T>,
 		pub gas_threshold: Perbill,
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T>
+	where
+		T::AccountId: From<[u8; 32]>,
+	{
 		fn build(&self) {
 			SlotWidth::<T>::put(&self.slot_width);
 			PriceLimit::<T>::put(&self.price_limit);
@@ -159,9 +149,12 @@ pub mod pallet {
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
+	pub enum Event<T: Config>
+	where
+		T::AccountId: From<[u8; 32]>,
+	{
 		/// Create order event.
-		OrderCreate { sequence_number: u64, orderer: <T as pallet::Config>::AuthorityId },
+		OrderCreate { sequence_number: u64, orderer: T::AccountId },
 	}
 
 	#[pallet::error]
@@ -183,20 +176,23 @@ pub mod pallet {
 	}
 
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> where T::AccountId: From<[u8; 32]> {}
 
 	#[pallet::inherent]
-	impl<T: Config> ProvideInherent for Pallet<T> {
+	impl<T: Config> ProvideInherent for Pallet<T>
+	where
+		T::AccountId: From<[u8; 32]>,
+	{
 		type Call = Call<T>;
 		type Error = MakeFatalError<()>;
 
 		const INHERENT_IDENTIFIER: InherentIdentifier = mp_coretime_on_demand::INHERENT_IDENTIFIER;
 		fn create_inherent(data: &InherentData) -> Option<Self::Call> {
-			let data: mp_coretime_on_demand::OrderInherentData<<T as pallet::Config>::AuthorityId> =
-				data.get_data(&mp_coretime_on_demand::INHERENT_IDENTIFIER)
-					.ok()
-					.flatten()
-					.expect("there is not data to be posted; qed");
+			let data: mp_coretime_on_demand::OrderInherentData = data
+				.get_data(&mp_coretime_on_demand::INHERENT_IDENTIFIER)
+				.ok()
+				.flatten()
+				.expect("there is not data to be posted; qed");
 			if data.author_pub.is_none() {
 				None
 			} else {
@@ -209,7 +205,10 @@ pub mod pallet {
 	}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>
+	where
+		T::AccountId: From<[u8; 32]>,
+	{
 		/// Create an order, which is called by the pallet.
 		/// Users cannot actively call this function.
 		/// Obtain order information by parsing inherited data.
@@ -220,7 +219,7 @@ pub mod pallet {
 		#[pallet::weight((<T as pallet::Config>::WeightInfo::create_order(), DispatchClass::Mandatory))]
 		pub fn create_order(
 			origin: OriginFor<T>,
-			data: mp_coretime_on_demand::OrderInherentData<<T as pallet::Config>::AuthorityId>,
+			data: mp_coretime_on_demand::OrderInherentData,
 		) -> DispatchResultWithPostInfo {
 			ensure_none(origin)?;
 
@@ -234,7 +233,10 @@ pub mod pallet {
 			// relay chian block number
 			let relay_chian_height = T::RelayChainStateProvider::current_relay_chain_state().number;
 			let block_number = frame_system::Pallet::<T>::block_number();
-			let orderer = author_pub.expect("author must exist");
+			let author = author_pub.expect("author must exist");
+			let mut r = [0u8; 32];
+			r.copy_from_slice(author.encode().as_slice());
+			let orderer = T::AccountId::try_from(r).map_err(|_| Error::<T>::SlotAuthorError)?;
 			// Check if the order is in author slot
 			if !Self::check_slot_author(place_order_height, orderer.clone()) {
 				Err(Error::<T>::SlotAuthorError)?;
@@ -242,7 +244,7 @@ pub mod pallet {
 			if order.is_none() {
 				OrderMap::<T>::insert(
 					old_sequence_number,
-					Order::<<T as pallet::Config>::AuthorityId> {
+					Order::<T::AccountId> {
 						sequence_number: old_sequence_number,
 						relay_chian_height,
 						place_order_height,
@@ -315,7 +317,10 @@ pub mod pallet {
 	}
 }
 
-impl<T: Config> Pallet<T> {
+impl<T: Config> Pallet<T>
+where
+	T::AccountId: From<[u8; 32]>,
+{
 	/// Whether the gas threshold for placing an order has been reached.
 	///
 	/// Parameters:
@@ -325,10 +330,7 @@ impl<T: Config> Pallet<T> {
 		gas_balance > txpool_threshold * core_price
 	}
 
-	fn check_slot_author(
-		relaychian_number: u32,
-		author: <T as pallet::Config>::AuthorityId,
-	) -> bool {
+	fn check_slot_author(relaychian_number: u32, author: T::AccountId) -> bool {
 		let authorities = pallet_aura::Pallet::<T>::authorities();
 		let slot_width = Self::slot_width();
 		let auth_len = authorities.len() as u32;
