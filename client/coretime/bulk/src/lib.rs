@@ -23,7 +23,6 @@
 //!
 mod metadata;
 
-use codec::Codec;
 use cumulus_primitives_core::ParaId;
 use cumulus_relay_chain_interface::RelayChainInterface;
 use futures::{lock::Mutex, select, FutureExt};
@@ -40,10 +39,7 @@ use polkadot_primitives::{AccountId, Balance};
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
 use sp_api::ProvideRuntimeApi;
-use sp_application_crypto::AppPublic;
-use sp_consensus_aura::AuraApi;
-use sp_core::crypto::Pair;
-use sp_runtime::traits::{Block as BlockT, Member};
+use sp_runtime::traits::Block as BlockT;
 use sp_state_machine::StorageProof;
 use std::{error::Error, sync::Arc};
 use subxt::{
@@ -61,7 +57,7 @@ fn u8_array_to_u128(array: [u8; 10]) -> u128 {
 }
 
 /// The main logic of bulk task.
-pub async fn coretime_bulk_task<P, R, Block, PB>(
+pub async fn coretime_bulk_task<P, R, Block>(
 	parachain: &P,
 	relay_chain: R,
 	para_id: ParaId,
@@ -71,10 +67,7 @@ where
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	R: RelayChainInterface + Clone,
-	P::Api: AuraApi<Block, PB::Public> + BulkRuntimeApi<Block>,
-	PB: Pair + 'static,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
+	P::Api: BulkRuntimeApi<Block>,
 {
 	let relay_chain_clone = relay_chain.clone();
 
@@ -229,7 +222,7 @@ where
 
 	Ok(())
 }
-pub async fn run_coretime_bulk_task<P, R, Block, PB>(
+pub async fn run_coretime_bulk_task<P, R, Block>(
 	parachain: Arc<P>,
 	relay_chain: R,
 	para_id: ParaId,
@@ -238,29 +231,22 @@ pub async fn run_coretime_bulk_task<P, R, Block, PB>(
 	Block: BlockT,
 	P: ProvideRuntimeApi<Block> + UsageProvider<Block>,
 	R: RelayChainInterface + Clone,
-	P::Api: AuraApi<Block, PB::Public> + BulkRuntimeApi<Block>,
-	PB: Pair + 'static,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
+	P::Api: BulkRuntimeApi<Block>,
 {
-	let relay_chain_notification = async move {
+	let bulk_task = async move {
 		loop {
-			let _ = coretime_bulk_task::<_, _, _, PB>(
-				&*parachain,
-				relay_chain.clone(),
-				para_id,
-				bulk_record.clone(),
-			)
-			.await;
+			let _ =
+				coretime_bulk_task(&*parachain, relay_chain.clone(), para_id, bulk_record.clone())
+					.await;
 		}
 	};
 	select! {
-		_ = relay_chain_notification.fuse() =>  {},
+		_ = bulk_task.fuse() =>  {},
 	}
 }
 
 /// Spawn task for bulk mode
-pub fn spawn_bulk_task<P, R, Block, PB>(
+pub fn spawn_bulk_task<P, R, Block>(
 	parachain: Arc<P>,
 	para_id: ParaId,
 	relay_chain: R,
@@ -271,12 +257,9 @@ where
 	Block: BlockT,
 	R: RelayChainInterface + Clone + 'static,
 	P: Send + Sync + 'static + ProvideRuntimeApi<Block> + UsageProvider<Block>,
-	P::Api: AuraApi<Block, PB::Public> + BulkRuntimeApi<Block>,
-	PB: Pair + 'static,
-	PB::Public: AppPublic + Member + Codec,
-	PB::Signature: TryFrom<Vec<u8>> + Member + Codec,
+	P::Api: BulkRuntimeApi<Block>,
 {
-	let coretime_bulk_task = run_coretime_bulk_task::<_, _, _, PB>(
+	let coretime_bulk_task = run_coretime_bulk_task(
 		parachain.clone(),
 		relay_chain.clone(),
 		para_id,
@@ -284,6 +267,6 @@ where
 	);
 	task_manager
 		.spawn_essential_handle()
-		.spawn("bulk task", "magport", coretime_bulk_task);
+		.spawn("bulk task", "coretime", coretime_bulk_task);
 	Ok(())
 }
