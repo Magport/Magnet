@@ -14,33 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-use crate::{self as bulk_pallet};
-use cumulus_pallet_parachain_system::{RelayChainState, RelaychainStateProvider};
+use crate::{self as order_pallet};
+use cumulus_pallet_parachain_system::RelayChainState;
+use cumulus_pallet_parachain_system::RelaychainStateProvider;
 pub use frame_support::{
 	construct_runtime, derive_impl, parameter_types,
 	traits::{Everything, Hooks},
-	BoundedVec,
 };
 use frame_system as system;
 use frame_system::{pallet_prelude::BlockNumberFor, EnsureRoot};
-use sp_core::{crypto::AccountId32, H256};
+pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
+use sp_core::{crypto::AccountId32, ConstBool, ConstU32, ConstU64, H256};
+use sp_keyring::Sr25519Keyring::Alice;
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentifyAccount, IdentityLookup, Verify},
-	BuildStorage, MultiSignature,
+	BuildStorage, MultiSignature, Perbill,
 };
-use std::str::FromStr;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 type Signature = MultiSignature;
 type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 type Balance = u128;
+
+pub const MILLISECS_PER_BLOCK: u64 = 6000;
+
+pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
+
 // Configure a mock runtime to test the pallet.
 construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system::{Pallet, Call, Config<T>, Storage, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Event<T>},
-		BulkPallet: bulk_pallet::{Pallet, Call, Storage, Event<T>},
+		Aura: pallet_aura,
+		Timestamp: pallet_timestamp,
+		OrderPallet: order_pallet::{Pallet, Call, Storage, Event<T>},
 		MockPallet: mock_pallet,
 	}
 );
@@ -118,23 +126,36 @@ impl RelaychainStateProvider for MockRelayStateProvider {
 		frame_support::storage::unhashed::put(b"MOCK_RELAY_ROOT_KEY", &state.state_root);
 	}
 }
-
-parameter_types! {
-	pub const MaxUrlLength: u32 = 300;
+impl pallet_timestamp::Config for Test {
+	/// A timestamp: milliseconds since the unix epoch.
+	type Moment = u64;
+	type OnTimestampSet = Aura;
+	#[cfg(feature = "experimental")]
+	type MinimumPeriod = ConstU64<0>;
+	#[cfg(not(feature = "experimental"))]
+	type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
+	type WeightInfo = ();
+}
+impl pallet_aura::Config for Test {
+	type AuthorityId = AuraId;
+	type DisabledValidators = ();
+	type MaxAuthorities = ConstU32<100_000>;
+	type AllowMultipleBlocksPerSlot = ConstBool<false>;
+	#[cfg(feature = "experimental")]
+	type SlotDuration = ConstU64<SLOT_DURATION>;
 }
 
 impl crate::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type UpdateOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
-	type RelayChainStateProvider = MockRelayStateProvider;
-	type MaxUrlLength = MaxUrlLength;
 	type WeightInfo = ();
+	type RelayChainStateProvider = MockRelayStateProvider;
 }
-pub struct BulkGasCostHandler();
+pub struct OrderGasCostHandler();
 
-pub trait BulkGasCost<T: frame_system::Config> {
-	/// In Bulk mode, the average gas consumed by a block.
+pub trait OrderGasCost<T: frame_system::Config> {
+	/// Gas consumed by placing an order in a certain block.
 	///
 	/// Parameters:
 	/// - `block_number`: The block number of para chain.
@@ -143,14 +164,23 @@ pub trait BulkGasCost<T: frame_system::Config> {
 	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError>;
 }
 
-impl<T> BulkGasCost<T> for BulkGasCostHandler
+impl<T> OrderGasCost<T> for OrderGasCostHandler
 where
 	T: crate::Config,
+	T::AccountId: From<[u8; 32]>,
 {
 	fn gas_cost(
-		_block_number: BlockNumberFor<T>,
+		block_number: BlockNumberFor<T>,
 	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
-		Ok(None)
+		let sequece_number = <crate::Pallet<T>>::block_2_sequence(block_number);
+		if sequece_number.is_none() {
+			return Ok(None);
+		}
+		let order = <crate::Pallet<T>>::order_map(
+			sequece_number.ok_or(sp_runtime::DispatchError::Other("sequece_number is none"))?,
+		)
+		.ok_or(sp_runtime::DispatchError::Other("Not exist order"))?;
+		Ok(Some((order.orderer, order.price)))
 	}
 }
 
@@ -159,7 +189,7 @@ pub mod mock_pallet {
 	use super::*;
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		type BulkGasCost: BulkGasCost<Self>;
+		type OrderGasCost: OrderGasCost<Self>;
 	}
 
 	#[pallet::call]
@@ -171,13 +201,13 @@ pub mod mock_pallet {
 
 	impl<T: Config> Pallet<T> {
 		pub fn get_gas_cost(block_number: BlockNumberFor<T>) -> Option<(T::AccountId, Balance)> {
-			T::BulkGasCost::gas_cost(block_number).unwrap()
+			T::OrderGasCost::gas_cost(block_number).unwrap()
 		}
 	}
 }
 
 impl mock_pallet::Config for Test {
-	type BulkGasCost = BulkGasCostHandler;
+	type OrderGasCost = OrderGasCostHandler;
 }
 pub struct ExtBuilder {
 	balances: Vec<(AccountId32, u128)>,
@@ -197,15 +227,15 @@ impl ExtBuilder {
 			.assimilate_storage(&mut t)
 			.unwrap();
 		crate::GenesisConfig::<Test> {
-			rpc_url: BoundedVec::try_from("ws://127.0.0.1:8855".as_bytes().to_vec()).unwrap(),
-			genesis_hash: H256::from_str(
-				"0x4ea18c8f295ba903acbbed39c70ea0569cf1705fa954a537ffa3b8b7125eaf58",
-			)
-			.expect("internal U256 is valid; qed"),
-			_marker: Default::default(),
+			slot_width: 3,
+			price_limit: 200000000,
+			gas_threshold: Perbill::one(),
 		}
 		.assimilate_storage(&mut t)
 		.unwrap();
+		pallet_aura::GenesisConfig::<Test> { authorities: vec![Alice.public().into()] }
+			.assimilate_storage(&mut t)
+			.unwrap();
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext

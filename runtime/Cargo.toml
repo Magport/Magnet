@@ -32,8 +32,9 @@ pallet-pot-runtime-api = { path = "../pallets/pot/runtime-api", default-features
 pallet-assurance = { path = "../pallets/assurance", default-features = false }
 pallet-liquidation = {path = "../pallets/liquidation", default-features = false}
 pallet-bulk = { path = "../pallets/bulk", default-features = false }
+pallet-on-demand = { path = "../pallets/on-demand", default-features = false }
 mp-coretime-bulk = { path = "../primitives/coretime/bulk", default-features = false }
-
+mp-coretime-on-demand = { path = "../primitives/coretime/on-demand", default-features = false }
 
 # Substrate
 frame-benchmarking = { workspace = true, default-features = false, optional = true}
@@ -218,6 +219,8 @@ std = [
 	"pallet-proxy/std",
 	"pallet-bulk/std",
 	"mp-coretime-bulk/std",
+	"pallet-on-demand/std",
+	"mp-coretime-on-demand/std",
 ]
 
 runtime-benchmarks = [
@@ -243,7 +246,7 @@ runtime-benchmarks = [
 	"pallet-evm-utils/runtime-benchmarks",
 	"pallet-precompile-substrate-utils/runtime-benchmarks",
 	"pallet-precompile-transfer-to-magnet/runtime-benchmarks",
-#	"pallet-order/runtime-benchmarks",
+	"pallet-on-demand/runtime-benchmarks",
 	"pallet-collective/runtime-benchmarks",
 	"pallet-society/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",

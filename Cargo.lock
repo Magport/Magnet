@@ -6425,6 +6425,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "mc-coretime-on-demand"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-client-collator",
+ "cumulus-client-consensus-aura",
+ "cumulus-client-consensus-common",
+ "cumulus-client-consensus-proposer",
+ "cumulus-client-parachain-inherent",
+ "cumulus-primitives-aura",
+ "cumulus-primitives-core",
+ "cumulus-primitives-parachain-inherent",
+ "cumulus-relay-chain-interface",
+ "futures",
+ "log",
+ "mc-coretime-common",
+ "mp-coretime-common",
+ "mp-coretime-on-demand",
+ "mp-system",
+ "pallet-balances",
+ "pallet-broker",
+ "pallet-transaction-payment-rpc-runtime-api",
+ "parity-scale-codec",
+ "polkadot-node-primitives",
+ "polkadot-node-subsystem",
+ "polkadot-overseer",
+ "polkadot-primitives",
+ "polkadot-runtime-parachains",
+ "sc-client-api",
+ "sc-consensus",
+ "sc-consensus-aura",
+ "sc-consensus-babe",
+ "sc-consensus-slots",
+ "sc-service",
+ "sc-telemetry",
+ "sc-transaction-pool",
+ "sc-transaction-pool-api",
+ "schnellru",
+ "sp-api",
+ "sp-application-crypto 30.0.0",
+ "sp-block-builder",
+ "sp-blockchain",
+ "sp-consensus",
+ "sp-consensus-aura",
+ "sp-core 28.0.0",
+ "sp-inherents",
+ "sp-keyring",
+ "sp-keystore 0.34.0",
+ "sp-runtime 31.0.1",
+ "sp-state-machine 0.35.0",
+ "sp-storage 19.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "sp-timestamp",
+ "substrate-prometheus-endpoint",
+ "subxt",
+ "tracing",
+]
+
+[[package]]
 name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7159,6 +7217,33 @@ dependencies = [
  "async-trait",
  "cumulus-primitives-core",
  "cumulus-relay-chain-interface",
+ "hex-literal",
+ "log",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-api",
+ "sp-consensus-aura",
+ "sp-consensus-grandpa",
+ "sp-core 28.0.0",
+ "sp-inherents",
+ "sp-io 30.0.0",
+ "sp-runtime 31.0.1",
+ "sp-session",
+ "sp-state-machine 0.35.0",
+ "sp-std 14.0.0 (git+https://github.com/paritytech/polkadot-sdk?branch=release-polkadot-v1.7.0)",
+ "sp-trie 29.0.0",
+ "sp-weights 27.0.0",
+]
+
+[[package]]
+name = "mp-coretime-on-demand"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cumulus-primitives-core",
+ "cumulus-relay-chain-interface",
+ "frame-support",
+ "frame-system",
  "hex-literal",
  "log",
  "parity-scale-codec",
@@ -7925,9 +8010,9 @@ dependencies = [
  "frame-benchmarking",
  "frame-support",
  "frame-system",
+ "log",
  "mp-system",
  "pallet-balances",
- "pallet-pot",
  "pallet-timestamp",
  "parity-scale-codec",
  "scale-info",
@@ -8875,6 +8960,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-on-demand"
+version = "0.1.0"
+dependencies = [
+ "cumulus-pallet-parachain-system",
+ "cumulus-primitives-core",
+ "frame-benchmarking",
+ "frame-support",
+ "frame-system",
+ "hex",
+ "hex-literal",
+ "log",
+ "mp-coretime-on-demand",
+ "pallet-aura",
+ "pallet-balances",
+ "pallet-collective",
+ "pallet-society",
+ "pallet-timestamp",
+ "pallet-xcm",
+ "parachains-common",
+ "parity-scale-codec",
+ "polkadot-primitives",
+ "polkadot-runtime-parachains",
+ "scale-info",
+ "serde",
+ "sp-consensus-aura",
+ "sp-core 28.0.0",
+ "sp-io 30.0.0",
+ "sp-keyring",
+ "sp-runtime 31.0.1",
+ "sp-trie 29.0.0",
+ "staging-xcm-builder",
+]
+
+[[package]]
 name = "pallet-pot"
 version = "0.1.0"
 dependencies = [
@@ -9443,7 +9562,9 @@ dependencies = [
  "jsonrpsee",
  "log",
  "mc-coretime-bulk",
+ "mc-coretime-on-demand",
  "mp-coretime-bulk",
+ "mp-coretime-on-demand",
  "mp-system",
  "pallet-balances",
  "pallet-move-rpc",
@@ -9534,6 +9655,7 @@ dependencies = [
  "hex-literal",
  "log",
  "mp-coretime-bulk",
+ "mp-coretime-on-demand",
  "mp-system",
  "pallet-assets",
  "pallet-assets-bridge",
@@ -9561,6 +9683,7 @@ dependencies = [
  "pallet-message-queue",
  "pallet-move",
  "pallet-multisig",
+ "pallet-on-demand",
  "pallet-pot",
  "pallet-pot-runtime-api",
  "pallet-precompile-substrate-utils",
