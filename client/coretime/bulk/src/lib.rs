@@ -93,6 +93,7 @@ where
 			continue;
 		}
 		let block_number = block.header().number;
+		let block_hash = block.hash();
 
 		let mut bulk_record_local = bulk_record.lock().await;
 		bulk_record_local.coretime_para_height = block_number;
@@ -137,7 +138,7 @@ where
 						relevant_keys.push(block_hash_key);
 
 						let proof = rpc
-							.state_get_read_proof(relevant_keys, Some(events.block_hash()))
+							.state_get_read_proof(relevant_keys, Some(block_hash))
 							.await
 							.unwrap();
 						let storage_proof =
@@ -176,7 +177,7 @@ where
 
 			// Query CoreAssigned event.
 			let ev_core_assigned = event.as_event::<metadata::CoreAssigned>();
-
+			log::info!("=============event:{:?}", ev_core_assigned);
 			if let Ok(core_assigned_event) = ev_core_assigned {
 				if let Some(ev) = core_assigned_event {
 					log::info!(
