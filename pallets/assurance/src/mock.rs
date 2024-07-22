@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
-use super::*;
-
 use cumulus_pallet_parachain_system::{
 	consensus_hook::{ConsensusHook, UnincludedSegmentCapacity},
 	relay_state_snapshot::RelayChainStateProof,
@@ -28,15 +26,12 @@ use frame_support::{
 	traits::{ConstU32, ConstU64, Get},
 	weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
-use pallet_pot::PotNameBtreemap;
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
-use sp_std::collections::btree_map::BTreeMap;
 use sp_std::{cell::RefCell, num::NonZeroU32};
-//use frame_system::pallet_prelude::*;
 
 use crate as pallet_assurance;
 
@@ -48,7 +43,6 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		ParachainSystem: cumulus_pallet_parachain_system::{Pallet, Call, Config<T>, Storage, Event<T>},
-		Pot: pallet_pot::{Pallet, Call, Storage, Event<T>},
 		Assurance: pallet_assurance::{Pallet, Call, Config<T>, Storage, Event<T>},
 	}
 );
@@ -168,34 +162,10 @@ impl ConsensusHook for TestConsensusHook {
 	}
 }
 
-parameter_types! {
-	pub const PotNames: [&'static str;3] = ["system", "treasury", "maintenance"];
-	pub Pots: BTreeMap<String, AccountId> = pallet_pot
-											::HashedPotNameBtreemap
-											::<Test, pallet_pot::HashedPotNameMapping<BlakeTwo256>>
-											::pots_btreemap(&(PotNames::get()));
-}
-
-impl pallet_pot::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type PotNameMapping = pallet_pot::HashedPotNameMapping<BlakeTwo256>;
-	type Currency = Balances;
-	type Pots = Pots;
-}
-
-parameter_types! {
-	pub const SystemPotName: &'static str = "system";
-}
-
 impl pallet_assurance::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
-	type SystemPotName = SystemPotName;
-	type Liquidate = ();
 	type DefaultBidThreshold = ConstU32<8u32>;
-	type DefaultLiquidateThreshold = ConstU64<100_000_000_000_000>;
 }
-
-pub const ALICE: AccountId32 = AccountId32::new([21u8; 32]);
 
 pub struct ExtBuilder {
 	existential_deposit: u64,
@@ -223,7 +193,6 @@ impl ExtBuilder {
 			.unwrap();
 		pallet_assurance::GenesisConfig::<Test> {
 			bid_threshold: 8u32,
-			liquidate_threshold: 100_000_000_000_000u64,
 			_marker: Default::default(),
 		}
 		.assimilate_storage(&mut t)

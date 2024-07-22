@@ -1,8 +1,8 @@
 [package]
-name = "pallet-bulk"
+name = "pallet-on-demand"
 authors = ["Magnet"]
-description = "bulk mode runtime logic."
-version = "0.2.0"
+description = "On demand order runtime logic."
+version = "0.1.0"
 license = "Apache-2.0"
 homepage = "https://magnet.magport.io/"
 repository.workspace = true
@@ -15,12 +15,10 @@ targets = ["x86_64-unknown-linux-gnu"]
 codec = { package = "parity-scale-codec", workspace = true, features = ["derive"], default-features = false }
 scale-info = { workspace = true, default-features = false, features = ["derive"] }
 log = { workspace = true, default-features = false }
-hex = { workspace = true }
 hex-literal = { workspace = true }
 
 # Local
-mp-coretime-bulk = { path = "../../primitives/coretime/bulk", default-features = false }
-mp-coretime-common = { path = "../../primitives/coretime/common", default-features = false}
+mp-coretime-on-demand = { path = "../../primitives/coretime/on-demand", default-features = false }
 
 # Cumulus
 cumulus-pallet-parachain-system = { workspace = true, default-features = false}
@@ -39,12 +37,12 @@ sp-runtime = { workspace = true, default-features = false}
 sp-trie = { workspace = true, default-features = false }
 pallet-balances = { workspace = true, default-features = false }
 sp-core = { workspace = true , default-features = false}
-pallet-broker = { workspace = true, default-features = false }
+pallet-aura = { workspace = true, default-features = false }
 
 [dev-dependencies]
 serde = { workspace = true }
 codec = { workspace = true, features = ["derive"], default-features = false }
-hex = { workspace = true }
+hex = { workspace = true, default-features = false }
 
 # Substrate
 sp-core = { workspace = true, default-features = false}
@@ -57,7 +55,8 @@ pallet-xcm = { workspace = true, default-features = false}
 pallet-society ={ workspace = true, default-features = false}
 xcm-builder = { workspace = true, default-features = false }
 parachains-common = { workspace = true, default-features = false }
-cumulus-pallet-parachain-system = { workspace = true, default-features = false, features = ["parameterized-consensus-hook",] }
+pallet-timestamp = { workspace = true, default-features = false }
+sp-keyring = { workspace = true, default-features = false}
 
 [features]
 default = [ "std" ]
@@ -77,7 +76,7 @@ std = [
 	"sp-core/std",
 	"sp-io/std",
 	"sp-runtime/std",
-	"mp-coretime-bulk/std",
+	"mp-coretime-on-demand/std",
 	"log/std",
 	"cumulus-pallet-parachain-system/std",
 	"cumulus-primitives-core/std",
@@ -86,8 +85,7 @@ std = [
 	"sp-trie/std",
 	"pallet-balances/std",
 	"sp-core/std",
-	"mp-coretime-common/std",
-	"pallet-broker/std",
+	"pallet-aura/std",
 ]
 try-runtime = [
 	"frame-support/try-runtime",

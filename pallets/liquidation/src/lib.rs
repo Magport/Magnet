@@ -47,15 +47,6 @@ pub mod pallet {
 	use pallet_balances;
 	// use pallet_order::OrderGasCost;
 	use pallet_utility;
-	pub trait OrderGasCost<T: frame_system::Config> {
-		/// Gas consumed by placing an order in a certain block.
-		///
-		/// Parameters:
-		/// - `block_number`: The block number of para chain.
-		fn gas_cost(
-			block_number: BlockNumberFor<T>,
-		) -> Result<Option<(T::AccountId, Balance)>, DispatchError>;
-	}
 
 	#[pallet::pallet]
 	#[pallet::without_storage_info]
@@ -88,7 +79,7 @@ pub mod pallet {
 		type WeightToFee: WeightToFeePolynomial<Balance = Balance>;
 
 		///get real weight cost from coreTime placeOrder pallet
-		type OrderGasCost: OrderGasCost<Self>;
+		type OrderGasCost: crate::OrderGasCost<Self>;
 
 		/// ED necessitate the account to exist
 		#[pallet::constant]
@@ -756,7 +747,39 @@ pub mod pallet {
 	}
 }
 
+pub trait OrderGasCost<T: frame_system::Config> {
+	/// Gas consumed by placing an order in a certain block.
+	///
+	/// Parameters:
+	/// - `block_number`: The block number of para chain.
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError>;
+}
+
 impl<T> OrderGasCost<T> for ()
+where
+	T: frame_system::Config,
+	T::AccountId: From<[u8; 32]>,
+{
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError> {
+		Ok(None)
+	}
+}
+
+pub trait BulkGasCost<T: frame_system::Config> {
+	/// In Bulk mode, the average gas consumed by a block.
+	///
+	/// Parameters:
+	/// - `block_number`: The block number of para chain.
+	fn gas_cost(
+		block_number: BlockNumberFor<T>,
+	) -> Result<Option<(T::AccountId, Balance)>, sp_runtime::DispatchError>;
+}
+
+impl<T> BulkGasCost<T> for ()
 where
 	T: frame_system::Config,
 	T::AccountId: From<[u8; 32]>,

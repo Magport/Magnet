@@ -21,11 +21,9 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
-use frame_support::traits::{Currency, Get};
-use frame_support::{sp_runtime, weights::Weight};
-use mp_system::Liquidate;
+use frame_support::traits::Get;
+use frame_support::weights::Weight;
 pub use pallet::*;
-use sp_core::crypto::AccountId32;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -35,17 +33,10 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 
 	#[pallet::config]
-	pub trait Config:
-		pallet_pot::Config + cumulus_pallet_parachain_system::Config + frame_system::Config
-	{
+	pub trait Config: cumulus_pallet_parachain_system::Config + frame_system::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
-		/// System pot name
-		type SystemPotName: Get<&'static str>;
-		/// Liquidate type for liquidate
-		type Liquidate: Liquidate;
-		/// Threshod for force bid coretime and force liquidate
+		/// Threshod for force bid coretime
 		type DefaultBidThreshold: Get<u32>;
-		type DefaultLiquidateThreshold: Get<BalanceOf<Self>>;
 	}
 
 	#[pallet::pallet]
@@ -55,8 +46,6 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		NewBidThreshold(u32),
-		NewLiquidateThreshold(BalanceOf<T>),
-		ForceLiquidate(BalanceOf<T>),
 	}
 
 	#[pallet::error]
@@ -65,24 +54,19 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		pub bid_threshold: u32,
-		pub liquidate_threshold: BalanceOf<T>,
 		#[serde(skip)]
 		pub _marker: PhantomData<T>,
 	}
 
 	impl<T: Config> GenesisConfig<T> {
-		pub fn new(bid_threshold: u32, liquidate_threshold: BalanceOf<T>) -> Self {
-			Self { bid_threshold, liquidate_threshold, _marker: PhantomData }
+		pub fn new(bid_threshold: u32) -> Self {
+			Self { bid_threshold, _marker: PhantomData }
 		}
 	}
 
 	impl<T: Config> Default for GenesisConfig<T> {
 		fn default() -> Self {
-			Self {
-				bid_threshold: T::DefaultBidThreshold::get(),
-				liquidate_threshold: T::DefaultLiquidateThreshold::get(),
-				_marker: PhantomData,
-			}
+			Self { bid_threshold: T::DefaultBidThreshold::get(), _marker: PhantomData }
 		}
 	}
 
@@ -90,7 +74,6 @@ pub mod pallet {
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			<BidThreshold<T>>::put(self.bid_threshold);
-			<LiquidateThreshold<T>>::put(self.liquidate_threshold);
 		}
 	}
 
@@ -102,35 +85,8 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type BidThreshold<T> = StorageValue<_, u32, ValueQuery, DefaultBidThreshold<T>>;
 
-	#[pallet::type_value]
-	pub fn DefaultLiquidateThreshold<T: Config>() -> BalanceOf<T> {
-		T::DefaultLiquidateThreshold::get()
-	}
-
-	#[pallet::storage]
-	pub type LiquidateThreshold<T> =
-		StorageValue<_, BalanceOf<T>, ValueQuery, DefaultLiquidateThreshold<T>>;
-
 	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
-	where
-		T::AccountId: From<AccountId32>,
-	{
-		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			let mut weight = Weight::zero();
-
-			if let Ok(balance) = pallet_pot::Pallet::<T>::balance_of(T::SystemPotName::get()) {
-				if balance < LiquidateThreshold::<T>::get() {
-					weight += T::Liquidate::liquidate();
-					Self::deposit_event(Event::ForceLiquidate(balance));
-				}
-				weight += T::DbWeight::get().writes(1);
-			}
-			weight += T::DbWeight::get().reads(2);
-
-			weight
-		}
-	}
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
@@ -142,18 +98,6 @@ pub mod pallet {
 			Self::deposit_event(Event::NewBidThreshold(blocknumber));
 			Ok(())
 		}
-
-		#[pallet::call_index(1)]
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
-		pub fn set_liquidate_threshold(
-			origin: OriginFor<T>,
-			balance: BalanceOf<T>,
-		) -> DispatchResult {
-			ensure_root(origin)?;
-			let _ = Self::set_liquidate_threshold_inner(balance);
-			Self::deposit_event(Event::NewLiquidateThreshold(balance));
-			Ok(())
-		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -162,23 +106,14 @@ pub mod pallet {
 			T::DbWeight::get().writes(1)
 		}
 
-		pub fn set_liquidate_threshold_inner(value: BalanceOf<T>) -> Weight {
-			<LiquidateThreshold<T>>::put(value);
-			T::DbWeight::get().writes(1)
-		}
-
-		pub fn on_relaychain(blocknumber: u32) -> i32 {
+		pub fn on_relaychain(blocknumber: u32) -> bool {
 			let last_relay_block_number =
 				RelaychainDataProvider::<T>::current_relay_chain_state().number;
 			if blocknumber > BidThreshold::<T>::get() + u32::from(last_relay_block_number) {
-				return 1;
+				return true;
 			}
 
-			0
+			false
 		}
 	}
 }
-
-pub type BalanceOf<T> = <<T as pallet_pot::Config>::Currency as Currency<
-	<T as frame_system::Config>::AccountId,
->>::Balance;

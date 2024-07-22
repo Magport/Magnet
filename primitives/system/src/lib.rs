@@ -16,7 +16,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::weights::Weight;
 use sp_core::crypto::AccountId32;
 
 // Base account id b"system:base' and fill with 1u32
@@ -26,20 +25,10 @@ const A: [u8; 32] = [
 ];
 pub const BASE_ACCOUNT: AccountId32 = AccountId32::new(A);
 
-pub trait Liquidate {
-	fn liquidate() -> Weight;
-}
-
-impl Liquidate for () {
-	fn liquidate() -> Weight {
-		Weight::zero()
-	}
-}
-
 sp_api::decl_runtime_apis! {
 	// API for on_relaychain call
 	pub trait OnRelayChainApi {
 		// return on_relaychain call result, 1 for force bid coretime
-		fn on_relaychain(blocknumber: u32) -> i32;
+		fn on_relaychain(blocknumber: u32) -> bool;
 	}
 }

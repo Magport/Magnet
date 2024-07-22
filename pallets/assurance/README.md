@@ -1,4 +1,4 @@
-# EVM-Utils Pallet
+# Assurance Pallet
 
 The Assurance Pallet ensuring block production as parathread.
 
@@ -7,7 +7,6 @@ The Assurance Pallet ensuring block production as parathread.
 
 ### Dispatchable Functions
 
-- `deposit` - deposit currency Dot to systems and special accounts.
 
 
 
