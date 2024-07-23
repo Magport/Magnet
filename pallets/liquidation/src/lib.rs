@@ -128,8 +128,9 @@ pub mod pallet {
 	pub type TreasuryRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
 
 	#[pallet::storage]
-	#[pallet::getter(fn operation_ratio)]
-	pub type OperationRatio<T: Config> = StorageValue<_, u32, ValueQuery>;
+	#[pallet::getter(fn operation_ratios)]
+	pub type OperationRatios<T: Config> =
+		StorageMap<_, Twox64Concat, T::AccountId, u32, ValueQuery>;
 
 	#[pallet::storage]
 	#[pallet::getter(fn collator_ratio)]
@@ -155,7 +156,7 @@ pub mod pallet {
 		pub admin_key: Option<T::AccountId>,
 		pub system_ratio: u32,
 		pub treasury_ratio: u32,
-		pub operation_ratio: u32,
+		pub operation_ratios: Vec<(T::AccountId, u32)>,
 		pub collator_ratio: u32,
 		pub min_liquidation_threshold: Balance,
 		pub profit_distribution_cycle: BlockNumberFor<T>,
@@ -167,7 +168,7 @@ pub mod pallet {
 			assert!(
 				self.system_ratio
 					+ self.treasury_ratio
-					+ self.operation_ratio
+					+ self.operation_ratios.iter().map(|(_, r)| *r).sum::<u32>()
 					+ self.collator_ratio
 					<= 100 * (PERCENT_UNIT as u32),
 				"Ratio sum must be <= 100%"
@@ -186,10 +187,12 @@ pub mod pallet {
 			}
 			SystemRatio::<T>::put(self.system_ratio);
 			TreasuryRatio::<T>::put(self.treasury_ratio);
-			OperationRatio::<T>::put(self.operation_ratio);
 			CollatorRatio::<T>::put(self.collator_ratio);
 			MinLiquidationThreshold::<T>::put(self.min_liquidation_threshold);
 			ProfitDistributionCycle::<T>::put(self.profit_distribution_cycle);
+			for (account, ratio) in &self.operation_ratios {
+				OperationRatios::<T>::insert(account, ratio);
+			}
 		}
 	}
 
@@ -224,8 +227,8 @@ pub mod pallet {
 		/// Set treasury ratio
 		TreasuryRatioSet(u32),
 
-		/// Set operation ratio
-		OperationRatioSet(u32),
+		/// Set operation ratio for a specific account
+		OperationRatioSet(T::AccountId, u32),
 
 		///Set collator ratio
 		CollatorRatioSet(u32),
@@ -466,6 +469,7 @@ pub mod pallet {
 				Error::<T>::GetPotAccountError
 			})?;
 
+			/*
 			let operation_account = pallet_pot::Pallet::<T>::ensure_pot(
 				T::OperationAccountName::get(),
 			)
@@ -473,17 +477,18 @@ pub mod pallet {
 				log::error!("get maintenance account err:{:?}", err);
 				Error::<T>::GetPotAccountError
 			})?;
+			*/
 
-			let system_ratio = SystemRatio::<T>::get();
+			//let system_ratio = SystemRatio::<T>::get();
 			let treasury_ratio = TreasuryRatio::<T>::get();
-			let operation_ratio = OperationRatio::<T>::get();
+			let collators_ratio = CollatorRatio::<T>::get();
+			//let total_operation_ratio: u32 = OperationRatios::<T>::iter().map(|(_, r)| r).sum();
 
 			let treasury_amount = (treasury_ratio as u128) / PERCENT_UNIT * total_profit
 				/ PARACHAIN_TO_RELAYCHAIN_UNIT;
-			let operation_amount = (operation_ratio as u128) / PERCENT_UNIT * total_profit;
-			let system_amount = (system_ratio as u128) / PERCENT_UNIT * total_profit;
-			let total_collators_profit =
-				total_profit.saturating_sub(treasury_amount + operation_amount + system_amount);
+			//let operation_amount = (operation_ratio as u128) / PERCENT_UNIT * total_profit;
+			//let system_amount = (system_ratio as u128) / PERCENT_UNIT * total_profit;
+			let total_collators_profit = (collators_ratio as u128) / PERCENT_UNIT * total_profit;
 
 			let origin: OriginFor<T> =
 				frame_system::RawOrigin::Signed(treasury_account.clone()).into();
@@ -501,9 +506,12 @@ pub mod pallet {
 			transfers.push((treasury_account, treasury_account_profit));
 			*/
 
-			let operation_account_profit =
-				operation_amount.try_into().unwrap_or_else(|_| Zero::zero());
-			transfers.push((operation_account, operation_account_profit));
+			for (operation_account, ratio) in OperationRatios::<T>::iter() {
+				let operation_amount = (ratio as u128) / PERCENT_UNIT * total_profit;
+				let operation_account_profit =
+					operation_amount.try_into().unwrap_or_else(|_| Zero::zero());
+				transfers.push((operation_account, operation_account_profit));
+			}
 
 			for (collator, collator_cost) in CollatorRealGasCosts::<T>::iter() {
 				let collator_ratio = Percent::from_rational(collator_cost, total_cost);
@@ -603,7 +611,7 @@ pub mod pallet {
 			ensure_root_or_admin::<T>(origin)?;
 
 			let treasury_ratio = TreasuryRatio::<T>::get();
-			let operation_ratio = OperationRatio::<T>::get();
+			let operation_ratio = OperationRatios::<T>::iter().map(|(_, r)| r).sum();
 			let collator_ratio = CollatorRatio::<T>::get();
 
 			let total_ratio = treasury_ratio + ratio + operation_ratio + collator_ratio;
@@ -627,7 +635,7 @@ pub mod pallet {
 			ensure_root_or_admin::<T>(origin)?;
 
 			let system_ratio = SystemRatio::<T>::get();
-			let operation_ratio = OperationRatio::<T>::get();
+			let operation_ratio = OperationRatios::<T>::iter().map(|(_, r)| r).sum();
 			let collator_ratio = CollatorRatio::<T>::get();
 
 			let total_ratio = system_ratio + ratio + operation_ratio + collator_ratio;
@@ -648,25 +656,29 @@ pub mod pallet {
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn set_operation_ratio(origin: OriginFor<T>, ratio: u32) -> DispatchResultWithPostInfo {
+		pub fn set_operation_ratio(
+			origin: OriginFor<T>,
+			operation_account: T::AccountId,
+			ratio: u32,
+		) -> DispatchResultWithPostInfo {
 			ensure_root_or_admin::<T>(origin)?;
 
 			let system_ratio = SystemRatio::<T>::get();
 			let treasury_ratio = TreasuryRatio::<T>::get();
 			let collator_ratio = CollatorRatio::<T>::get();
+			let total_existing_operation_ratio: u32 =
+				OperationRatios::<T>::iter().map(|(_, r)| r).sum();
+			let total_ratio = system_ratio
+				+ treasury_ratio + collator_ratio
+				+ total_existing_operation_ratio
+				+ ratio;
+			log::info!("3 -+-+-+-+-+ set operation ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, collator_ratio:{:?}, operation account:{:?}, op_ratio:{:?}",
+				total_ratio, system_ratio, treasury_ratio, collator_ratio, operation_account, ratio);
 
-			let total_ratio = system_ratio + treasury_ratio + ratio + collator_ratio;
-			log::info!("3 -+-+-+-+-+ set operation ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, collator_ratio:{:?}, operation_ratio:{:?}",
-            total_ratio, system_ratio, treasury_ratio, collator_ratio, ratio);
-			ensure_total_ratio_not_exceed_one::<T>(
-				system_ratio,
-				treasury_ratio,
-				ratio,
-				collator_ratio,
-			)?;
+			ensure!((total_ratio as u128) <= 100 * PERCENT_UNIT, Error::<T>::InvalidRatio);
 
-			OperationRatio::<T>::put(ratio);
-			Self::deposit_event(Event::OperationRatioSet(ratio));
+			OperationRatios::<T>::insert(operation_account.clone(), ratio);
+			Self::deposit_event(Event::OperationRatioSet(operation_account, ratio));
 			Ok(Pays::No.into())
 		}
 
@@ -677,7 +689,7 @@ pub mod pallet {
 
 			let system_ratio = SystemRatio::<T>::get();
 			let treasury_ratio = TreasuryRatio::<T>::get();
-			let operation_ratio = OperationRatio::<T>::get();
+			let operation_ratio = OperationRatios::<T>::iter().map(|(_, r)| r).sum();
 
 			let total_ratio = system_ratio + treasury_ratio + ratio + operation_ratio;
 			log::info!("4. *********** set collator ratio, total ratio:{:?}, system_ratio:{:?}, treasury_ratio:{:?}, operation_ratio:{:?}, collator_ratio:{:?}",
