@@ -28,12 +28,11 @@ use frame_support::{
 	traits::Currency,
 };
 use frame_system::pallet_prelude::*;
-use mp_coretime_bulk::well_known_keys::broker_regions;
+use mp_coretime_bulk::{well_known_keys::broker_regions, RegionRecord, RegionRecordV0};
 use mp_coretime_common::{
 	chain_state_snapshot::GenericStateProof, well_known_keys::SYSTEM_BLOCKHASH_GENESIS,
 };
 pub use pallet::*;
-use pallet_broker::RegionRecord;
 use sp_runtime::sp_std::{prelude::*, vec};
 use weights::WeightInfo;
 
@@ -245,11 +244,25 @@ pub mod pallet {
 
 			let region_key = broker_regions(region_id);
 			// Read RegionRecord from proof.
-			let region_record = storage_rooted_proof
+			let p_region_record = storage_rooted_proof
 				.read_entry::<RegionRecord<T::AccountId, BalanceOf<T>>>(region_key.as_slice(), None)
-				.ok()
-				.ok_or(Error::<T>::FailedReading)?;
-
+				.ok();
+			let (balance, purchaser) = if let Some(region_record) = p_region_record {
+				let balance = region_record.paid.ok_or(Error::<T>::PurchaserNone)?;
+				let purchaser = region_record.owner.ok_or(Error::<T>::PurchaserNone)?;
+				(balance, purchaser)
+			} else {
+				let region_record = storage_rooted_proof
+					.read_entry::<RegionRecordV0<T::AccountId, BalanceOf<T>>>(
+						region_key.as_slice(),
+						None,
+					)
+					.ok()
+					.ok_or(Error::<T>::FailedReading)?;
+				let balance = region_record.paid.ok_or(Error::<T>::PurchaserNone)?;
+				let purchaser = region_record.owner;
+				(balance, purchaser)
+			};
 			let genesis_hash_key = SYSTEM_BLOCKHASH_GENESIS;
 			let genesis_hash = storage_rooted_proof
 				.read_entry::<PHash>(genesis_hash_key, None)
@@ -263,8 +276,7 @@ pub mod pallet {
 			let real_start_relaychain_height = Self::relaychain_block_number();
 			let real_end_relaychain_height = real_start_relaychain_height + duration;
 			let old_record_index = RecordIndex::<T>::get();
-			let balance = region_record.paid.ok_or(Error::<T>::PurchaserNone)?;
-			let purchaser = region_record.owner;
+
 			// Create record of purchase coretime.
 			BulkRecords::<T>::insert(
 				old_record_index,
@@ -282,7 +294,7 @@ pub mod pallet {
 			Self::deposit_event(Event::RecordCreated {
 				purchaser,
 				price: balance,
-				duration: region_record.end,
+				duration,
 				start_relaychain_height,
 				end_relaychain_height,
 				real_start_relaychain_height,

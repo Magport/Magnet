@@ -29,12 +29,12 @@ use futures::{lock::Mutex, select, FutureExt};
 use mc_coretime_common::is_parathread;
 use mp_coretime_bulk::{
 	self, well_known_keys::broker_regions, BulkMemRecord, BulkMemRecordItem, BulkRuntimeApi,
-	BulkStatus,
+	BulkStatus, RegionRecord,
 };
 use mp_coretime_common::{
 	chain_state_snapshot::GenericStateProof, well_known_keys::SYSTEM_BLOCKHASH_GENESIS,
 };
-use pallet_broker::{CoreMask, RegionId, RegionRecord};
+use pallet_broker::{CoreMask, RegionId};
 use polkadot_primitives::{AccountId, Balance};
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
@@ -80,7 +80,7 @@ where
 
 	let api = OnlineClient::<PolkadotConfig>::from_url(rpc_url).await?;
 
-	let mut blocks_sub = api.blocks().subscribe_best().await?;
+	let mut blocks_sub = api.blocks().subscribe_finalized().await?;
 
 	// For each block, print a bunch of information about it:
 	while let Some(block) = blocks_sub.next().await {
@@ -137,10 +137,8 @@ where
 						relevant_keys.push(region_key.as_slice());
 						relevant_keys.push(block_hash_key);
 
-						let proof = rpc
-							.state_get_read_proof(relevant_keys, Some(block_hash))
-							.await
-							.unwrap();
+						let proof =
+							rpc.state_get_read_proof(relevant_keys, Some(block_hash)).await?;
 						let storage_proof =
 							StorageProof::new(proof.proof.into_iter().map(|bytes| bytes.to_vec()));
 
@@ -177,7 +175,6 @@ where
 
 			// Query CoreAssigned event.
 			let ev_core_assigned = event.as_event::<metadata::CoreAssigned>();
-			log::info!("=============event:{:?}", ev_core_assigned);
 			if let Ok(core_assigned_event) = ev_core_assigned {
 				if let Some(ev) = core_assigned_event {
 					log::info!(
@@ -220,7 +217,6 @@ where
 			}
 		}
 	}
-
 	Ok(())
 }
 pub async fn run_coretime_bulk_task<P, R, Block>(

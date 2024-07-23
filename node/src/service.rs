@@ -49,8 +49,6 @@ use crate::eth::{
 	FrontierBlockImport as TFrontierBlockImport,
 	FrontierPartialComponents,
 };
-use cumulus_relay_chain_interface::OccupiedCoreAssumption;
-use cumulus_relay_chain_interface::PersistedValidationData;
 use futures::lock::Mutex;
 use mc_coretime_bulk::spawn_bulk_task;
 use mc_coretime_on_demand::spawn_on_demand_order;
@@ -581,7 +579,6 @@ fn start_consensus(
 	let params = AuraParams {
 		create_inherent_data_providers: move |_, ()| {
 			let bulk_mem_record_clone = bulk_mem_record.clone();
-			let relay_chain_interface = relay_chain_interface.clone();
 			let order_record_clone = order_record.clone();
 			async move {
 				let mut bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
