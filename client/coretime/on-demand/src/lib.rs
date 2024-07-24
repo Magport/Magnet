@@ -31,19 +31,14 @@ use cumulus_primitives_core::{
 };
 use cumulus_relay_chain_interface::{RelayChainInterface, RelayChainResult};
 use futures::{lock::Mutex, pin_mut, select, FutureExt, Stream, StreamExt};
-use mc_coretime_common::is_parathread;
+use mc_coretime_common::{coretime_cores, is_parathread, relaychain_spot_price};
 use metadata::{CoreAssignment, CoreDescriptor};
 use mp_coretime_on_demand::{
-	self,
-	well_known_keys::{
-		paras_core_descriptors, EnqueuedOrder, ACTIVE_CONFIG, ON_DEMAND_QUEUE, SPOT_TRAFFIC,
-	},
-	OrderRecord, OrderRuntimeApi, OrderStatus,
+	self, well_known_keys::paras_core_descriptors, OrderRecord, OrderRuntimeApi, OrderStatus,
 };
 use mp_system::OnRelayChainApi;
 pub use pallet_transaction_payment_rpc_runtime_api::TransactionPaymentApi;
 use polkadot_primitives::OccupiedCoreAssumption;
-use runtime_parachains::configuration::HostConfiguration;
 use sc_client_api::UsageProvider;
 use sc_service::TaskManager;
 use sc_transaction_pool_api::{InPoolTransaction, MaintainedTransactionPool};
@@ -55,10 +50,7 @@ use sp_core::H256;
 use sp_keystore::KeystorePtr;
 use sp_runtime::{
 	codec::Encode,
-	traits::{
-		AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay, SaturatedConversion,
-	},
-	FixedPointNumber, FixedU128,
+	traits::{AtLeast32BitUnsigned, Block as BlockT, Header as HeaderT, MaybeDisplay},
 };
 use std::{cmp::Ordering, net::SocketAddr};
 use std::{error::Error, fmt::Debug, sync::Arc};
@@ -84,21 +76,9 @@ async fn get_spot_price<Balance>(
 where
 	Balance: Codec + MaybeDisplay + 'static + Debug + From<u128>,
 {
-	let spot_traffic_storage = relay_chain.get_storage_by_key(hash, SPOT_TRAFFIC).await.ok()?;
-	let p_spot_traffic = spot_traffic_storage
-		.map(|raw| <FixedU128>::decode(&mut &raw[..]))
-		.transpose()
-		.ok()?;
-	let active_config_storage = relay_chain.get_storage_by_key(hash, ACTIVE_CONFIG).await.ok()?;
-	let p_active_config = active_config_storage
-		.map(|raw| <HostConfiguration<u32>>::decode(&mut &raw[..]))
-		.transpose()
-		.ok()?;
-	if p_spot_traffic.is_some() && p_active_config.is_some() {
-		let spot_traffic = p_spot_traffic.unwrap();
-		let active_config = p_active_config.unwrap();
-		let spot_price = spot_traffic
-			.saturating_mul_int(active_config.on_demand_base_fee.saturated_into::<u128>());
+	let p_spot_price = relaychain_spot_price(&relay_chain, hash).await;
+	log::info!("=============p_spot_price:{:?}", p_spot_price);
+	if let Some(spot_price) = p_spot_price {
 		Some(Balance::from(spot_price))
 	} else {
 		None
@@ -107,20 +87,14 @@ where
 
 /// Whether the relay chain has ondemand function enabled.
 async fn start_on_demand(
-	relay_chain: impl RelayChainInterface + Clone,
+	relay_chain: impl RelayChainInterface + Clone + Send,
 	hash: H256,
 	para_id: ParaId,
 ) -> Option<bool> {
-	let active_config_storage = relay_chain.get_storage_by_key(hash, ACTIVE_CONFIG).await.ok()?;
-	// Get config
-	let p_active_config = active_config_storage
-		.map(|raw| <HostConfiguration<u32>>::decode(&mut &raw[..]))
-		.transpose()
-		.ok()?;
-	if let Some(active_config) = p_active_config {
-		let mut result = false;
-		// Get the number of cores.
-		let cores = active_config.coretime_cores;
+	// Get the number of cores.
+	let r_cores = coretime_cores(&relay_chain, hash).await;
+	let mut result = false;
+	if let Some(cores) = r_cores {
 		for core in 0..cores {
 			let key = paras_core_descriptors(polkadot_primitives::CoreIndex(core));
 			let core_descriptors_storage =
@@ -143,11 +117,8 @@ async fn start_on_demand(
 				}
 			}
 		}
-		Some(result)
-	} else {
-		// get config failed
-		Some(false)
 	}
+	Some(result)
 }
 
 /// Create an order to purchase core.
@@ -348,27 +319,6 @@ where
 	);
 
 	// Check whether the conditions for placing an order are met, and if so, place the order
-
-	// Check if it is in the ondemand queue, if so, do not place a order.
-	// key = OnDemandAssignmentProvider OnDemandQueue
-	let mut exist_order = false;
-	let on_demand_queue_storage = relay_chain.get_storage_by_key(p_hash, ON_DEMAND_QUEUE).await?;
-	let on_demand_queue = on_demand_queue_storage
-		.map(|raw| <Vec<EnqueuedOrder>>::decode(&mut &raw[..]))
-		.transpose()?;
-	if let Some(vvs) = on_demand_queue.clone() {
-		for vv in vvs.into_iter() {
-			if vv.para_id == para_id {
-				exist_order = true;
-				break;
-			}
-		}
-	}
-	if exist_order {
-		let mut order_record_local = order_record.lock().await;
-		order_record_local.order_status = OrderStatus::Complete;
-		return Ok(());
-	}
 	// get on demand core price
 	let max_amount = parachain.runtime_api().order_max_amount(hash)?;
 	let p_spot_price = get_spot_price::<Balance>(relay_chain.clone(), p_hash).await;
@@ -511,7 +461,7 @@ pub async fn ondemand_event_task(
 		for event in events.iter() {
 			let event = event?;
 			// Query Broker Assigned Event
-			let ev_order_placed = event.as_event::<metadata::OnDemandOrderPlaced>();
+			let ev_order_placed = event.as_event::<metadata::OnDemandOrderPlacedV0>();
 			if let Ok(order_placed_event) = ev_order_placed {
 				if let Some(ev) = order_placed_event {
 					log::info!(
