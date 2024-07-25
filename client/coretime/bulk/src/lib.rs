@@ -29,7 +29,7 @@ use futures::{lock::Mutex, select, FutureExt};
 use mc_coretime_common::is_parathread;
 use mp_coretime_bulk::{
 	self, well_known_keys::broker_regions, BulkMemRecord, BulkMemRecordItem, BulkRuntimeApi,
-	BulkStatus, RegionRecord,
+	BulkStatus, RegionRecord, RegionRecordV0,
 };
 use mp_coretime_common::{
 	chain_state_snapshot::GenericStateProof, well_known_keys::SYSTEM_BLOCKHASH_GENESIS,
@@ -154,8 +154,23 @@ where
 								None,
 							)
 							.ok();
+						let mut proof_gen = false;
 						// Check proof is ok.
 						if head_data.is_some() {
+							proof_gen = true;
+						} else {
+							// decode to lower version
+							let head_data = relay_storage_rooted_proof
+								.read_entry::<RegionRecordV0<AccountId, Balance>>(
+									region_key.as_slice(),
+									None,
+								)
+								.ok();
+							if head_data.is_some() {
+								proof_gen = true;
+							}
+						}
+						if proof_gen {
 							// Record some data.
 							let record_item = BulkMemRecordItem {
 								storage_proof,

@@ -3,7 +3,7 @@ use parachain_magnet_runtime::{AccountId, AuraId, Signature, EXISTENTIAL_DEPOSIT
 use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
-use sp_core::{sr25519, Pair, Public, H160, U256};
+use sp_core::{sr25519, Pair, Public, H160, H256, U256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 use sp_std::marker::PhantomData;
 use std::{collections::BTreeMap, str::FromStr};
@@ -289,7 +289,7 @@ fn testnet_genesis(
 		},
 		"bulkPallet":{
 			"rpcUrl": b"ws://127.0.0.1:8855".to_vec(),
-			"genesisHash": U256::from_str("0x9e68f1a9b89f5e9f60b1e76db8fe75939ffba5bddc7eb9f39ec9ddf19c700be6").expect("internal U256 is valid; qed")
+			"genesisHash": H256::from_str("0x016f9d0bc355e718ce950727cd423d4915f34ded0a94f466242446b8865e061f").expect("genesis hash error.")
 		},
 		"orderPallet": {
 			"slotWidth": 3,
