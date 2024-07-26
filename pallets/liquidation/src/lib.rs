@@ -484,11 +484,12 @@ pub mod pallet {
 			let collators_ratio = CollatorRatio::<T>::get();
 			//let total_operation_ratio: u32 = OperationRatios::<T>::iter().map(|(_, r)| r).sum();
 
-			let treasury_amount = (treasury_ratio as u128) / PERCENT_UNIT * total_profit / 100
-				/ PARACHAIN_TO_RELAYCHAIN_UNIT;
+			let treasury_amount = (treasury_ratio as u128) / PERCENT_UNIT * total_profit
+				/ 100 / PARACHAIN_TO_RELAYCHAIN_UNIT;
 			//let operation_amount = (operation_ratio as u128) / PERCENT_UNIT * total_profit;
 			//let system_amount = (system_ratio as u128) / PERCENT_UNIT * total_profit;
-			let total_collators_profit = (collators_ratio as u128) / PERCENT_UNIT * total_profit / 100;
+			let total_collators_profit =
+				(collators_ratio as u128) / PERCENT_UNIT * total_profit / 100;
 
 			let origin: OriginFor<T> =
 				frame_system::RawOrigin::Signed(treasury_account.clone()).into();
