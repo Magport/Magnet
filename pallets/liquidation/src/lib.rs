@@ -495,16 +495,16 @@ pub mod pallet {
 
 			let _send_treasury_profit = Self::send_assets_to_relaychain_treasury(
 				origin,
-				treasury_account.into(),
+				treasury_account.clone().into(),
 				treasury_amount,
 			)?;
 
 			let mut transfers = Vec::new();
-			/*
+
+			let treasury_amount_parachain = treasury_amount * PARACHAIN_TO_RELAYCHAIN_UNIT;
 			let treasury_account_profit =
-				treasury_amount.try_into().unwrap_or_else(|_| Zero::zero());
+				treasury_amount_parachain.try_into().unwrap_or_else(|_| Zero::zero());
 			transfers.push((treasury_account, treasury_account_profit));
-			*/
 
 			for (operation_account, ratio) in OperationRatios::<T>::iter() {
 				let operation_amount = (ratio as u128) / PERCENT_UNIT * total_profit / 100;
