@@ -987,7 +987,7 @@ impl pallet_utility::Config for Runtime {
 parameter_types! {
 	pub const SystemRatio: Perbill = Perbill::from_percent(20); // 20% for system
 	pub const TreasuryRatio: Perbill = Perbill::from_percent(33); // 33% for treasury
-	pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
+	//pub const OperationRatio: Perbill = Perbill::from_percent(25); // 25% for maintenance
 	pub const ProfitDistributionCycle: BlockNumber = 10;
 	pub const ExistDeposit: Balance = EXISTENTIAL_DEPOSIT;
 	pub const MinLiquidationThreshold: Balance = MILLIUNIT * 20;

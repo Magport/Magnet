@@ -68,6 +68,7 @@ std = [
     "xcm-builder/std",
     "cumulus-pallet-xcmp-queue/std",
     "xcm-executor/std",
+    "sp-consensus-aura/std",
 ]
 try-runtime = [
     "frame-support/try-runtime",

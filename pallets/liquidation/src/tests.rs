@@ -9,7 +9,7 @@ fn distribute_profit_should_work() {
 		.existential_deposit(100)
 		.system_ratio(20_000_0000)
 		.treasury_ratio(33_000_0000)
-		.operation_ratio(25_000_0000)
+		.operation_ratio(vec![(AccountId32::new([1u8; 32]), 25_000_0000)])
 		.collator_ratio(22_000_0000)
 		.min_liquidation_threshold(20_000_000_000)
 		.profit_distribution_cycle(10)
@@ -37,4 +37,29 @@ fn distribute_profit_should_work() {
 			assert_eq!(<TotalCost<Test>>::get(), Zero::zero());
 			assert!(<CollatorRealGasCosts<Test>>::iter().next().is_none());
 		});
+}
+
+#[test]
+fn set_operation_ratios_should_work() {
+	ExtBuilder::default().build().execute_with(|| {
+		let new_ratios = vec![
+			(AccountId32::new([1u8; 32]), 15_000_0000),
+			(AccountId32::new([2u8; 32]), 10_000_0000),
+		];
+
+		for (account, ratio) in new_ratios.clone() {
+			assert_ok!(Liquidation::set_operation_ratio(
+				RuntimeOrigin::root(),
+				account.clone(),
+				ratio
+			));
+			assert_eq!(OperationRatios::<Test>::get(account), ratio);
+		}
+
+		let total_ratio = SystemRatio::<Test>::get()
+			+ TreasuryRatio::<Test>::get()
+			+ CollatorRatio::<Test>::get()
+			+ OperationRatios::<Test>::iter().map(|(_, r)| r).sum::<u32>();
+		assert!(total_ratio <= 100 * PERCENT_UNIT as u32);
+	});
 }
