@@ -1,12 +1,44 @@
 
-## What is the MAGNET?
+# What is the MAGNET?
 
+**Magnet has evolved! Our project now contains two parts, Magnet Network and Magnet Stack.**
 
-**MAGNET serves as Polkadot's Smart Contract Docking Station, operating on the PAYG Model. It is in the process of developing a scalable smart contract platform, utilizing DOT as the gas fee within this model.**
-
-🔎 For more about Magnet Network, head to our [website](https://magnet.magport.io/)<br>
+🔎 For more about Magnet Network, head to our [website](https://magnet.magport.io/) ***New version coming soon!***<br>
 📢 Follow our latest updates on [Twitter](https://twitter.com/Magnet20239)<br>
 🤝 Engage with fellow developers on our [Telegram server](https://t.me/+aep298N0KXUwZTM1)<br>
+
+## Magnet Stack
+
+Magnet Stack is an advanced platform designed to streamline Polkadot Coretime-ready chain deployment and project initiation, significantly simplifying the development process. Magnet Stack allows users to customize their blockchain network through an easy-to-use web UI, and automatically generate node codes.
+
+## Key Features
+### Coretime Functionalities
+Magnet Stack supports two types of Coretime functionalities, on-demand and Bulk, optimizing resource management and providing flexibility in blockchain architecture. On-demand coretime mode also supports on-demand block production and assurance mechanisms to further increase resource efficiency and stability. 
+
+### Multi-VM Support
+Magnet Stack leverages Substrate's robust framework to support multiple virtual machines, including EVM, WASM and MoveVM, enabling developers to run and interact with various smart contract environments.
+
+### Magnet Template Layer
+The platform provides customizable templates for various functionalities, allowing users to tailor their blockchain network to meet specific needs. This layer includes pre-built modules that can be easily integrated into your project, saving development time and effort.
+
+### Appchain Model
+The Appchain Model offers flexibility with support for multiple models, including parathread and Tanssi-container chains. This allows developers to choose the best architecture for their specific use case.
+
+### Dynamic Generator
+The Dynamic Generator facilitates the one-click generation of Substrate code for customized features, simplifying the node deployment process. This feature enables developers to quickly create and deploy nodes with the required specifications.
+
+### User-Friendly Interface
+Magnet Stack enhances the user experience with a user-friendly interface and a comprehensive suite of SDKs, making blockchain development more accessible and efficient for developers of all skill levels.
+
+![Magnet Stack Layers](https://github.com/user-attachments/assets/0ee27e57-04c3-4f9b-a739-4874227c5aaa)
+
+***Getting started with the Magnet Stack APP website, coming soon!***
+
+
+
+## Magnet Network
+
+**MAGNET serves as Polkadot's Smart Contract Docking Station, operating on the PAYG Model. It is in the process of developing a scalable smart contract platform, utilizing DOT as the gas fee within this model.**
 
 ### Business Model Introduction
 
