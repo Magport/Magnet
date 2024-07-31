@@ -1418,16 +1418,12 @@ impl_runtime_apis! {
 
 		fn account_basic(address: H160) -> EVMAccount {
 			let account_id = <Runtime as pallet_evm::Config>::AddressMapping::into_account_id(address);
-
 			let nonce = frame_system::Pallet::<Runtime>::account_nonce(&account_id);
-
 			let balance_free =
 				<Runtime as pallet_evm::Config>::Currency::free_balance(account_id.clone());
 			let balance_reserved =
 							<Runtime as pallet_evm::Config>::Currency::reserved_balance(account_id);
 			let balance = balance_free.saturating_add(balance_reserved);
-
-
 			let account = EVMAccount {
 					nonce: U256::from(UniqueSaturatedInto::<u128>::unique_saturated_into(nonce)),
 					balance: U256::from(UniqueSaturatedInto::<u128>::unique_saturated_into(balance)),
