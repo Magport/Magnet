@@ -11,9 +11,9 @@ mod weights;
 pub mod xcm_config;
 pub mod xcms;
 
-use pallet_evm::AddressMapping;
 use codec::{Decode, Encode, MaxEncodedLen};
 use core::ops::Div;
+use pallet_evm::AddressMapping;
 
 use cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
 use cumulus_pallet_parachain_system::RelayNumberStrictlyIncreases;
