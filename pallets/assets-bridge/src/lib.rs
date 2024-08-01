@@ -213,25 +213,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type ClaimBond: Get<ReserveBalanceOf<Self>>;
 	}
-    impl<T: Config> Pallet<T> {
-        fn ensure_admin(who: &T::AccountId) -> Result<(), Error<T>> {
-            if Some(who.clone()) != Self::admin_key() {
-                Err(Error::<T>::RequireAdmin)
-            } else {
-                Ok(())
-            }
-        }
-       
-        fn is_in_emergency(asset_id: T::AssetId) -> bool {
-            Self::emergencies()
-                .iter()
-                .any(|emergency| emergency.clone() == asset_id.clone())
-        }
-    
-        fn is_in_back_foreign(asset_id: T::AssetId) -> bool {
-            Self::back_foreign_assets().iter().any(|id| id.clone() == asset_id.clone())
-        }
-    }
+
 	/// The Substrate Account for Evm Addresses
 	///
 	/// SubAccounts: map H160 => Option<AccountId>
@@ -397,7 +379,8 @@ pub mod pallet {
 			force: LocalFortitude,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			Self::ensure_admin(&who)?; 
+			ensure!(!Self::is_in_emergency(asset_id.clone()), Error::<T>::InEmergency);
+			ensure!(!amount.is_zero(), Error::<T>::ZeroBalance);
 
 			// 1. check evm account
 			//let evm_account = Self::evm_accounts(&who).ok_or(Error::<T>::EthAddressHasNotMapped)?;
@@ -728,5 +711,13 @@ where
 		}
 	}
 
+	fn is_in_emergency(asset_id: T::AssetId) -> bool {
+		Self::emergencies()
+			.iter()
+			.any(|emergency| emergency.clone() == asset_id.clone())
+	}
 
+	fn is_in_back_foreign(asset_id: T::AssetId) -> bool {
+		Self::back_foreign_assets().iter().any(|id| id.clone() == asset_id.clone())
+	}
 }
