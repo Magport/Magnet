@@ -516,7 +516,7 @@ pub mod pallet {
 			asset_id: Option<T::AssetId>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			ensure!(Some(who) == Self::admin_key(), Error::<T>::RequireAdmin);
+			Self::ensure_admin(&who)?;
 
 			Emergencies::<T>::try_mutate(|emergencies| {
 				if let Some(id) = asset_id.clone() {
