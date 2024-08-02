@@ -14,21 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with Magnet.  If not, see <http://www.gnu.org/licenses/>.
 
+//! Keys of well known.
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_core::crypto::AccountId32;
+use {pallet_broker::RegionId, sp_core::Encode, sp_io::hashing::blake2_128, sp_std::vec::Vec};
 
-// Base account id b"system:base' and fill with 1u32
-const A: [u8; 32] = [
-	115, 121, 115, 116, 101, 109, 58, 98, 97, 115, 101, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1,
-];
-pub const BASE_ACCOUNT: AccountId32 = AccountId32::new(A);
+// XXHash a String:Broker Regions
+pub const REGIONS: &[u8] =
+	&hex_literal::hex!["4dcb50595177a3177648411a42aca0f53dc63b0b76ffd6f80704a090da6f8719"];
 
-sp_api::decl_runtime_apis! {
-	// API for on_relaychain call
-	pub trait OnRelayChainApi {
-		// return on_relaychain call result, 1 for force bid coretime
-		fn on_relaychain(blocknumber: u32) -> bool;
-	}
+/// Broker Regions
+pub fn broker_regions(region_id: RegionId) -> Vec<u8> {
+	region_id.using_encoded(|region_id_bytes: &[u8]| {
+		REGIONS
+			.iter()
+			.chain(blake2_128(region_id_bytes).iter())
+			.chain(region_id_bytes.iter())
+			.cloned()
+			.collect()
+	})
 }

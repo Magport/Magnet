@@ -49,9 +49,14 @@ use crate::eth::{
 	FrontierBlockImport as TFrontierBlockImport,
 	FrontierPartialComponents,
 };
-use crate::on_demand_order::spawn_on_demand_order;
+use cumulus_relay_chain_interface::OccupiedCoreAssumption;
+use cumulus_relay_chain_interface::PersistedValidationData;
 use futures::lock::Mutex;
-use magnet_primitives_order::{OrderRecord, OrderStatus};
+use mc_coretime_bulk::spawn_bulk_task;
+use mc_coretime_on_demand::spawn_on_demand_order;
+use mp_coretime_bulk::BulkMemRecord;
+use mp_coretime_bulk::BulkStatus;
+use mp_coretime_on_demand::OrderRecord;
 /// Native executor type.
 pub struct ParachainNativeExecutor;
 
@@ -237,13 +242,8 @@ async fn start_node_impl(
 	let client = params.client.clone();
 	let backend = params.backend.clone();
 	let mut task_manager = params.task_manager;
-	let mut rpc_address = String::from("ws://");
-	rpc_address.push_str(
-		&polkadot_config
-			.rpc_addr
-			.expect("Should set rpc address for submit order extrinic")
-			.to_string(),
-	);
+	let relay_rpc = polkadot_config.rpc_addr;
+
 	let (relay_chain_interface, collator_key) = build_relay_chain_interface(
 		polkadot_config,
 		&parachain_config,
@@ -458,20 +458,8 @@ async fn start_node_impl(
 		sync_service: sync_service.clone(),
 	})?;
 	if validator {
-		let order_record =
-			Arc::new(Mutex::new(OrderRecord::<sp_consensus_aura::sr25519::AuthorityId> {
-				relay_parent: None,
-				relay_height: 0,
-				relay_base: Default::default(),
-				relay_base_height: 0,
-				order_status: OrderStatus::Init,
-				validation_data: None,
-				para_id,
-				sequence_number: 0,
-				author_pub: None,
-				txs: vec![],
-			}));
-		spawn_on_demand_order::<_, _, _, _, sp_consensus_aura::sr25519::AuthorityPair, _>(
+		let order_record = Arc::new(Mutex::new(OrderRecord::new()));
+		spawn_on_demand_order(
 			client.clone(),
 			para_id,
 			relay_chain_interface.clone(),
@@ -479,7 +467,16 @@ async fn start_node_impl(
 			&task_manager,
 			params.keystore_container.keystore(),
 			order_record.clone(),
-			rpc_address,
+			relay_rpc,
+		)?;
+		let bulk_mem_record =
+			Arc::new(Mutex::new(BulkMemRecord { coretime_para_height: 0, items: Vec::new() }));
+		spawn_bulk_task(
+			client.clone(),
+			para_id,
+			relay_chain_interface.clone(),
+			&task_manager,
+			bulk_mem_record.clone(),
 		)?;
 		start_consensus(
 			client.clone(),
@@ -498,6 +495,7 @@ async fn start_node_impl(
 			overseer_handle,
 			announce_block,
 			order_record,
+			bulk_mem_record,
 		)?;
 	}
 
@@ -553,15 +551,10 @@ fn start_consensus(
 	collator_key: CollatorPair,
 	overseer_handle: OverseerHandle,
 	announce_block: Arc<dyn Fn(Hash, Option<Vec<u8>>) + Send + Sync>,
-	order_record: Arc<Mutex<OrderRecord<sp_consensus_aura::sr25519::AuthorityId>>>,
+	order_record: Arc<Mutex<OrderRecord>>,
+	bulk_mem_record: Arc<Mutex<BulkMemRecord>>,
 ) -> Result<(), sc_service::Error> {
 	use cumulus_client_consensus_aura::collators::lookahead::{self as aura, Params as AuraParams};
-	// use cumulus_client_consensus_aura::collators::basic::{
-	// 	self as basic_aura, Params as BasicAuraParams,
-	// };
-	// use magnet_client_consensus_aura::collators::on_demand::{
-	// 	self as on_demand_aura, Params as BasicAuraParams,
-	// };
 
 	// NOTE: because we use Aura here explicitly, we can use `CollatorSybilResistance::Resistant`
 	// when starting the network.
@@ -587,30 +580,66 @@ fn start_consensus(
 	let relay_chain_interface_clone = relay_chain_interface.clone();
 	let params = AuraParams {
 		create_inherent_data_providers: move |_, ()| {
+			let bulk_mem_record_clone = bulk_mem_record.clone();
 			let relay_chain_interface = relay_chain_interface.clone();
 			let order_record_clone = order_record.clone();
 			async move {
-				let parent_hash = relay_chain_interface.best_block_hash().await?;
-				let (relay_parent, validation_data, sequence_number, author_pub) = {
-					let order_record_local = order_record_clone.lock().await;
-					if order_record_local.validation_data.is_none() {
-						(parent_hash, None, order_record_local.sequence_number, None)
-					} else {
-						(
-							order_record_local.relay_parent.expect("can not get relay_parent hash"),
-							order_record_local.validation_data.clone(),
-							order_record_local.sequence_number,
-							order_record_local.author_pub.clone(),
-						)
-					}
+				let mut bulk_mem_record_clone_local = bulk_mem_record_clone.lock().await;
+				let record_items = &mut bulk_mem_record_clone_local.items;
+				let item = record_items.iter().find(|item| item.status == BulkStatus::CoreAssigned);
+				let (
+					storage_proof,
+					storage_root,
+					region_id,
+					duration,
+					start_relaychain_height,
+					end_relaychain_height,
+				) = if let Some(item) = item {
+					(
+						Some(&item.storage_proof),
+						item.storage_root,
+						item.region_id,
+						item.duration,
+						item.start_relaychain_height,
+						item.end_relaychain_height,
+					)
+				} else {
+					(None, Default::default(), 0u128.into(), 0, 0, 0)
 				};
-				let order_inherent = magnet_primitives_order::OrderInherentData::create_at(
-					relay_parent,
-					&relay_chain_interface,
-					&validation_data,
-					para_id,
-					sequence_number,
+				let bulk_inherent = mp_coretime_bulk::BulkInherentData::create_at(
+					storage_proof,
+					storage_root,
+					region_id,
+					duration,
+					start_relaychain_height,
+					end_relaychain_height,
+				)
+				.await;
+				if storage_proof.is_some() {
+					if let Some(pos) =
+						record_items.iter().position(|item| item.status == BulkStatus::CoreAssigned)
+					{
+						record_items.remove(pos);
+					}
+				}
+				let bulk_inherent = bulk_inherent.ok_or_else(|| {
+					Box::<dyn std::error::Error + Send + Sync>::from(
+						"Failed to create bulk inherent",
+					)
+				})?;
+
+				let (author_pub, relay_chian_number, price) = {
+					let order_record_local = order_record_clone.lock().await;
+					(
+						order_record_local.author_pub.clone(),
+						order_record_local.relay_height,
+						order_record_local.price,
+					)
+				};
+				let order_inherent = mp_coretime_on_demand::OrderInherentData::create_at(
+					relay_chian_number,
 					&author_pub,
+					price,
 				)
 				.await;
 				let order_inherent = order_inherent.ok_or_else(|| {
@@ -618,7 +647,7 @@ fn start_consensus(
 						"Failed to create order inherent",
 					)
 				})?;
-				Ok(order_inherent)
+				Ok((bulk_inherent, order_inherent))
 			}
 		},
 

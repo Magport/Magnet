@@ -3,8 +3,9 @@ use parachain_magnet_runtime::{AccountId, AuraId, Signature, EXISTENTIAL_DEPOSIT
 use sc_chain_spec::{ChainSpecExtension, ChainSpecGroup};
 use sc_service::ChainType;
 use serde::{Deserialize, Serialize};
-use sp_core::{sr25519, Pair, Public, H160, U256};
+use sp_core::{crypto::Ss58Codec, sr25519, Pair, Public, H160, U256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
+use sp_runtime::AccountId32;
 use sp_std::marker::PhantomData;
 use std::{collections::BTreeMap, str::FromStr};
 
@@ -75,7 +76,7 @@ pub fn development_config() -> ChainSpec {
 		Extensions {
 			relay_chain: "rococo-local".into(),
 			// You MUST set this to the correct network!
-			para_id: 1000,
+			para_id: 2000,
 		},
 	)
 	.with_name("Development")
@@ -108,7 +109,7 @@ pub fn development_config() -> ChainSpec {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 		],
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		1000.into(),
+		2000.into(),
 	))
 	.build()
 }
@@ -126,7 +127,7 @@ pub fn local_testnet_config() -> ChainSpec {
 		Extensions {
 			relay_chain: "rococo-local".into(),
 			// You MUST set this to the correct network!
-			para_id: 1000,
+			para_id: 2000,
 		},
 	)
 	.with_name("Local Testnet")
@@ -159,13 +160,16 @@ pub fn local_testnet_config() -> ChainSpec {
 			get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
 		],
 		get_account_id_from_seed::<sr25519::Public>("Alice"),
-		1000.into(),
+		2000.into(),
 	))
 	.with_protocol_id("magnet-local")
 	.with_properties(properties)
 	.build()
 }
 
+fn get_account_id_from_address(address: &str) -> AccountId32 {
+	AccountId32::from_ss58check(address).expect("Invalid address")
+}
 fn testnet_genesis(
 	invulnerables: Vec<(AccountId, AuraId)>,
 	endowed_accounts: Vec<AccountId>,
@@ -174,6 +178,11 @@ fn testnet_genesis(
 ) -> serde_json::Value {
 	let alice = get_from_seed::<sr25519::Public>("Alice");
 	let bob = get_from_seed::<sr25519::Public>("Bob");
+
+	let op_account1 =
+		get_account_id_from_address("5GP7etLvS2VLLfUar7Q2TkQkaxHweYnDvrhh3s5hhf8eorPW");
+	let op_account2 =
+		get_account_id_from_address("5CFuj7WxZAyinLxoqAJ8NH4yEEVXUUSHi9LRhodC3HyzHvN4");
 
 	let evm_accounts = {
 		let mut map = BTreeMap::new();
@@ -287,11 +296,23 @@ fn testnet_genesis(
 			"changeDefaultMoveStdlibBundleTo": Option::<Vec<u8>>::None,
 			"changeDefaultSubstrateStdlibBundleTo": Option::<Vec<u8>>::None,
 		},
+		"bulkPallet":{
+			"rpcUrl": b"ws://127.0.0.1:8855".to_vec(),
+			"genesisHash": U256::from_str("0x4ea18c8f295ba903acbbed39c70ea0569cf1705fa954a537ffa3b8b7125eaf58").expect("internal U256 is valid; qed")
+		},
+		"orderPallet": {
+			"slotWidth": 3,
+			"priceLimit": 200000000,
+			"gasThreshold": 10,
+		},
 		"liquidation":{
 			"adminKey": Some(root.clone()),
 			"systemRatio": 20_000_0000,
 			"treasuryRatio": 33_000_0000,
-			"operationRatio": 25_000_0000,
+			"operationRatios": vec![
+				(op_account1.clone(), 15_000_0000),
+				(op_account2.clone(), 10_000_0000)
+			],
 			"collatorRatio": 22_000_0000,
 			"minLiquidationThreshold": 20_000_000_000_000_000u128,
 			"profitDistributionCycle": 10,
