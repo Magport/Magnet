@@ -491,7 +491,7 @@ pub mod pallet {
 			erc20: H160,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			ensure!(Some(who) == Self::admin_key(), Error::<T>::RequireAdmin);
+			Self::ensure_admin(&who)?;
 
 			// ensure asset_id and erc20 address has not been mapped
 			ensure!(!Erc20s::<T>::contains_key(asset_id.clone()), Error::<T>::AssetIdHasMapped);
@@ -667,7 +667,7 @@ pub mod pallet {
 			new_contract: H160,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			ensure!(Some(who) == Self::admin_key(), Error::<T>::RequireAdmin);
+			Self::ensure_admin(&who)?;
 
 			EvmContracts::<T>::mutate(|contracts| {
 				contracts.insert(new_contract);
